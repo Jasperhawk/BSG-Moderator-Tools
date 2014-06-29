@@ -1,0 +1,799 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Setup" script:language="StarBasic">Option Explicit
+
+dim SetupSheet, SetupForm as object
+
+global const _GameTypeBase 			= 0
+global const _GameTypePegasus 		= 1
+global const _GameTypeExodus 		= 2
+global const _GameTypeDaybreak		= 3
+global const _GameTypeRevelations 	= 4
+
+const _ObjectiveKobol 			= 0
+const _ObjectiveNewCaprica 		= 1
+const _ObjectiveIonianNebula 	= 2
+const _ObjectiveEarth			= 3
+const _ObjectiveColony 			= 4
+
+const _SympathizerNONE 		= 0
+const _Sympathizer 			= 1
+const _SympatheticCylon 	= 2
+const _Mutineer				= 3
+
+const _InitTrackCol = 1
+const _InitTrackRow = 22
+
+const _InitFlagCol = 1
+const _InitFlagRow = 20
+
+
+sub GetSetup
+	if SetupSheet &lt;&gt; NULL then
+		exit sub
+	end if 
+	
+	SetupSheet= ThisComponent.Sheets.getByName(&quot;Setup&quot;)
+	SetupForm = SetupSheet.DrawPage.Forms.GetByName(&quot;formSetup&quot;)
+end sub
+
+sub SetInitFlag (initflag as boolean)
+	SetupSheet.getCellByPosition(_InitFlagCol,_InitFlagRow).value = initflag
+end sub
+
+function GetInitFlag as boolean
+	GetSetup
+	GetInitFlag = SetupSheet.getCellByPosition(_InitFlagCol,_InitFlagRow).value
+end function
+
+function PlayerCnt as integer
+	GetSetup
+	
+	PlayerCnt = val(SetupForm.getByName(&quot;lstPlayerCnt&quot;).StringItemList(SetupForm.getByName(&quot;lstPlayerCnt&quot;).SelectedItems(0))
+end function
+
+function OptionIsNoSympathizer as boolean
+	Dim grpOpt as object
+	GetSetup
+	
+	SetupForm.getGroupByName(&quot;optSymp&quot;, grpOpt)
+	OptionIsNoSympathizer = (grpOpt(_SympathizerNONE).state = 1)
+end function
+
+function OptionIsSympathizer as boolean
+	Dim grpOpt as object
+	GetSetup
+	
+	SetupForm.getGroupByName(&quot;optSymp&quot;, grpOpt)
+	OptionIsSympathizer = (grpOpt(_Sympathizer).state = 1)
+end function
+
+function OptionIsSympatheticCylon as boolean
+	Dim grpOpt as object
+	GetSetup
+	
+	SetupForm.getGroupByName(&quot;optSymp&quot;, grpOpt)
+	OptionIsSympatheticCylon = (grpOpt(_SympatheticCylon).state = 1)
+end function
+
+function OptionIsMutineer as boolean
+	Dim grpOpt as object
+	GetSetup
+	
+	SetupForm.getGroupByName(&quot;optSymp&quot;, grpOpt)
+	OptionIsMutineer = (grpOpt(_Mutineer).state = 1)
+end function
+
+function UsePersonalGoals as boolean
+	GetSetup
+	
+	UsePersonalGoals = (SetupForm.GetByName(&quot;chkPersonalGoals&quot;).state = 1)
+end function
+
+function UseFinalFive as boolean
+	GetSetup
+	
+	UseFinalFive = (SetupForm.GetByName(&quot;chkFinalFive&quot;).state = 1)
+end function
+
+function UseCylonFleet as boolean
+	GetSetup
+	
+	UseCylonFleet = (SetupForm.GetByName(&quot;chkCylonFleet&quot;).state = 1)
+end function
+
+function UseCivilWar as boolean
+	UseCivilWar = (SetupForm.GetByName(&quot;chkCivilWar&quot;).state = 1)
+end function
+
+function VariantComplexDestiny as boolean
+	GetSetup
+	
+	VariantComplexDestiny = (SetupForm.GetByName(&quot;chkComplexDestiny&quot;).state = 1)
+end function
+
+function VariantTreacherousDestiny as boolean
+	GetSetup
+	
+	VariantTreacherousDestiny = (SetupForm.GetByName(&quot;chkTreacherousDestiny&quot;).state = 1)
+end function
+
+function VariantManualLoyalty as boolean
+	GetSetup
+	
+	VariantManualLoyalty = (SetupForm.GetByName(&quot;chkManualLoyalty&quot;).state = 1)
+end function
+
+function VariantCustomLoyalty as boolean
+	GetSetup
+	
+	VariantCustomLoyalty = (SetupForm.GetByName(&quot;chkCustomLoyalty&quot;).state = 1)
+end function
+
+function VariantFlaws as boolean
+	GetSetup
+	
+	VariantFlaws = (SetupForm.GetByName(&quot;chkFlaws&quot;).state = 1)
+end function
+
+function GetQuorumHandLimit as integer
+	dim grpOpt as object
+	dim i as integer
+	GetSetup
+	
+	SetupForm.GetGroupByName(&quot;optQuorum&quot;, grpOpt)
+	if grpOpt(0).state = 1 then
+		GetQuorumHandLimit = 99
+	else
+		GetQuorumHandLimit = 10
+	end if
+end function
+
+function ObjectiveIsNewCaprica as boolean
+	ObjectiveIsNewCaprica = (GetObjective() = _ObjectiveNewCaprica)
+end function
+
+function ObjectiveIsKobol as boolean
+	ObjectiveIsKobol = (GetObjective() = _ObjectiveKobol)
+end function
+
+function ObjectiveIsIonianNebula as boolean
+	ObjectiveIsIonianNebula = (GetObjective() = _ObjectiveIonianNebula)
+end function
+
+function ObjectiveIsEarth as boolean
+	ObjectiveIsEarth	= (GetObjective() = _ObjectiveEarth)
+end function
+
+function ObjectiveIsColony as boolean
+	ObjectiveIsColony = (GetObjective() = _ObjectiveColony)
+end function
+
+function GetObjective as integer
+	dim grpOpt as object
+	dim i as integer
+	GetSetup
+	
+	SetupForm.GetGroupByName(&quot;optObjective&quot;, grpOpt)
+	for i = 0 to ubound(grpOpt)
+		if grpOpt(i).state = 1 then
+			GetObjective = i
+			exit for
+		end if
+	next i
+end function &apos;GetObjective
+
+
+function GameTypeIsBase as boolean
+	GetSetup
+	GameTypeIsBase = ((not GameTypeIsPegasus) and (not GameTypeIsExodus) and (not GameTypeIsDaybreak) and (not GameTypeIsRevelations))
+end function
+
+function GameTypeIsPegasus as boolean
+	GetSetup
+	GameTypeIsPegasus = (SetupForm.getByName(&quot;chkPegasus&quot;).state = 1)
+end function
+
+function GameTypeIsExodus as boolean
+	GetSetup
+	GameTypeIsExodus = (SetupForm.getByName(&quot;chkExodus&quot;).state = 1)
+end function
+
+function GameTypeIsDaybreak as boolean
+	GetSetup
+	GameTypeIsDaybreak	= (SetupForm.getByName(&quot;chkDaybreak&quot;).state = 1)
+end function
+
+function GameTypeIsRevelations as boolean
+	GetSetup
+	GameTypeIsRevelations = (SetupForm.getByName(&quot;chkRevelations&quot;).state = 1)
+end function
+
+sub PopulatePlayerCnts
+	dim sel() as integer
+	dim plyrcntlst() as integer
+	GetSetup
+		
+	if GameTypeIsPegasus() or GameTypeIsDaybreak() then
+		plyrcntlst	= Array(3,4,5,6,7)		
+	else
+		plyrcntlst	= Array(3,4,5,6)
+	end if
+	
+	&apos;set player counts available based on game selection
+	sel = SetupForm.getByName(&quot;lstPlayerCnt&quot;).SelectedItems() 
+	SetupForm.getByName(&quot;lstPlayerCnt&quot;).StringItemList() = plyrcntlst()
+	if sel(0) &gt; ubound(plyrcntlst) then
+		sel(0) = ubound(plyrcntlst)
+	end if
+	SetupForm.getByName(&quot;lstPlayerCnt&quot;).SelectedItems() = sel()
+end sub	&apos;PopulatePlayerCnts
+
+sub EnableStep (whichstep as integer, enableflag as boolean)
+	dim grpBtn as object
+	dim grpTxt as object
+	dim grpLst as object
+	dim grpOpt as object
+	dim i, StepCol(), StepRow() as integer
+	GetSetup
+	
+	StepCol = Array(,1,1,2,1)
+	StepRow = Array(,3,7,7,13)
+	
+&apos;	if whichstep &lt; 4 then	&apos;for debugging only
+		SetupForm.getGroupByName(&quot;btnStep&quot;,grpBtn)
+		grpBtn(whichstep-1).enabled = enableflag
+&apos;	end if
+	
+	if enableflag then
+		SetupSheet.getCellByPosition(StepCol(whichstep),StepRow(whichstep)).CharColor = _red
+	else
+		SetupSheet.getCellByPosition(StepCol(whichstep),StepRow(whichstep)).CharColor = _black
+	end if
+	
+	select case whichstep
+		case 1
+			&apos; Expansions
+			SetupForm.getByName(&quot;chkPegasus&quot;).enabled = enableflag
+			SetupForm.getByName(&quot;chkExodus&quot;).enabled = enableflag
+			SetupForm.getByName(&quot;chkDaybreak&quot;).enabled	= enableflag
+			SetupForm.getByName(&quot;chkRevelations&quot;).enabled = false
+			
+			&apos; Player Count
+			SetupForm.getByName(&quot;lstPlayerCnt&quot;).enabled = enableflag
+			
+			&apos; Variants
+			SetupForm.getByName(&quot;chkComplexDestiny&quot;).enabled = enableflag
+			SetupForm.getByName(&quot;chkTreacherousDestiny&quot;).enabled = false
+			SetupForm.getByName(&quot;chkManualLoyalty&quot;).enabled = enableflag
+			SetupForm.getByName(&quot;chkCustomLoyalty&quot;).enabled = enableflag
+			SetupForm.getByName(&quot;chkFlaws&quot;).enabled = enableflag
+			
+		case 2
+			SetupForm.getGroupByName(&quot;txtPlyr&quot;, grpTxt)
+			for i = 0 to ubound(grpTxt)
+				grpTxt(i).enabled = enableflag
+			next i
+			
+		case 3
+			SetupForm.getGroupByName(&quot;lstSelectChar&quot;, grpLst)
+			for i = 0 to ubound(grpLst)
+				grpLst(i).enabled = enableflag
+			next i
+			
+		case 4
+			SetupForm.GetGroupByName(&quot;optObjective&quot;, grpOpt)
+			for i = 0 to ubound(grpOpt)
+				grpOpt(i).enabled = FALSE
+			next i
+			SetupForm.GetGroupByName(&quot;optSymp&quot;, grpOpt)
+			for i = 0 to ubound(grpOpt)
+				grpOpt(i).enabled = FALSE
+			next i
+			SetupForm.GetGroupByName(&quot;optQuorum&quot;, grpOpt)
+			for i = 0 to ubound(grpOpt)
+				grpOpt(i).enabled = enableFlag
+			next i
+
+			SetupForm.GetByName(&quot;chkPersonalGoals&quot;).enabled = FALSE
+			SetupForm.GetByName(&quot;chkFinalFive&quot;).enabled = FALSE
+			SetupForm.GetByName(&quot;chkCylonFleet&quot;).enabled = FALSE
+			SetupForm.GetByName(&quot;chkCivilWar&quot;).enabled	= FALSE
+	end select
+end sub	&apos;EnableStep
+
+sub PrepSetup
+	dim i, sel(1) as integer
+	GetSetup
+	
+	if MsgBox(&quot;This will unlock the game options and allow a game to be initialized, do you want to proceed?&quot;,4,&quot;BEGIN GAME SETUP&quot;) &lt;&gt; 6 then
+		exit sub
+	end if
+
+	EnableStep 1, TRUE
+	EnableStep 2, FALSE
+	EnableStep 3, FALSE
+	EnableStep 4, FALSE
+	
+	SetupForm.getByName(&quot;chkPegasus&quot;).state 	= 0
+	SetupForm.getByName(&quot;chkExodus&quot;).state 		= 0
+	SetupForm.getByName(&quot;chkDaybreak&quot;).state	= 0
+	SetupForm.getByName(&quot;chkRevelations&quot;).state = 0
+	
+	SetupForm.GetByName(&quot;chkPersonalGoals&quot;).state	= 0
+	SetupForm.GetByName(&quot;chkFinalFive&quot;).state 		= 0
+	SetupForm.GetByName(&quot;chkCylonFleet&quot;).state		= 0
+	SetupForm.GetByName(&quot;chkCivilWar&quot;).state 		= 0
+	
+	SetupForm.getByName(&quot;chkComplexDestiny&quot;).state 		= 0
+	SetupForm.getByName(&quot;chkTreacherousDestiny&quot;).state 	= 0
+	SetupForm.getByName(&quot;chkManualLoyalty&quot;).state 		= 0
+	SetupForm.getByName(&quot;chkCustomLoyalty&quot;).state 		= 0
+	SetupForm.getByName(&quot;chkFlaws&quot;).state 				= 0
+
+	PopulatePlayerCnts
+end sub &apos;PrepSetup
+
+Sub Step1Complete
+	dim grpBtn as object
+	dim grpTxt as object
+	dim gamename, variants as string
+	dim gametype, i, typecnt as integer
+	GetSetup
+
+	if MsgBox(&quot;Are you sure you&apos;ve selected the correct Expansions, Variants, and player count?&quot;,4,&quot;SETUP STEP 1&quot;) &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	EnableStep 1, FALSE
+	EnableStep 2, TRUE
+
+	SetupForm.getGroupByName(&quot;txtPlyr&quot;, grpTxt)
+	for i = 0 to ubound(grpTxt)
+		if i &lt; PlayerCnt() then
+&apos;			grpTxt(i).text = &quot;&quot;
+			if grpTxt(i).text = &quot;n/a&quot; then
+				grpTxt(i).text = &quot;&quot;
+			end if
+			grpTxt(i).enabled = TRUE
+		else
+			grpTxt(i).text = &quot;n/a&quot;
+			grpTxt(i).enabled = FALSE
+		end if
+	next i
+
+end sub &apos;Step1Complete
+
+sub PegasusCheckbox
+	dim enableflag as boolean
+	GetSetup
+	
+	enableflag = GameTypeIsPegasus() or GameTypeIsDaybreak()
+	SetupForm.getByName(&quot;chkRevelations&quot;).enabled = enableflag
+	SetupForm.getByName(&quot;chkRevelations&quot;).state = 0
+	SetupForm.getByName(&quot;chkTreacherousDestiny&quot;).enabled = enableflag
+	SetupForm.getByName(&quot;chkTreacherousDestiny&quot;).state = 0
+	
+	PopulatePlayerCnts()
+end sub
+
+sub RevelationsCheckbox
+	dim enableflag as boolean
+	GetSetup
+	
+	if GameTypeIsRevelations() then
+		SetupForm.getByName(&quot;chkTreacherousDestiny&quot;).state = 1
+		SetupForm.getByName(&quot;chkTreacherousDestiny&quot;).enabled = false
+	else
+		SetupForm.getByName(&quot;chkTreacherousDestiny&quot;).state = 0
+		SetupForm.getByName(&quot;chkTreacherousDestiny&quot;).enabled = GameTypeIsPegasus() or GameTypeIsDaybreak()
+	end if
+end sub
+
+sub Step2Complete
+	dim grpTxt as object
+	dim i, j, rtncd as integer
+	dim sortOrder(6), sorttmp as double
+	dim playername(6), tmp as string
+	GetSetup
+	
+
+	SetupForm.getGroupByName(&quot;txtPlyr&quot;, grpTxt)
+	for i = 0 to ubound(grpTxt)
+		if grpTxt(i).text = &quot;&quot; then
+			MsgBox &quot;All player names must be entered before proceeding.&quot;, 0, &quot;SETUP STEP 2&quot;
+			exit sub
+		end if
+		playername(i) = grpTxt(i).text
+	next i
+	
+	rtncd = MsgBox(&quot;Do you want to randomize the turn order before proceeding?&quot;,4, &quot;SETUP STEP 2&quot;)
+
+	if rtncd = 6 then
+		Randomize	
+		for i = 0 to 6
+			if i &gt;= PlayerCnt() then
+				sortOrder(i) = 1
+			else
+				sortOrder(i) = rnd()
+			end if
+		next i
+		for i = 0 to ubound(grpTxt) - 1
+			for j = i+1 to ubound(grpTxt)
+				if sortOrder(i) &gt; sortOrder(j) then
+					tmp = playername(i)
+					sorttmp = sortorder(i)
+					
+					playername(i) = playername(j)
+					sortorder(i) = sortorder(j)
+					
+					playername(j) = tmp
+					sortorder(j) = sorttmp
+				end if
+			next j
+		next i
+		
+		for i = 0 to ubound(grpTxt)
+			grpTxt(i).text = playername(i) 
+		next i
+	end if
+		
+	if MsgBox(&quot;Completing this step will allow character selection.  Do you want to proceed?&quot;,4,&quot;SETUP STEP 2&quot;)&lt;&gt;6 then
+		exit sub
+	end if
+
+	EnableStep 2, FALSE
+	EnableStep 3, TRUE
+	PopulateSelectChar
+	
+end sub	&apos;Step2Complete
+	
+sub PopulateSelectChar
+	dim grpLst as object
+	dim charlst(), peglst(), exlst(), daybreaklst(), revlst() as string
+	dim i, lstsize, newsize as integer
+	
+	GetSetup
+
+	charlst = Array(&quot;&quot;,&quot;Adama&quot;,&quot;Apollo&quot;,&quot;Baltar&quot;,&quot;Boomer&quot;,&quot;Chief&quot;,&quot;Helo&quot;,&quot;Roslin&quot;,&quot;Starbuck&quot;,&quot;Tigh&quot;,&quot;Zarek&quot;) 
+	peglst = Array(&quot;Cain&quot;,&quot;Dee&quot;,&quot;Ellen&quot;,&quot;Kat&quot;,&quot;Cavil&quot;,&quot;Leoben&quot;,&quot;Six&quot;)
+	exlst = Array(&quot;Anders&quot;,&quot;Cally&quot;,&quot;Gaeta&quot;,&quot;Tory&quot;)
+	daybreaklst	= Array(&quot;Cottle&quot;,&quot;Hoshi&quot;,&quot;Hot Dog&quot;,&quot;Lampkin&quot;,&quot;D&apos;Anna&quot;,&quot;Simon&quot;,&quot;Doral&quot;,&quot;Athena&quot;,&quot;Gaius&quot;,&quot;Karl&quot;,&quot;Lee&quot;,&quot;Tom&quot;)
+	revlst = Array(&quot;Elosha&quot;,&quot;Kelly&quot;,&quot;Racetrack&quot;,&quot;Seelix&quot;,&quot;Shaw&quot;)
+
+	redim preserve charlst(42)
+	
+	lstsize=11
+		
+	if GameTypeIsPegasus() then
+		charlst(lstsize) = &quot;---------&quot;
+		lstsize=lstsize + 1
+		for i = 0 to ubound(peglst)
+			charlst(lstsize) = peglst(i)
+			lstsize=lstsize + 1
+		next i
+	end if
+	if GameTypeIsExodus() then
+		charlst(lstsize) = &quot;---------&quot;
+		lstsize=lstsize + 1
+		for i = 0 to ubound(exlst)
+			charlst(lstsize) = exlst(i)
+			lstsize=lstsize + 1
+		next i
+	end if
+	if GameTypeIsDaybreak() then
+		charlst(lstsize) = &quot;---------&quot;
+		lstsize=lstsize + 1
+		for i = 0 to ubound(daybreaklst)
+			charlst(lstsize) = daybreaklst(i)
+			lstsize=lstsize + 1
+		next i
+	end if
+	if GameTypeIsRevelations() then
+		charlst(lstsize) = &quot;---------&quot;
+		lstsize=lstsize + 1
+		for i = 0 to ubound(revlst)
+			charlst(lstsize) = revlst(i)
+			lstsize=lstsize + 1
+		next i
+	end if
+		
+	SetupForm.getGroupByName(&quot;lstSelectChar&quot;, grpLst)
+	for i = 0 to ubound(grpLst)
+		grpLst(i).StringItemList() = charlst()
+		if i &gt;= PlayerCnt() then
+			grpLst(i).enabled = FALSE
+			grpLst(i).StringItemList() = g_emptylst()
+		end if
+	next i
+
+end sub	&apos;PopulateSelectChar
+
+
+function HasLeader as boolean
+	dim grpLst as object
+	dim pickchar as string
+	dim i as integer
+	GetSetup
+
+	HasLeader = FALSE
+	SetupForm.getGroupByName(&quot;lstSelectChar&quot;, grpLst)
+	for i = 0 to ubound(grpLst)
+		if ubound(grpLst(i).SelectedItems()) &lt;&gt; -1 then
+			pickchar= grpLst(i).StringItemList(grpLst(i).SelectedItems(0))	
+			if pickchar = &quot;Cavil&quot; or pickchar = &quot;Leoben&quot; or pickchar = &quot;D&apos;Anna&quot; or pickchar = &quot;Simon&quot; or pickchar = &quot;Doral&quot; or pickchar = &quot;Six&quot; or pickchar = &quot;Athena&quot; then
+				HasLeader = TRUE
+				exit for
+			end if
+		end if
+	next i		
+end function
+
+sub Step3Complete
+	dim grpLst as object
+	dim grpOpt as object
+	dim grpOptSymp as object
+	dim grpOptQrm as object
+	dim pickedlst(6), pickchar as string
+	dim leadercnt, i, j as integer
+	dim sympok as boolean
+
+	GetSetup
+
+&apos;	charlst = Array(&quot;&quot;,&quot;Adama&quot;,&quot;Apollo&quot;,&quot;Anders&quot;,&quot;Baltar&quot;,&quot;Boomer&quot;,&quot;Cain&quot;,&quot;Cally&quot;,&quot;Chief&quot;,&quot;Dee&quot;,&quot;Ellen&quot;,&quot;Gaeta&quot;,&quot;Helo&quot;,&quot;Kat&quot;,&quot;Roslin&quot;,&quot;Starbuck&quot;,&quot;Tigh&quot;,&quot;Tory&quot;,&quot;Zarek&quot;,&quot;Cavil&quot;,&quot;Leoben&quot;,&quot;Six&quot;)
+	leadercnt = 0
+	SetupForm.getGroupByName(&quot;lstSelectChar&quot;, grpLst)
+	for i = 0 to ubound(grpLst)
+		if i &lt; PlayerCnt() then
+			if ubound(grpLst(i).SelectedItems()) = -1 then
+				MsgBox &quot;You must select all the characters before proceding.&quot;,0,&quot;SETUP STEP 3&quot;
+				exit sub
+			end if
+			pickchar= grpLst(i).StringItemList(grpLst(i).SelectedItems(0))	
+			if left(pickchar,1) = &quot;-&quot; then
+				MsgBox &quot;You must select all the characters before proceding.&quot;,0,&quot;SETUP STEP 3&quot;
+				exit sub
+			end if
+			for j = 0 to i - 1
+				if pickchar = pickedlst(j) then
+					MsgBox &quot;You cannot have two &quot; &amp; pickchar &amp; &quot;&apos;s on the crew! Try again.&quot;,0,&quot;SETUP STEP 3&quot;
+					exit sub
+				end if
+			next j
+			pickedlst(i) = pickchar
+			if pickchar = &quot;Cavil&quot; or pickchar = &quot;Leoben&quot; or pickchar = &quot;D&apos;Anna&quot; or pickchar = &quot;Simon&quot; or pickchar = &quot;Doral&quot; or pickchar = &quot;Six&quot; or pickchar = &quot;Athena&quot; then
+				if leadercnt = 1 then
+					MsgBox &quot;You cannot have multiple Cylon Leaders! Try again.&quot;,0,,&quot;SETUP STEP 3&quot;
+					exit sub
+				else
+					leadercnt = 1
+				end if
+			end if
+		end if
+	next i
+	
+	if PlayerCnt() = 7 and leadercnt = 0 then
+		MsgBox &quot;You must have a Cylon Leader in a 7-Player game. Try again.&quot;,0,,&quot;SETUP STEP 3&quot;
+		exit sub
+	end if
+
+	if MsgBox(&quot;Finalize Characters and move on to Option selection?&quot;,4,&quot;SETUP STEP 3&quot;) &lt;&gt; 6 then
+		exit sub
+	end if
+				
+	EnableStep 3, FALSE
+	EnableStep 4, TRUE
+
+	SetupForm.GetGroupByName(&quot;optObjective&quot;, grpOpt)
+	SetupForm.GetGroupByName(&quot;optSymp&quot;, grpOptSymp)
+	SetupForm.GetGroupByName(&quot;optQuorum&quot;, grpOptQrm)
+
+	&apos; Set up objectives
+	grpOpt(_ObjectiveKobol).enabled = TRUE
+	grpOpt(_ObjectiveKobol).state 	= 1
+	if GameTypeIsPegasus then
+		grpOpt(_ObjectiveNewCaprica).enabled	= TRUE
+	end if
+	if GameTypeIsExodus then
+		grpOpt(_ObjectiveIonianNebula).enabled	= TRUE
+	end if
+	if GameTypeIsDaybreak then
+&apos;		grpOpt(_ObjectiveEarth).enabled			= TRUE
+	end if
+	if GameTypeIsRevelations then
+&apos;		grpOpt(_ObjectiveColony).enabled 		= TRUE
+	end if
+
+	&apos; Set up Sympathizer/Cylon Leader options
+	if ((PlayerCnt() = 4 or PlayerCnt() = 6) and NOT HasLeader()) or (GameTypeIsDaybreak and (PlayerCnt = 5 or PlayerCnt = 7) and HasLeader) then
+		sympok = TRUE
+	else
+		sympok = FALSE
+	end if
+
+	if sympok then
+		if GameTypeIsDaybreak() then
+			grpOptSymp(_Mutineer).enabled	= TRUE
+			grpOptSymp(_Mutineer).state 	= 1
+		else
+			grpOptSymp(_SympathizerNONE).enabled	= TRUE
+			grpOptSymp(_Sympathizer).enabled		= TRUE
+			grpOptSymp(_Sympathizer).state			= 1	&apos; Auto-select Sympathizer
+			if GameTypeIsPegasus then
+				grpOptSymp(_SympatheticCylon).enabled	= TRUE
+			end if
+		end if
+	else
+		grpOptSymp(_SympathizerNONE).enabled	= TRUE
+		grpOptSymp(_SympathizerNONE).state 		= 1
+	end if
+	
+	&apos; Quorum Cards
+	if GameTypeIsBase then
+		grpOptQrm(0).state	= 1
+	else
+		grpOptQrm(1).state		= 1
+		grpOptQrm(0).enabled	= FALSE
+		grpOptQrm(1).enabled	= FALSE
+	end if
+	
+	&apos; Modules
+	if GameTypeIsExodus then
+		SetupForm.GetByName(&quot;chkPersonalGoals&quot;).enabled	= TRUE
+		SetupForm.GetByName(&quot;chkFinalFive&quot;).enabled		= TRUE
+		SetupForm.GetByName(&quot;chkCylonFleet&quot;).enabled	= TRUE
+	end if
+	
+	if GameTypeIsRevelations then
+&apos;		SetupForm.GetByName(&quot;chkCivilWar&quot;).enabled	= TRUE
+	end if
+end sub	&apos;Step3Complete
+
+
+sub SetInitTrack (taskID as integer, completed as boolean)
+	dim tasklist as variant
+	GetSetup
+		
+	tasklist=Array(,&quot;Initialize&quot;,&quot;Ships&quot;,&quot;Game State&quot;,&quot;Loyalty Cards&quot;,&quot;Skill Cards &amp; Destiny&quot;,&quot;Crisis Cards&quot;,&quot;Super Crisis Cards&quot;,&quot;Quorum Cards&quot;,&quot;Destination Cards&quot;,&quot;Game Log&quot;)
+	
+	if completed then
+		SetupSheet.getCellByPosition(_InitTrackCol, _InitTrackRow + TaskID).string		= &quot;&quot;
+		SetupSheet.getCellByPosition(_InitTrackCol+1, _InitTrackRow + TaskID).string	= tasklist(taskID)
+	else
+		SetupSheet.getCellByPosition(_InitTrackCol, _InitTrackRow + TaskID).string		= tasklist(taskID)
+		SetupSheet.getCellByPosition(_InitTrackCol+1, _InitTrackRow + TaskID).string	= &quot;&quot;
+	end if	
+end sub
+
+
+sub Initialize_Game
+	&apos; this will reset everything.
+	dim playerID, taskID, rtncd as integer
+	dim grpTxt as object
+	dim grpLst as object
+	GetSetup
+		
+	if VariantFlaws() and UsePersonalGoals() then
+		MsgBox(&quot;It is not recommended to use both Flaws and Personal Goals in the same game.&quot;)
+	end if
+		
+	&apos; oh, and you need to confirm a couple of times...
+	rtncd = MsgBox (&quot;Do you really want to Initialize the game?&quot;,4,&quot;COMPLETE SETUP&quot;)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	SetInitFlag TRUE
+	
+	for taskID = 1 to 10
+		SetInitTrack taskid, FALSE
+	next taskID		
+	
+
+	&apos; This is just to show that we&apos;re doing something...
+	SetInitTrack 1, TRUE
+
+
+	&apos; put the Players&apos; names &amp; Characters on the Game State tab.
+	SetupForm.getGroupByName(&quot;txtPlyr&quot;, grpTxt)
+	SetupForm.getGroupByName(&quot;lstSelectChar&quot;, grpLst)
+	for playerID = 0 to 6
+		if grpTxt(playerID).text = &quot;n/a&quot; then
+			SetPlayer playerID + 1, &quot;&quot;
+			SetPlayerName playerID + 1, &quot;&quot;
+		else
+			SetPlayer playerID + 1, grpTxt(playerID).text
+			SetPlayerName playerID + 1, grpLst(playerID).StringItemList(grpLst(playerID).SelectedItems(0))	
+		end if
+	next playerID
+
+	&apos; sweep all the ships from the board, repair all ships
+	&apos; shuffle the civilians and the basestar damage tokens
+	&apos; launch the ships for the initial setup
+	&apos; Has to happen before Game State, because Apollo.
+	Initialize_Ships
+	SetInitTrack 2, TRUE
+
+	&apos; set initial President, Admiral, and starting location (default Apollo to Sector 6?)
+	&apos; reset all resource counters, including Nukes
+	&apos; reset Jump Track to the start
+	&apos; clear any damage and shuffle the Galactia Damage tokens
+	&apos; reset the turn to 1.1
+	Initialize_GameState
+	Initialize_IonianNebula
+	SetInitTrack 3, TRUE
+	
+	
+	&apos; Create the appropriate size loyalty deck
+	&apos; Shuffle Loyalty and deal the first round of cards, set the initial loyalty on GameState
+	Initialize_Mutiny	
+	Initialize_Loyalty
+	SetInitTrack 4, TRUE
+	
+	&apos; set default hand description for each player 
+	&apos; put all the cards back in the skill decks and shuffle them all.
+	&apos; deal the destiny deck
+	Initialize_SkillCards
+	SetInitTrack 5, TRUE	
+	
+	&apos; Shuffle the Crisis Card deck
+	Initialize_CrisisCards
+	SetInitTrack 6, TRUE
+		
+	&apos; Shuffle the Super-Crisis cards
+	Initialize_Super
+	SetInitTrack 7, TRUE
+
+	&apos; Shuffle the Quorum Deck
+	Initialize_Quorum
+	SetInitTrack 8, TRUE
+	
+	&apos; Shuffle the Destination cards
+	Initialize_Destination
+	SetInitTrack 9, TRUE
+		
+	&apos; Clear the game log of everything we just did
+	Initialize_GameLog
+	SetInitTrack 10, TRUE
+	
+	SetInitFlag FALSE
+	
+	Initialize_Board
+	
+	EnableStep 4, FALSE
+	if Not FileExists(GetGimpPath()) then
+		MsgBox &quot;Please make sure you select the proper GIMP executable file if you want to generate image files.&quot;,0,&quot;COMPLETE SETUP&quot;
+	end if
+
+	
+	MsgBox &quot;The Game is ready to start.&quot;,0,&quot;COMPLETE SETUP&quot;
+	
+end sub
+
+function GetGIMPPath as string
+	GetSetup
+	
+	GetGIMPPath=SetupForm.getByName(&quot;fileGIMPExe&quot;).Text
+end function
+
+sub SetImgBGColor
+	dim clrstr, numstr as string
+
+	GetSetup
+		
+	clrstr = hex(SetupSheet.GetCellByPosition(4, 20).CellBackColor)
+	numstr = cint(&quot;&amp;H&quot; &amp; left(clrstr,2)) &amp; &quot; &quot; &amp; cint(&quot;&amp;H&quot; &amp; mid(clrstr,3,2)) &amp; &quot; &quot; &amp; cint(&quot;&amp;H&quot; &amp; mid(clrstr,5,2))
+		
+	msgbox &quot;To have the selected color as the image background, add the following row of values on the image template tab.&quot; &amp; chr(10) &amp; &quot;BGColor &quot; &amp; numstr
+
+end sub
+
+
+&apos;+== do we want to implement full &quot;no sympathizer&quot; variant rules?
+&apos;•  If playing a 6 player game, the Sharon “Boomer” Valerii character may not be chosen during setup.
+&apos;•  Instead of adding the Sympathizer card to the loyalty deck,  add 1 additional “You are Not a Cylon” card. 
+&apos;•  The humans start the game with the following resources: 8 Fuel, 7 Food, 9 Morale, 10 Population. 
+&apos;•  Revealed Cylon players may draw 3 Skill cards on their turns (instead of 2). 
+
+
+</script:module>

@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Util" script:language="StarBasic">REM  *****  BASIC  *****
+
+option explicit
+
+global const _white		= &amp;Hffffff
+global const _yellow	= &amp;Hffff00
+global const _orange	= &amp;Hffcc99
+global const _bluegrey	= &amp;He6e6ff
+global const _red		= &amp;Hff0000
+global const _blue		= &amp;h0000ff
+global const _blue8		= &amp;h99ccff
+global const _black		= &amp;h000000
+global const _green		= &amp;h009900
+global const _purple	= &amp;h990099
+global const _grey		= &amp;H909090
+global const _ltgrey	= &amp;He6e6e6
+global const _blue2		= &amp;h0084D1
+global const _green1	= &amp;h355e00
+global const _red2 		= &amp;hcc3300
+global const _blue3		= &amp;h0099cc
+global const _brown		= &amp;h800000
+
+global const _ListGamePlayers 		= 1
+global const _ListGameLocations 	= 2
+global const _ListGameDamaged 		= 3
+global const _ListGameDamagedPeg	= 4
+global const _ListSkillPlayers 		= 5
+global const _ListSkillCards 		= 6
+global const _ListSkillDecks 		= 7
+global const _ListQuorumHand 		= 8
+global const _ListMutinyPlayers		= 9
+global const _ListMutinyCards		= 10
+
+const _PostCardRow		= 4		&apos; cardID starts at 0, but we want the preamble anyway.
+const _PostCardCol		= 3		&apos; playerID starts at 1
+const _PostQuorumCol	= 11
+const _PostBenevRow		= 29
+const _PostAntRow		= 30
+
+function GetSelected (listid as integer) as integer
+	dim tmplst() as string
+	
+	select case listid
+		case _ListGamePlayers
+			GetGS
+			tmplst	= GameForm.getByName(&quot;lstPlayers&quot;).SelectedItems()
+		
+		case _ListGameLocations
+			GetGS
+			tmplst	= GameForm.getByName(&quot;lstLocations&quot;).SelectedItems()
+		
+		case _ListGameDamaged
+			GetGS
+			tmplst	= GameForm.getByName(&quot;lstDamaged&quot;).SelectedItems()
+			
+		case _ListGameDamagedPeg
+			GetGS
+			tmplst	= GameForm.getByName(&quot;lstDamagedPeg&quot;).SelectedItems()
+
+		case _ListSkillPlayers
+			GetSF
+			tmplst	= SkillForm.getByName(&quot;lstPlayers&quot;).SelectedItems()
+
+		case _ListSkillCards
+			GetSF
+			tmplst	= SkillForm.getByName(&quot;lstPlyrHand&quot;).SelectedItems()
+			
+		case _ListSkillDecks
+			GetSF
+			tmplst	= SkillForm.getByName(&quot;lstSkillDecks&quot;).SelectedItems()
+			
+		case _ListQuorumHand
+			GetQrm
+			tmplst	= QrmForm.getByName(&quot;lstPresidentsHand&quot;).SelectedItems()
+
+		case _ListMutinyPlayers
+			GetMutinySheet
+			tmplst	= MutinyForm.getByName(&quot;lstPlayers&quot;).SelectedItems()
+			
+		case _ListMutinyCards
+			GetMutinySheet
+			tmplst	= MutinyForm.getByName(&quot;lstMutinyCards&quot;).SelectedItems()
+
+		case else
+			GetSelected = -1
+			exit function
+	end select
+
+	if ubound(tmplst) = -1 then
+		GetSelected	= -1
+	else
+		GetSelected	= val(tmplst(0))
+	end if
+end function
+
+sub SaveVersion
+rem ----------------------------------------------------------------------
+rem define variables
+dim document   as object
+dim dispatcher as object
+rem ----------------------------------------------------------------------
+rem get access to the document
+document   = ThisComponent.CurrentController.Frame
+dispatcher = createUnoService(&quot;com.sun.star.frame.DispatchHelper&quot;)
+
+rem ----------------------------------------------------------------------
+dim args1(0) as new com.sun.star.beans.PropertyValue
+args1(0).Name = &quot;VersionComment&quot;
+args1(0).Value = &quot;Turn &quot; &amp; GetCurTurn()
+
+dispatcher.executeDispatch(document, &quot;.uno:Save&quot;, &quot;&quot;, 0, args1())
+end sub
+
+sub GenerateHandLists
+	dim playerID, cardID, cardcnt, fileno as integer
+	dim player, card, filename as string
+	dim PostSheet, LoyaltySheet, CrisisSheet as object		&apos; This is the only function that uses the Posting Template tab, so we can leave it local.
+	
+	PostSheet		= ThisComponent.Sheets.getByName(&quot;Posting Templates&quot;)
+	LoyaltySheet	= ThisComponent.Sheets.getByName(&quot;Loyalty&quot;)
+	CrisisSheet		= ThisComponent.Sheets.getByName(&quot;Crisis Cards&quot;)
+	
+	for playerID = 1 to playercnt()
+		player	= GetPlayerName(playerID)
+		
+		&apos; Open file
+		fileno		= FreeFile()
+		filename	= GetPath(false) &amp; player &amp; &quot;.txt&quot;
+		open filename for output as fileno 
+		
+		&apos; Skill Cards
+		cardID	= 0
+		card	= PostSheet.getCellByPosition(_PostCardCol + playerID, + _PostCardRow + cardID).string
+		do while card &lt;&gt; &quot;&quot;
+			print #fileno, card
+			if cardID = 0 then
+				print #fileno, &quot;&quot;	&apos; A little separation from the title line.
+			end if
+			cardID	= cardID + 1
+			card	= PostSheet.getCellByPosition(_PostCardCol + playerID, + _PostCardRow + cardID).string
+		loop
+		if cardID &lt; 2 then
+			print #fileno, &quot;You have no Skill Cards.&quot;
+		end if
+		
+		&apos; Quorum Hand
+		if playerID = GetTitle(_TitlePresident) then
+			print #fileno, &quot;&quot;
+			cardID	= 1
+			card	= PostSheet.getCellByPosition(_PostQuorumCol, + _PostCardRow + cardID).string
+			do while card &lt;&gt; &quot;&quot;
+				print #fileno, card
+				cardID	= cardID + 1
+				card	= PostSheet.getCellByPosition(_PostQuorumCol, + _PostCardRow + cardID).string
+			loop
+			if cardID &lt; 2 then
+				print #fileno, &quot;You have no Quorum Cards.&quot;
+			end if
+		end if
+		
+		&apos; Mutiny Cards for Daybreak
+		if GameTypeIsDaybreak() then
+			if ubound(GetMutinyHand(playerID)) &gt;= 0 then
+				print #fileno, &quot;&quot;
+				print #fileno, &quot;Your Mutiny Hand is:&quot;
+				for each card in GetMutinyHand(playerID)
+					if card &lt;&gt; &quot;&quot; then
+						print #fileno, card
+					end if
+				next card
+			end if
+		end if
+		
+		&apos; Loyalty Cards
+		cardID	= 0
+		if IsCylonLeader(playerID) and not GameTypeIsDaybreak() then
+			print #fileno, &quot;&quot;
+			print #fileno, &quot;Your Agenda is: &quot; &amp;  LoyaltySheet.getCellByPosition(playerID, _LoyaltyAgendaRow).string
+		elseif GetLoyaltyCount(playerID) &gt; 0 then
+			print #fileno, &quot;&quot;
+			if IsCylonLeader(playerID) then
+				print #fileno, &quot;Your Motives are:&quot;
+			else
+				print #fileno, &quot;Your Loyalty is:&quot;
+			end if
+			for cardID = 1 to _MaxLoyaltyInHand
+				card	= LoyaltySheet.getCellByPosition(playerID, _LoyaltyRow + cardID).string
+				if card &lt;&gt; &quot;&quot; then
+					print #fileno, card
+				end if
+			next cardID
+		end if	
+		
+		&apos; Super Crisis Card(s) if Cylon.
+		if GetSuperCnt(playerID) &gt; 0 then
+			print #fileno, &quot;&quot;
+			print #fileno, &quot;Your Super Crisis is (are): &quot;
+			
+			for cardID = 1 to SuperCrisisCnt
+				if CrisisSheet.getCellByPosition(_SuperNameCol, _SuperRow + cardID).string = player then
+					print #fileno, CrisisSheet.getCellByPosition(_SuperCol, _SuperRow+ cardID).string
+				end if
+			next cardID
+		end if
+		
+		&apos; OPG / Miracle Tokens
+		if IsCylonLeader(playerID) or not IsRevealed(playerID) then
+		print #fileno, &quot;&quot;
+			if GameTypeIsDaybreak() then
+				print #fileno, &quot;You have &quot; &amp; GetMiracles(playerID) &amp; &quot; Miracle Token(s).&quot;
+			elseif OPGUsed(playerID) then
+				print #fileno, &quot;Your Once Per Game ability has been used.&quot;
+			else
+				print #fileno, &quot;Your Once Per Game ability is still available.&quot;
+			end if
+		end if
+		
+		&apos; Trauma in Ionian Nebula
+		if ObjectiveIsIonianNebula() then
+			print #fileno, &quot;&quot;
+			print #fileno, PostSheet.getCellByPosition(_PostCardCol + playerID, _PostBenevRow).string
+			print #fileno, PostSheet.getCellByPosition(_PostCardCol + playerID, _PostAntRow).string
+		end if
+		&apos; Close File
+		close #fileno
+		
+	next playerID
+end sub
+</script:module>

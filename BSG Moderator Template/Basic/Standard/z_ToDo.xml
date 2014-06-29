@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="z_ToDo" script:language="StarBasic">&apos; The To Do List....
+Sub Main
+
+End Sub
+
+&apos; ***GENERAL***
+&apos;
+&apos;	-Update the ReadMe to have a basic &quot;How to Use&quot; section for the spreadsheet that at least talks about the Yellow and Orange areas.
+&apos;		Possibly a simple one- or two-turn walkthrough.
+&apos;
+&apos;   -make saving versions an option and add an option to create a new version backup at save time instead/as well.
+&apos;   	For the save file option, don&apos;t bother with a &quot;save as&quot; because of the context issue; 
+&apos;			save the current file and then use an O/S level copy to backup the file.
+&apos;
+
+&apos; ***Customization and data***
+&apos;	-currently there is skill color customization on *both* the skills tab and the posting templates tab...reconcile that
+&apos;
+&apos;	-allow customization of agendas if the table doesn&apos;t like one or more of the included ones? 
+&apos;
+&apos;	-7 player support without a cylon leader?
+&apos;
+&apos;	-Allow customization of crisis deck by mix of card type?
+&apos;
+&apos;	-add validations for the Destination and Quorum deck like we have for skills and crisis?
+
+&apos; ***GAME STATE***
+
+
+&apos; ***SETUP***
+&apos; -add place for the game NAME/NUMBER (used for the imamge generation)
+&apos;
+&apos; -add area for the GIMP file prep which would verify the available paths &amp; files 
+&apos;		(both for gimp and for the master.xcf file?) and potentially create the new game master .xcf file?
+&apos;
+&apos; -available characters should be pulled from Reference
+
+
+&apos; ***LOYALTY***
+&apos; -pull Agendas from Reference?
+&apos; -pull all loyalty cards from Reference?
+
+
+&apos; ***SKILL***
+&apos;
+&apos; Skill Check management to be more formal
+&apos;   -Essentially need to have three states:
+&apos;		*CLEAR* - no skill check in play, skill check can be invoked, either from crisis tab or skill tab.
+&apos;		*PREP/INT* - skill check has been invoked.  Interrupts can be played here (only).
+&apos;		*IN PROGRESS* - no more interrupts, destiny has been added (unless guts played).  can play into check or clear the check.
+&apos;
+&apos; -Support Exodus skill = 0 cards
+
+
+&apos; ***POSTING TEMPLATES***
+
+
+&apos; ***DESTINATION***
+&apos; 	-add support for Gas Cloud (crisis reorder?)
+&apos;
+&apos;	-add support for Mining Asteroid (in terms of invoking Scar).
+
+
+&apos; ***SHIPS***
+
+&apos; ***CRISIS***
+
+&apos; ***IMAGE DATA***
+&apos; - currently lots of data is pulled from Board Status....probably we should be going against primary sources
+
+
+&apos; ***IMAGE (GIMP)***
+&apos;	- revisit the default locations of scar and the pilots, they appear to overlap in some cases.
+&apos;
+&apos;	- enhance the graveyard to include ships (civilians, raptors, vipers)
+&apos;
+&apos; 	- support moving the character bar to the top or bottom?
+
+
+&apos; ***REFERENCE***
+
+&apos; ***EXODUS: Ionian Nebula***
+&apos; - Crossroads Phase: Elimination is not currently supported (eliminate a player so he shows up blank on the image and turn will skip him)
+&apos;
+
+
+&apos; ***EXODUS: Cylon Fleet***
+&apos; - Add GIMP support for Pegasus + Cylon Fleet + New Caprica
+&apos;		GIMP is supported...now investigate what happens when Galactica Returns and there are ships on the Cylon Fleet
+
+&apos; ***EXODUS: Conflicted Loyalties***
+
+&apos; ***REPORTED BUGS***
+&apos; per Jasperhawk - problem with two charcaters in a two-word location?  I can&apos;t reproduce, keep investigating.
+
+</script:module>

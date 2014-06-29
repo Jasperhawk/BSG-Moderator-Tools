@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="GameLog" script:language="StarBasic">option explicit
+const _TurnIDCol = 2
+const _TurnIdxCol = 3
+
+const _BuryRow = 2
+const _BuryDestCol = 5
+const _BuryCrisisCol = 7
+
+global const _CardTypeDest = 0
+global const _CardTypeCrisis = 1
+
+Dim AuditSheet as object
+
+sub GetAuditSheet
+	if AuditSheet &lt;&gt; NULL then
+		exit sub
+	end if 
+	
+	AuditSheet= ThisComponent.Sheets.getByName(&quot;Game Log&quot;)
+end sub
+
+sub LogBuryCard (cardType as integer, cardName as string)
+	dim currow, burycol as integer
+	
+	GetAuditSheet
+
+	&apos;find the first empty row
+	currow = _BuryRow
+	if cardType = _CardTypeDest then
+		burycol = _BuryDestCol
+	else
+		burycol = _BuryCrisisCol
+	end if
+	do until AuditSheet.GetCellByPosition(burycol, currow).string = &quot;&quot;
+		currow = currow+1
+	loop
+	AuditSheet.GetCellByPosition(burycol, currow).string = GetCurTurn()
+	AuditSheet.GetCellByPosition(burycol+1, currow).string = cardName
+	
+end sub
+
+Sub LogThis (logtxt as string)
+	dim nextrow as integer
+	
+	if logtxt = &quot;&quot; then
+		exit sub
+	end if
+	
+	GetAuditSheet
+	
+	nextrow=GetNextRow()
+
+	AuditSheet.GetCellByPosition(0,nextrow).string=GetCurTurn()
+	AuditSheet.GetCellByPosition(1,nextrow).string=logtxt
+	
+	RefreshViewLog
+end sub
+
+function GetNextRow as integer
+	&apos;this is essentially to find the end of the log
+	&apos;so use the index to get the beginning of the current turn and walk from there
+	dim idxrow as integer
+	
+	idxrow = GetTurnIdx(GetCurTurn())
+	do until AuditSheet.GetCellByPosition(0,idxrow).string = &quot;&quot;
+		idxrow=idxrow+1
+	loop
+	GetNextRow= idxrow
+end function
+	
+function GetTurnIdx (turnID as string) as integer
+	&apos;returns the beginning of where the turn starts, if the turn doesn&apos;t yet exist, create it, pointing to the end of the log
+	dim idxrow, logrow, lastidxStart as integer
+	GetAuditSheet
+	
+	idxrow = 1
+	do until AuditSheet.GetCellByPosition(_TurnIDCol, idxrow).string = &quot;&quot;
+		if AuditSheet.GetCellByPosition(_TurnIDCol, idxrow).string=TurnID then
+			GetTurnIdx = AuditSheet.GetCellByPosition(_TurnIdxCol,idxrow).value
+			exit function
+		end if
+		lastidxStart = AuditSheet.GetCellByPosition(_TurnIdxCol,idxrow).value
+		idxrow = idxrow + 1
+	loop
+	
+	&apos; so this is for a turn that we haven&apos;t seen...find the end of the log.
+	logrow=lastidxStart
+	do until AuditSheet.GetCellByPosition(0,logrow).string = &quot;&quot;
+		logrow=logrow+1
+	loop
+	&apos; now add in a new index entry and return
+	AuditSheet.GetCellByPosition(_TurnIDCol, idxrow).string= TurnID
+	AuditSheet.GetCellByPosition(_TurnIdxCol,idxrow).value= logrow
+	
+	GetTurnIdx = logrow
+end function	&apos;GetTurnIdx
+
+function GetLogByTurn (TurnID as string) as variant
+	dim loglst(20) as string
+	dim rowcnt, startrow as integer
+	GetAuditSheet
+	
+	startrow = GetTurnIdx (turnID) -1
+	rowcnt = 1
+	do while AuditSheet.GetCellByPosition(0, startrow + rowcnt).string = turnID
+		if rowcnt &gt; ubound(loglst) then
+			redim preserve loglst(rowcnt+20)
+		end if
+		loglst(rowcnt) = AuditSheet.GetCellByPosition(1, startrow + rowcnt).string
+		rowcnt=rowcnt+1
+	loop
+
+	GetLogByTurn = loglst()
+end function
+
+sub Initialize_GameLog
+	dim idxrow, logrow, lastidxStart, currow as integer
+	GetAuditSheet
+	
+	&apos;clear preexisting index information
+	idxrow = 1
+	do until AuditSheet.GetCellByPosition(_TurnIDCol, idxrow).string = &quot;&quot;
+		AuditSheet.GetCellByPosition(_TurnIDCol, idxrow).string = &quot;&quot;
+		AuditSheet.GetCellByPosition(_TurnIdxCol, idxrow).string = &quot;&quot;
+		idxrow = idxrow + 1
+	loop
+	
+	&apos; clear the bury log, also
+	currow = _BuryRow + 1
+	do until AuditSheet.GetCellByPosition( _BuryDestCol, currow).string = &quot;&quot;
+		AuditSheet.GetCellByPosition( _BuryDestCol, currow).string = &quot;&quot;
+		AuditSheet.GetCellByPosition( _BuryDestCol+1, currow).string = &quot;&quot;
+		currow = currow+1
+	loop
+	currow = _BuryRow + 1
+	do until AuditSheet.GetCellByPosition( _BuryCrisisCol, currow).string = &quot;&quot;
+		AuditSheet.GetCellByPosition( _BuryCrisisCol, currow).string = &quot;&quot;
+		AuditSheet.GetCellByPosition( _BuryCrisisCol+1, currow).string = &quot;&quot;
+		currow = currow+1
+	loop
+		
+	&apos;clear all log messages
+	idxrow = 1
+	do until AuditSheet.GetCellByPosition(0,idxrow).string = &quot;&quot;
+		AuditSheet.GetCellByPosition(0,idxrow).string=&quot;&quot;
+		AuditSheet.GetCellByPosition(1,idxrow).string=&quot;&quot;
+		idxrow =idxrow+1
+	loop
+	
+	&apos;set initial index and log message
+	AuditSheet.GetCellByPosition(_TurnIDCol, 1).string= &quot;1.1&quot;
+	AuditSheet.GetCellByPosition(_TurnIdxCol,1).value= 1
+
+	AuditSheet.GetCellByPosition(0,1).string=&quot;1.1&quot;
+	AuditSheet.GetCellByPosition(1,1).string=&quot;************************************&quot;
+	AuditSheet.GetCellByPosition(0,2).string=&quot;1.1&quot;
+	AuditSheet.GetCellByPosition(1,2).string=&quot;Game Commences: Turn 1.1&quot;
+
+	RefreshViewLog
+end sub
+
+</script:module>

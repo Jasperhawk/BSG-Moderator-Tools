@@ -1,0 +1,875 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Quorum" script:language="StarBasic">REM  *****  BASIC  *****
+option explicit
+
+dim QrmSheet as object
+dim QrmForm as object
+
+const _QrmBaseCnt = 17
+const _QrmPegasusCnt = 9 
+const _QrmExodusCnt = 3	
+const _QrmRevelationsCnt = 3
+const _MaxQrmCnt = _QrmBaseCnt + _QrmPegasusCnt + _QrmExodusCnt + _QrmRevelationsCnt
+
+const _QrmRow = 14
+const _QrmTypeCol = 0
+const _QrmDeckCol = 1
+const _QrmHandCol = _QrmDeckCol + 1
+const _QrmInPlayCol = _QrmDeckCol + 2
+const _QrmAssignCol = _QrmDeckCol + 3
+const _QrmDiscardCol = _QrmDeckCol + 4
+const _QrmRemoveCol = _QrmDeckCol + 5
+const _QrmGameTypeCol = _QrmTypeCol + 8
+
+const _QrmDeckCntCol = 6
+const _QrmDeckCntRow = 2
+
+const _SortModeStd = 1
+const _SortModeShuffle = 2
+const _SortModeBury = 3
+const _SortModeConfigure = 4
+
+const _QrmMaxDeckCol = 1
+const _QrmMaxDeckRow = 4
+
+sub GetQRM
+	if QrmSheet &lt;&gt; NULL then
+		exit sub
+	end if 
+	
+	QrmSheet= ThisComponent.Sheets.getByName(&quot;Quorum Cards&quot;)
+	QrmForm = QrmSheet.DrawPage.Forms.GetByName(&quot;formQuorum&quot;)
+end sub
+
+function GetQrmGameType (qrmid as integer) as string
+	GetQrmGameType = QrmSheet.getCellByPosition(_QrmGameTypeCol, _QrmRow + qrmid).string
+end function
+
+function QrmCnt as integer
+	dim curcnt as integer
+	
+	curcnt = _QrmBaseCnt
+	
+	if GameTypeIsPegasus() then
+		curcnt = curcnt + _QrmPegasusCnt
+	end if
+	
+	if GameTypeIsExodus() then
+		curcnt = curcnt + _QrmExodusCnt
+	end if
+	
+	if GameTypeIsRevelations() then
+		curcnt = curcnt + _QrmRevelationsCnt
+	end if
+	
+	QrmCnt = curcnt
+end function &apos;QrmCnt
+
+
+
+function CheckQrmHandLimit as boolean
+	dim currow, QrmHandLimit as integer
+	dim curcard as string
+	
+	GetQrm
+	currow = _QrmRow + 1
+	do until QrmSheet.GetCellByPosition(_QrmHandCol,currow).String = &quot;&quot;
+		currow=currow+1
+	loop
+
+	CheckQrmHandLimit=((currow - _QrmRow -1 ) &lt;= GetQuorumHandLimit())
+end function	&apos;CheckQrmHandLimit
+
+
+
+function IsQrmDeckEmpty as boolean
+	IsQrmDeckEmpty = (QrmSheet.GetCellByPosition(_QrmDeckCntCol, _QrmDeckCntRow).value = 0)
+end function
+
+
+&apos; get the first card from the deck and put it into the president&apos;s hand
+sub DealQrmCard
+	DealQrmToPres TRUE
+end sub
+
+
+sub DealQrmToPres (withmsg as boolean)
+	dim currow as integer
+	dim curcard as string
+
+	GetQrm
+	currow = _QrmRow + 1
+	do until QrmSheet.GetCellByPosition(_QrmDeckCol,currow).String &lt;&gt; &quot;&quot;
+		currow=currow+1
+	loop
+	
+	&apos;found the top of the deck...move it to the president&apos;s hand
+	QrmSheet.GetCellByPosition(_QrmHandCol,currow).String = QrmSheet.GetCellByPosition(_QrmDeckCol,currow).String
+	QrmSheet.GetCellByPosition(_QrmDeckCol,currow).String = &quot;&quot;
+	curcard = QrmSheet.GetCellByPosition(_QrmHandCol,currow).String 
+	SortQrm _SortModeStd
+	UpdateQrmCardLst
+
+	if withmsg then
+		MsgBox &quot;President &quot; &amp; GetPresident() &amp; &quot; receives QUORUM card: &quot; &amp; curcard
+	end if
+	LogThis &quot;President &quot; &amp; GetPresident() &amp; &quot; receives QUORUM card:&quot; &amp; curcard 
+	
+	if IsQrmDeckEmpty() then
+		&apos; no cards left, we need to reshuffle
+		ShuffleQrm
+	end if
+end sub 	&apos;DealQrmToPres
+
+
+sub UpdateQrmCardLst
+	dim handlst(26) as string
+	dim curCnt, laststatus as integer
+	dim rowID as integer
+
+	GetQrm
+	curCnt = 0
+	laststatus = 1
+	for rowID = 1 to QrmCnt()
+		curCnt=curCnt+1
+		if QrmStatus(rowID) &gt; 2 then
+			exit for
+		end if
+		if QrmStatus(rowID) &lt;&gt; laststatus then
+			laststatus = 2
+			handlst(curCnt) = &quot;--------------&quot;
+			curCnt=curCnt+1
+		end if
+		if QrmStatus(rowID) = 1 then
+			handlst(curCnt) = QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String
+		else
+			handlst(curCnt) = QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String &amp; &quot; (&quot; &amp; QrmSheet.GetCellByPosition(_QrmAssignCol,_QrmRow + rowID).String &amp; &quot;)&quot;
+		end if
+	next rowID
+	
+	QrmForm.getByName(&quot;lstPresidentsHand&quot;).StringItemList=g_emptylst()	
+	QrmForm.getByName(&quot;lstPresidentsHand&quot;).StringItemList=handlst()
+	UpdateBtns
+end sub		&apos;UPdateQrmCardLst
+
+
+function GetPresident as string
+	If GetPlayerName(GetTitle(_TitlePresident)) = &quot;Chief&quot; then
+		GetPresident = &quot;Tyrol&quot;
+	else
+		GetPresident = GetPlayerName(GetTitle(_TitlePresident))
+	end if
+end function
+
+
+sub ShuffleQrm 
+	&apos;move cards from discard back to deck and then reshuffle
+	dim rowID as integer
+	dim cardcnt as integer
+	dim holdback as integer
+
+	holdback = 0
+	cardcnt = 0
+	for rowID = 1 to QrmCnt()
+		if QrmStatus(rowID) = 4 then
+			cardcnt = cardcnt + 1
+			QrmSheet.GetCellByPosition(_QrmDeckCol,_QrmRow + rowID).String = QrmSheet.GetCellByPosition(_QrmDiscardCol,_QrmRow + rowID).String
+			QrmSheet.GetCellByPosition(_QrmDiscardCol,_QrmRow + rowID).String = &quot;&quot;
+		elseif QrmStatus(rowID) = 3 then
+			&apos;card is in the deck, we&apos;ll need to holdback when we reshuffle.
+			holdback=holdback + 1
+		end if
+	next rowID
+	
+	if cardcnt &gt; 0 then
+		SortQrm _SortModeShuffle, holdback
+	
+		MsgBox &quot;Quorum Deck Reshuffled: &quot; &amp; cardcnt &amp; &quot; cards from discard pile&quot;
+		LogThis &quot;Quorum Deck reshuffled: &quot; &amp; cardcnt &amp; &quot; cards from discard pile&quot;
+	else
+		MsgBox &quot;Quorum Deck is empty, but there are no cards to be reshuffled&quot;
+	end if
+end sub		&apos;ShuffleQrm
+
+&apos;Ordering of the Qrm deck should be: 1)In Hand, 2)In Play, 3)In Deck, 4)Discard, 5)Removed
+&apos; the optional holdback parameter is used when we need to shuffle the discard pile but need to retain the current
+&apos;  deck consisting of &lt;holdback&gt; cards - this is used by the Skilled Politician if there aren&apos;t enough cards to draw.
+sub SortQrm (sortmode as integer, Optional holdback as integer)
+	dim srtOrder(_MaxQrmCnt) as double
+	dim tmpval as double
+	dim tmpstr(8) as string
+	dim rowid, row2, colID, maxcnt as integer
+	dim buryflag as boolean
+	if IsMissing(holdback) then
+		holdback = 0
+	end if
+
+	if sortmode = _SortModeConfigure then
+		maxcnt = _MaxQrmCnt
+	else
+		maxcnt = QrmCnt()
+	end if
+	
+	buryflag = FALSE
+	for rowid = 1 to maxcnt
+		select case QrmStatus(rowid)
+			case 1 
+				srtOrder(rowid) = rowid
+			case 2
+				srtOrder(rowid) = rowid + 100
+			case 3
+				if sortmode = _SortModeShuffle then
+					if holdback &gt; 0 then
+						srtOrder(rowid) = 203 - holdback
+						holdback=holdback -1
+					else
+						srtOrder(rowid) = rnd() + 210
+					end if
+
+				elseif Sortmode = _SortModeConfigure then
+					if (GetQrmGameType(rowid) = &quot;B&quot; OR (GetQrmGameType(rowid) = &quot;P&quot; and GameTypeIsPegasus()) OR (GetQrmGameType(rowid) = &quot;E&quot; and GameTypeIsExodus()) OR (GetQrmGameType(rowid) = &quot;R&quot; and GameTypeIsRevelations())) then
+						srtOrder(rowid) = 0
+					else
+						srtOrder(rowid) = 1
+					end if
+
+				else
+					if sortmode = _SortModeStd or buryflag then
+						srtOrder(rowid) = rowid + 200
+					else
+						buryflag = TRUE
+						srtOrder(rowid) = rowid + 250	
+					end if
+				end if
+			case 4
+				srtOrder(rowid) = rowid + 300
+			case 5
+				srtOrder(rowid) = rowid + 400
+		end select
+	next rowid
+	
+	for rowid = 1 to maxcnt - 1
+		for row2 = rowid+1 to maxcnt
+			if srtOrder(rowid) &gt; srtOrder(row2) then
+				tmpval = srtorder(rowid)
+				for colID = 0 to 8
+					tmpstr(colID) = QrmSheet.GetCellByPosition(_QrmTypeCol + colID,_QrmRow +  rowid).String
+				next colID
+				
+				srtOrder(rowid)= srtOrder(row2)
+				for colID = 0 to 8
+					QrmSheet.GetCellByPosition(_QrmTypeCol + colID,_QrmRow +  rowid).String = QrmSheet.GetCellByPosition(_QrmTypeCol + colID,_QrmRow +  row2).String
+				next colID	
+				
+				srtOrder(row2) = tmpval
+				for colID = 0 to 8
+					QrmSheet.GetCellByPosition(_QrmTypeCol + colID,_QrmRow +  row2).String = tmpstr(colID)
+				next colID
+			end if
+		next row2
+	next rowid
+				
+end sub		&apos;SortQrm
+
+function QrmStatus (rowid as integer) as integer
+	if QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowid).String &lt;&gt; &quot;&quot; then
+		QrmStatus = 1
+	elseif QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowid).String &lt;&gt; &quot;&quot; then
+		QrmStatus = 2
+	elseif QrmSheet.GetCellByPosition(_QrmDeckCol,_QrmRow + rowid).String &lt;&gt; &quot;&quot; then
+		QrmStatus = 3
+	elseif QrmSheet.GetCellByPosition(_QrmDiscardCol,_QrmRow + rowid).String &lt;&gt; &quot;&quot; then
+		QrmStatus = 4
+	else
+		QrmStatus = 5
+	end if
+end function	&apos;QrmStatus
+
+function GetSelectedQrm as integer
+	&apos; this will actually adjust the return value to become the correct rowID
+	dim rowID, selID as integer
+	GetQRM
+
+	rowid = 1
+	do while QrmStatus(rowid) = 1
+		rowid=rowid+1
+	loop
+	
+	SelID = GetSelected(_ListQuorumHand)
+
+	&apos;rowid is the row after the cards in hand ends
+	if rowid &lt; selID then
+		GetSelectedQrm=selID-1
+	else
+		GetSelectedQrm=selID
+	end if
+end function
+
+
+
+function GetSelectedQrmStr as string
+	dim selID as integer
+	GetQRM
+
+	SelID = GetSelected(_ListQuorumHand)
+	if SelID &gt; -1 then
+		GetSelectedQrmStr=QrmForm.getByName(&quot;lstPresidentsHand&quot;).StringItemList(selID)
+	else
+		GetSelectedQrmStr=&quot;&quot;
+	end if
+end function
+
+
+
+sub PopulateAssignPlayers
+	dim plyrcnt, playerID as integer
+	dim namelst(6) as string
+	GetQRM
+	
+	QrmForm.getByName(&quot;lstAssignPlayers&quot;).enabled=TRUE
+	plyrcnt =0
+	for playerID = 1 to PlayerCnt()
+		if playerID &lt;&gt; GetTitle(_TitlePresident) and not IsRevealed(playerID) then
+			plyrcnt=plyrcnt + 1
+			namelst(plyrcnt) = GetPlayerName(playerID)
+		end if
+	next playerID
+	QrmForm.getByName(&quot;lstAssignPlayers&quot;).StringItemList=g_emptylst()
+	QrmForm.getByName(&quot;lstAssignPlayers&quot;).StringItemList=namelst()
+end sub
+
+
+sub UpdateBtns
+	dim namelst(6) as string
+	dim selID, playerID, plyrcnt as integer
+	dim selName as string
+	
+	GetQRM
+	
+	selID = GetSelectedQrm()	
+	selName= GetSelectedQrmStr()
+	
+	QrmForm.getByName(&quot;btnPlayCard&quot;).enabled=FALSE
+	QrmForm.getByName(&quot;btnDiscardCard&quot;).enabled=FALSE
+	QrmForm.getByName(&quot;btnUndealCard&quot;).enabled=FALSE
+	QrmForm.getByName(&quot;lstAssignPlayers&quot;).enabled=FALSE
+	QrmForm.getByName(&quot;lstAssignPlayers&quot;).StringItemList=g_emptylst()
+
+	if left(selName,3)= &quot;---&quot; or selID = -1 then
+		exit sub
+	end if
+
+	QrmForm.getByName(&quot;btnDiscardCard&quot;).enabled=TRUE
+	QrmForm.getByName(&quot;btnUndealCard&quot;).enabled=TRUE
+	
+	&apos; we&apos;ve got the name...is this in the president&apos;s hand, or in play?	
+	if instr(selName,&quot;(&quot;) = 0 then
+		&apos;this is a card from the president&apos;s hand, so it&apos;s playable
+		QrmForm.getByName(&quot;btnPlayCard&quot;).enabled=TRUE
+
+		if QrmSheet.GetCellByPosition(_QrmTypeCol,_QrmRow + selID).String = &quot;A&quot; then
+			PopulateAssignPlayers
+		end if
+	end if
+
+end sub		&apos;UpdateBtns
+
+
+
+sub UndealQrmCard
+	dim rowID, rtncd as integer
+	dim curcard as string
+	GetQRM
+	
+	rowID = GetSelectedQrm()	
+	curcard = GetSelectedQrmStr()
+
+	rtncd = MsgBox (&quot;Do you want to put &apos;&quot; &amp; curcard &amp; &quot;&apos; back into the Quorum deck and reshuffle it?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+
+	&apos; card is either in hand or in play	
+	if QrmStatus(rowID) = 1 then
+		curcard = QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String 
+		QrmSheet.GetCellByPosition(_QrmDeckCol,_QrmRow + rowID).String = QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String
+		QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String = &quot;&quot;
+	else
+		&apos;must have been assigned to someone
+		curcard = QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String &amp; &quot; (&quot; &amp; QrmSheet.GetCellByPosition(_QrmAssignCol,_QrmRow + rowID).String &amp; &quot;)&quot;
+		QrmSheet.GetCellByPosition(_QrmDeckCol,_QrmRow + rowID).String = QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String
+		QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String = &quot;&quot;
+		QrmSheet.GetCellByPosition(_QrmAssignCol,_QrmRow + rowID).String = &quot;&quot;
+		Board_RefreshPlayerAssignments
+	end if
+
+	SortQrm _SortModeShuffle
+	UpdateQrmCardLst
+
+	LogThis &quot;Quorum card &apos;&quot; &amp; curcard &amp; &quot;&apos; has been put back into the deck, which was reshuffled.&quot;
+end sub
+
+sub DiscardQrmCard
+	dim rowID as integer
+	dim curcard as string
+	GetQRM
+	
+	rowID = GetSelectedQrm()	
+	if QrmStatus(rowID) = 1 then
+		&apos;simple discard
+		curcard = QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String 
+		QrmSheet.GetCellByPosition(_QrmDiscardCol,_QrmRow + rowID).String = QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String
+		QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String = &quot;&quot;
+	else
+		&apos;must have been assigned to someone
+		curcard = QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String &amp; &quot; (&quot; &amp; QrmSheet.GetCellByPosition(_QrmAssignCol,_QrmRow + rowID).String &amp; &quot;)&quot;
+		QrmSheet.GetCellByPosition(_QrmDiscardCol,_QrmRow + rowID).String = QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String
+		QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String = &quot;&quot;
+		QrmSheet.GetCellByPosition(_QrmAssignCol,_QrmRow + rowID).String = &quot;&quot;
+		Board_RefreshPlayerAssignments
+	end if
+
+	SortQrm _SortModeStd
+	UpdateQrmCardLst
+		
+&apos;	MsgBox &quot;Quorum card &apos;&quot; &amp; curcard &amp; &quot;&apos; DISCARDED&quot;
+	LogThis &quot;Quorum card &apos;&quot; &amp; curcard &amp; &quot;&apos; DISCARDED&quot;
+	
+	if IsQrmDeckEmpty() then
+		&apos; no cards left, we need to reshuffle
+		ShuffleQrm
+	end if
+end sub		&apos;DiscardQrmCard
+
+
+sub PlayQrmCard
+	dim rowID, rtncd as integer
+	dim curcard, targetplyr as string
+	GetQRM
+	
+	rowID = GetSelectedQrm()	
+	curcard = GetSelectedQrmStr()
+	
+	&apos;this is a card from the president&apos;s hand, find out what it can do
+	select case QrmSheet.GetCellByPosition(_QrmTypeCol,_QrmRow + rowID).String
+		case &quot;R&quot;
+			&apos;this card can be removed or discarded, ask if it was successful.
+			if curcard = &quot;Reevaluate Rights&quot; then
+				rtncd = 6
+			else
+				rtncd = MsgBox(&quot;Was the &apos;&quot; &amp; curcard &amp; &quot;&apos; successful?&quot;, 4)
+			end if
+			if rtncd = 6 then
+				&apos;success, remove the card
+				QrmSheet.GetCellByPosition(_QrmRemoveCol,_QrmRow + rowID).String = QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String
+				QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String = &quot;&quot;
+				LogThis &quot;Quorum card &apos;&quot; &amp;  curcard &amp; &quot;&apos; PLAYED and REMOVED.&quot;
+			else
+				&apos;failure, just discard it
+				QrmSheet.GetCellByPosition(_QrmDiscardCol,_QrmRow + rowID).String = QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String
+				QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String = &quot;&quot;
+				LogThis &quot;Quorum card &apos;&quot; &amp;  curcard &amp; &quot;&apos; PLAYED and DISCARDED.&quot;
+			end if
+		case &quot;A&quot;
+			&apos;this card is assigned to another character
+			if ubound(QrmForm.getByName(&quot;lstAssignPlayers&quot;).SelectedItems()) &lt; 0  then
+				MsgBox (&quot;Select a character to assign the card to.&quot;)
+				exit sub
+			end if
+			targetplyr =QrmForm.getByName(&quot;lstAssignPlayers&quot;).StringItemList(QrmForm.getByName(&quot;lstAssignPlayers&quot;).SelectedItems(0))
+		
+			rtncd = MsgBox (&quot;Assign &quot; &amp; targetplyr &amp; &quot; as &quot; &amp; StripAssign(GetSelectedQrmStr()) &amp; &quot;?&quot;,4)
+			if rtncd &lt;&gt; 6 then
+				exit sub
+			end if
+			LogThis targetplyr &amp; &quot; has been ASSIGNED as the &quot; &amp; StripAssign(GetSelectedQrmStr())
+
+			QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String = QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String
+			QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String = &quot;&quot;
+			QrmSheet.GetCellByPosition(_QrmAssignCol,_QrmRow + rowID).String = targetplyr
+		
+		case &quot;S&quot;
+			&apos;this card is persistant...&quot;assigned&quot; to president
+			targetplyr = GetPlayerName(GetTitle(_TitlePresident))
+			rtncd = MsgBox (targetplyr &amp; &quot; Accepts Prophecy?&quot;,4)
+			if rtncd &lt;&gt; 6 then
+				exit sub
+			end if
+			LogThis targetplyr &amp; &quot; Accepts Prophecy&quot;
+			QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String = QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String
+			QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String = &quot;&quot;
+			QrmSheet.GetCellByPosition(_QrmAssignCol,_QrmRow + rowID).String = targetplyr
+			
+		case else &apos;type &quot;D&quot;
+			QrmSheet.GetCellByPosition(_QrmDiscardCol,_QrmRow + rowID).String = QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String
+			QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowID).String = &quot;&quot;
+			LogThis &quot;Quorum card &apos;&quot; &amp;  curcard &amp; &quot;&apos; PLAYED and DISCARDED.&quot;
+			
+	end select
+
+	SortQrm _SortModeStd
+	UpdateQrmCardLst
+	Board_RefreshPlayerAssignments		
+
+end sub &apos;PlayQrmCard
+
+sub MoveSPUp
+	MoveSP TRUE
+end sub
+
+sub MoveSPDown
+	MoveSP FALSE
+end sub
+
+sub MoveSP (asup as boolean)
+	dim playlst(1), cardlst(3), tmp as string
+	dim  tmplst() as integer
+	dim whichcard, currow as integer
+	
+	GetQRM
+	tmplst = QrmForm.getByName(&quot;lstSPDiscard&quot;).SelectedItems()			
+
+	if ubound(tmplst) = -1 then
+		MsgBox &quot;Select a card to move.&quot;
+		exit sub
+	else
+		whichcard=tmplst(0)
+	end if
+	
+	if not asup and (whichcard=3) then
+		exit sub &apos; we can&apos;t move the last card down
+	end if	
+	cardlst = QrmForm.getByName(&quot;lstSPDiscard&quot;).StringItemList
+	cardlst(0) = QrmForm.getByName(&quot;txtSPPlay&quot;).String 
+
+	tmp=cardlst(whichcard)
+	if asup then
+		cardlst(whichcard) = cardlst(whichcard-1)
+		cardlst(whichcard-1) = tmp
+		tmplst(0)=tmplst(0) - 1
+	else
+		cardlst(whichcard) = cardlst(whichcard+1)
+		cardlst(whichcard+1) = tmp
+		tmplst(0)=tmplst(0) + 1
+	end if
+
+	&apos;if we moved a card up into the &quot;play&quot; spot, we need to find out if it&apos;s an assignment card or not.
+	if asup and whichcard = 1 then
+		&apos;find out what type of card this is...
+		currow = _QrmRow + 1
+		do until QrmSheet.GetCellByPosition(_QrmDeckCol,currow).String = cardlst(0)
+			currow=currow+1
+		loop
+		if QrmSheet.GetCellByPosition(_QrmTypeCol,currow).String = &quot;A&quot; then
+			PopulateAssignPlayers
+		else
+			QrmForm.getByName(&quot;lstAssignPlayers&quot;).enabled=FALSE
+		end if
+	end if
+	
+	QrmForm.getByName(&quot;txtSPPlay&quot;).String = cardlst(0)
+	cardlst(0)=&quot;&quot;
+	QrmForm.getByName(&quot;lstSPDiscard&quot;).StringItemList=g_emptylst()	
+	QrmForm.getByName(&quot;lstSPDiscard&quot;).StringItemList=cardlst()
+	QrmForm.getByName(&quot;lstSPDiscard&quot;).SelectedItems = tmplst
+end sub &apos;MoveSP
+
+sub EnableSP (enableflag as boolean)
+	GetQrm
+	
+	QrmForm.getByName(&quot;lstSPDiscard&quot;).enabled = enableflag
+	QrmForm.getByName(&quot;txtSPPlay&quot;).enabled = enableflag
+	QrmForm.getByName(&quot;btnSPUP&quot;).enabled = enableflag
+	QrmForm.getByName(&quot;btnSPDOWN&quot;).enabled = enableflag
+	QrmForm.getByName(&quot;btnSPComplete&quot;).enabled = enableflag
+	QrmForm.getByName(&quot;btnSkilledPolitician&quot;).enabled = enableflag
+	
+	if not enableflag then
+		QrmForm.getByName(&quot;txtSPPlay&quot;).String = &quot;&quot;
+		QrmForm.getByName(&quot;lstSPDiscard&quot;).StringItemList=g_emptylst()
+	end if	
+end sub &apos;EnableSP
+
+sub SkilledPolitician_Complete
+	dim cardlst(3), tmp, tmpstr(8), playtype, curcard, targetplyr as string
+	dim colID, i, currow, toprow, rtncd as integer
+	dim whichcard as integer
+	dim discardit as boolean
+	&apos;move each of the discarding cards to the top (in order) and then bury them, then play the last card
+	
+	GetQRM
+	cardlst = QrmForm.getByName(&quot;lstSPDiscard&quot;).StringItemList
+	cardlst(0) = QrmForm.getByName(&quot;txtSPPlay&quot;).String 
+
+	toprow = _QrmRow + 1
+	do until QrmSheet.GetCellByPosition(_QrmDeckCol,toprow).String &lt;&gt; &quot;&quot;
+		toprow=toprow+1
+	loop
+	&apos;toprow is now the row of the first card in the deck
+	
+	&apos;find the card to play
+	currow= toprow
+	do until QrmSheet.GetCellByPosition(_QrmDeckCol,currow).String = cardlst(0)
+		currow=currow+1
+	loop
+	
+	&apos;okay, what type of card are we playing?
+	playtype = QrmSheet.GetCellByPosition(_QrmTypeCol,currow).String
+	discardit=FALSE
+
+	tmp = &quot;As a Skilled Politician, Roslin wants to play &apos;&quot; &amp; QrmSheet.GetCellByPosition(_QrmDeckCol,currow).String &amp; &quot;&apos; and discard (in order) &quot;
+	for i = 1 to 3
+		if i &gt; 1 then
+			tmp = tmp &amp; &quot;, &quot;
+		end if
+		tmp = tmp &amp; &quot;&apos;&quot; &amp; cardlst(i) &amp; &quot;&apos;&quot;
+	next i
+	tmp = tmp &amp; &quot;?&quot;
+	
+	rtncd = MsgBox(tmp,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	if playtype = &quot;R&quot; then
+		rtncd = MsgBox(&quot;Was the play of the &quot; &amp; cardlst(0) &amp; &quot; successful?&quot;,4)
+		discardit = (rtncd &lt;&gt; 6)
+	elseif playtype = &quot;A&quot; then
+		targetplyr =QrmForm.getByName(&quot;lstAssignPlayers&quot;).StringItemList(QrmForm.getByName(&quot;lstAssignPlayers&quot;).SelectedItems(0))
+		rtncd = MsgBox (&quot;Assign &quot; &amp; targetplyr &amp; &quot; as &quot; &amp; StripAssign(cardlst(0)) &amp; &quot;?&quot;,4)
+		if rtncd &lt;&gt; 6 then
+			exit sub
+		end if
+	end if	
+	
+	LogThis &quot;Invoking Roslin&apos;s Skilled Politician OPG.&quot;
+	for i = 1 to 3
+		if cardlst(i) &lt;&gt; &quot;&quot; then
+			&apos;find the first occurance of this card in the deck		
+			currow = toprow
+			do until QrmSheet.GetCellByPosition(_QrmDeckCol,currow).String = cardlst(i)
+				currow=currow+1
+			loop
+			if currow &lt;&gt; toprow then
+				&apos; we need to swap the two cards
+				for colID = 0 to 8
+					tmpstr(colID) = QrmSheet.GetCellByPosition(_QrmTypeCol + colID,toprow).String
+				next colID
+				
+				for colID = 0 to 8
+					QrmSheet.GetCellByPosition(_QrmTypeCol + colID,toprow).String = QrmSheet.GetCellByPosition(_QrmTypeCol + colID,currow).String
+				next colID	
+				
+				for colID = 0 to 8
+					QrmSheet.GetCellByPosition(_QrmTypeCol + colID,currow).String = tmpstr(colID)
+				next colID
+			end if
+			LogThis QrmSheet.GetCellByPosition(_QrmDeckCol,toprow).String &amp; &quot; moved to the bottom of the Quorum deck.&quot;
+
+			SortQrm _SortModeBury
+		end if
+	next i
+
+
+	if playtype = &quot;D&quot; or discardit then
+		&apos;simple discard
+		LogThis &quot;Quorum card &apos;&quot; &amp; QrmSheet.GetCellByPosition(_QrmDeckCol,toprow).String &amp; &quot;&apos; PLAYED &amp; DISCARDED&quot;
+		QrmSheet.GetCellByPosition(_QrmDiscardCol,toprow).String = QrmSheet.GetCellByPosition(_QrmDeckCol,toprow).String
+		QrmSheet.GetCellByPosition(_QrmDeckCol,toprow).String = &quot;&quot;
+		
+	elseif playtype = &quot;S&quot; then
+		&apos;Assign Prophecy
+		QrmSheet.GetCellByPosition(_QrmInPlayCol,toprow).String = QrmSheet.GetCellByPosition(_QrmDeckCol,toprow).String
+		QrmSheet.GetCellByPosition(_QrmDeckCol,toprow).String = &quot;&quot;
+		QrmSheet.GetCellByPosition(_QrmAssignCol,toprow).String = GetPlayerName(GetTitle(_TitlePresident))
+		LogThis GetPlayerName(GetTitle(_TitlePresident)) &amp; &quot; Accept&apos;s Prophecy&quot;
+		
+	elseif playtype = &quot;A&quot; then
+		&apos;Assign to a player...
+		QrmSheet.GetCellByPosition(_QrmInPlayCol,toprow).String = QrmSheet.GetCellByPosition(_QrmDeckCol,toprow).String
+		QrmSheet.GetCellByPosition(_QrmDeckCol,toprow).String = &quot;&quot;
+		QrmSheet.GetCellByPosition(_QrmAssignCol,toprow).String = targetplyr
+		LogThis targetplyr &amp; &quot; has been ASSIGNED as the &quot; &amp; StripAssign(QrmSheet.GetCellByPosition(_QrmInPlayCol,toprow).String)
+
+	else	&apos;&quot;R&quot; and is being removed
+		LogThis &quot;Quorum card &apos;&quot; &amp; QrmSheet.GetCellByPosition(_QrmDeckCol,toprow).String &amp; &quot;&apos; PLAYED &amp; REMOVED.&quot;
+		QrmSheet.GetCellByPosition(_QrmRemoveCol,toprow).String = QrmSheet.GetCellByPosition(_QrmDeckCol,toprow).String
+		QrmSheet.GetCellByPosition(_QrmDeckCol,toprow).String = &quot;&quot;
+
+	end if
+
+	SortQrm _SortModeStd
+	UpdateQrmCardLst
+	Board_RefreshPlayerAssignments		
+		
+	if IsQrmDeckEmpty() then
+		ShuffleQrm
+	end if
+
+	SetOPG GetPlayerID(&quot;Roslin&quot;), 0
+	EnableSP FALSE
+end sub &apos;SkilledPolitician_Complete
+
+
+&apos;SkilledPolitician is Roslin&apos;s OPG
+sub SkilledPolitician_Prep
+	dim currow as integer
+	dim curcard as string
+	dim qrmlst(3) as string
+	dim i as integer
+
+	GetQrm
+	currow = _QrmRow + 1
+	do until QrmSheet.GetCellByPosition(_QrmDeckCol,currow).String &lt;&gt; &quot;&quot;
+		currow=currow+1
+	loop
+	
+	&apos;found the top of the deck...move it to the SP area
+	QrmForm.getByName(&quot;txtSPPlay&quot;).String = QrmSheet.GetCellByPosition(_QrmDeckCol,currow).String
+	
+	&apos;if this card is an assignment card, we need to enable the assignment picker...
+	if QrmSheet.GetCellByPosition(_QrmTypeCol, currow).String = &quot;A&quot; then
+		PopulateAssignPlayers
+	end if		
+
+	if QrmSheet.GetCellByPosition(_QrmDeckCol,currow+3).String = &quot;&quot; then
+		&apos; there are not enough cards in the deck
+		ShuffleQrm
+	end if
+	for i = 1 to 3
+		if QrmSheet.GetCellByPosition(_QrmDeckCol,currow+i).String &lt;&gt; &quot;&quot; then
+			qrmlst(i) = QrmSheet.GetCellByPosition(_QrmDeckCol,currow+i).String
+		end if
+	next i
+	QrmForm.getByName(&quot;lstSPDiscard&quot;).StringItemList=g_emptylst()	
+	QrmForm.getByName(&quot;lstSPDiscard&quot;).StringItemList=qrmlst()
+
+	EnableSP TRUE	
+end sub
+
+
+function StripAssign (assignstr as string) as string
+	if assignstr = &quot;Probation&quot; then
+		stripAssign = &quot;Probation&quot;
+	elseif assignstr = &quot;Endorse Religious Leader&quot; then
+		stripAssign = &quot;Religious Leader&quot;
+	else
+		stripAssign = mid(assignstr, 8, len(assignstr))
+	end if
+end function
+
+function GetAssignmentName (asgnID as integer)
+	select case asgnID
+		case 1
+			GetAssignmentName = &quot;Assign Arbitrator&quot;
+		case 2
+			GetAssignmentName = &quot;Assign Mission Specialist&quot;
+		case 3
+			GetAssignmentName = &quot;Assign Vice President&quot;
+		case 4 
+			GetAssignmentName = &quot;Accept Prophecy&quot;
+		case 5
+			GetAssignmentName = &quot;Assign Chief of Staff&quot;
+		case 6
+			GetAssignmentName = &quot;Probation&quot;
+		case 7
+			GetAssignmentName = &quot;Endorse Religious Leader&quot;
+	end select
+end function
+
+function GetAssigned (asgnID as integer) as string
+	dim rowid as integer
+	GetQRM
+		
+	GetAssigned = &quot;&quot;
+	for rowid = 1 to QrmCnt()
+		if QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String = GetAssignmentName(asgnID) then
+			GetAssigned = QrmSheet.GetCellByPosition(_QrmAssignCol,_QrmRow + rowID).String 
+			exit for
+		end if
+	next rowid
+end function
+
+sub RemoveAssignments (plyrID as integer)
+	&apos; if a player reveals, any assignments go away
+	dim rowID as integer
+	dim plyrname, curcard as string
+	GetQrm
+	
+	plyrname = GetPlayerName(plyrID)
+	
+	for rowID = 1 to QrmCnt()
+		if QrmSheet.GetCellByPosition(_QrmAssignCol,_QrmRow + rowID).String = plyrname then
+			curcard = QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String &amp; &quot; (&quot; &amp; QrmSheet.GetCellByPosition(_QrmAssignCol,_QrmRow + rowID).String &amp; &quot;)&quot;
+			QrmSheet.GetCellByPosition(_QrmDiscardCol,_QrmRow + rowID).String = QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String
+			QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String = &quot;&quot;
+			QrmSheet.GetCellByPosition(_QrmAssignCol,_QrmRow + rowID).String = &quot;&quot;
+			Board_RefreshPlayerAssignments
+			LogThis &quot;Quorum card &apos;&quot; &amp; curcard &amp; &quot;&apos; DISCARDED&quot;
+		end if
+	next rowID
+
+	SortQrm _SortModeStd
+	UpdateQrmCardLst
+	
+	if IsQrmDeckEmpty() then
+		&apos; no cards left, we need to reshuffle
+		ShuffleQrm
+	end if
+end sub
+
+sub Initialize_Quorum
+	dim rowid, plyrid as integer
+	GetQrm
+
+	&apos;first move everything back into the deck
+	for rowid=1 to _MaxQrmCnt
+		select case QrmStatus(rowid)
+			case 1
+				QrmSheet.GetCellByPosition(_QrmDeckCol,_QrmRow + rowid).String = QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowid).String
+				QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowid).String = &quot;&quot;
+	
+			case 2		
+				QrmSheet.GetCellByPosition(_QrmDeckCol,_QrmRow + rowid).String = QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowid).String
+				QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowid).String = &quot;&quot;
+				QrmSheet.GetCellByPosition(_QrmAssignCol,_QrmRow + rowid).String = &quot;&quot;
+			
+			case 4
+				QrmSheet.GetCellByPosition(_QrmDeckCol,_QrmRow + rowid).String = QrmSheet.GetCellByPosition(_QrmDiscardCol,_QrmRow + rowid).String
+				QrmSheet.GetCellByPosition(_QrmDiscardCol,_QrmRow + rowid).String = &quot;&quot;
+				
+			case 5
+				QrmSheet.GetCellByPosition(_QrmDeckCol,_QrmRow + rowid).String = QrmSheet.GetCellByPosition(_QrmRemoveCol,_QrmRow + rowid).String
+				QrmSheet.GetCellByPosition(_QrmRemoveCol,_QrmRow + rowid).String = &quot;&quot;
+				
+			&apos; case 3 is already in the deck
+		end select
+	next rowid
+	
+	SortQrm _SortModeConfigure
+	&apos; show all the rows we&apos;ll need, hide the others.
+	for rowid = 1 to _MaxQrmCnt
+		if rowid &lt;= QrmCnt() then
+			QrmSheet.Rows(_QrmRow + rowid).IsVisible = TRUE
+		else
+			QrmSheet.Rows(_QrmRow + rowid).IsVisible = FALSE
+		end if
+	next rowid
+	SortQrm _SortModeShuffle
+
+	UpdateQrmCardLst	
+		
+	EnableSP FALSE
+	if GetPlayerID(&quot;Roslin&quot;) &gt; 0 then
+		QrmForm.getByName(&quot;btnSkilledPolitician&quot;).enabled = TRUE
+	end if
+	
+	QrmSheet.GetCellByPosition(_QrmMaxDeckCol,_QrmMaxDeckRow).value = QrmCnt()
+
+	DealQrmToPres FALSE
+end sub	&apos;Initialize_Quorum
+
+
+
+</script:module>

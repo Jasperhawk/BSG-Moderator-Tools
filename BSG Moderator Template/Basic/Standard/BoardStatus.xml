@@ -1,0 +1,606 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="BoardStatus" script:language="StarBasic">REM  *****  BASIC  *****
+dim BoardSheet as object
+
+dim locations as variant
+dim LocRow as variant
+dim LocCol as variant
+dim LocCylonIdx as integer
+dim SectorRow as variant
+dim SectorCol as variant
+
+const _BoardPlayerCol = 13
+const _BoardPlayerTitleCol = _BoardPlayerCol + 2
+const _BoardPlayerRow = 2
+
+const _ViperRowOffset = 2
+
+const _AssignmentCol = 15
+const _AssignmentRow = 11
+
+const _Colonial1Col = 0
+const _Colonial1Row = 15
+
+const _DetectorCol = 7
+const _DetectorRow =9
+
+const _SpecialsCol = 4
+const _SpecialsRow = 10
+
+const _PegasusCol = 14
+const _PegasusRow = 33
+
+const _GraveCol = 0
+const _GraveRow = 36
+
+const _JumpTrackCol = 5
+const _JumpTrackRow = 5
+
+const _PursuitTrackCol = 5
+const _PursuitTrackRow = 57
+
+sub GetBS
+	if BoardSheet &lt;&gt; NULL then
+		exit sub
+	end if 
+	
+	BoardSheet= ThisComponent.Sheets.getByName(&quot;Board Status&quot;)
+end sub
+
+sub InitializeSectors
+	SectorCol	= array(0,0,4,9,13,9,4)
+	SectorRow	= Array(0,24,12,12,24,35,35)
+end sub
+
+sub InitializeLocations
+	if Locations &lt;&gt; NULL then
+		exit sub
+	end if
+	Locations	= Array(&quot;Admiral&apos;s Quarters&quot;, &quot;Armory&quot;, &quot;Brig&quot;, &quot;Command&quot;, &quot;Communications&quot;, &quot;FTL Control&quot;, &quot;Hangar Deck&quot;, &quot;Research Lab&quot;, &quot;Sickbay&quot;, &quot;Weapons Control&quot; , _
+		&quot;----------&quot;, &quot;Administration&quot;, &quot;President&apos;s Office&quot;, &quot;Press Room&quot;, _
+		&quot;----------&quot;, &quot;Pegasus CIC&quot;, &quot;Airlock&quot;, &quot;Main Batteries&quot;, &quot;Engine Room&quot;, _
+		&quot;----------&quot;, &quot;Resistance HQ&quot;, &quot;Occupation Authority&quot;, &quot;Breeder&apos;s Canyon&quot;, &quot;Shipyard&quot;, &quot;Medical Center&quot;, &quot;Detention&quot;, _
+		&quot;----------&quot;, &quot;Caprica&quot;, &quot;Cylon Fleet&quot;, &quot;Human Fleet&quot;, &quot;Resurrection Ship&quot;, &quot;Basestar Bridge&quot;)
+	LocCylonIdx = Ubound(locations) - 5
+	
+	LocCol	= Array(7, 10, 11, 5, 7, 6, 9, 9, 11, 5, -1, 2, 1, 0, -1, 14, 15, 16, 17, -1, 16, 16, 18, 20, 14, 14, -1, 14, 15, 16, 17, 18)
+	LocRow	= Array(29, 25, 29, 29, 21, 25, 29, 21, 21, 21, -1, 17, 17, 17, -1, 35, 35, 35, 35, -1, 42, 50, 46, 46, 42, 50, -1, 17, 17, 17, 17, 17)
+	
+end sub		&apos;InitializeLocations
+
+function GetHumanLocCnt as integer
+	GetHumanLocCnt = LocCylonIdx
+end function
+
+sub Board_RefreshPlayerLoc
+	dim i, j, locid, offset, rowsToClear as integer
+	dim plyrname, locname as string
+	InitializeLocations
+	GetBS
+	
+	if GetInitFlag() then
+		exit sub
+	end if
+
+	&apos; clear the locations
+	
+	for i = 0 to ubound(loccol)
+		select case LocCol(i)
+			case -1
+				rowsToClear=0
+				
+			case 16
+				if Locrow(i)=42 then
+					rowsToClear=7
+				else
+					rowsToClear=4
+				end if
+				
+			case 18, 20
+				rowsToClear=8
+			
+			case else
+				rowsToClear=4
+		end select
+
+		for j = 1 to rowstoclear
+			BoardSheet.GetCellByPosition(LocCol(i),LocRow(i)+j).string =&quot;&quot;
+		next j
+	next i
+
+	&apos; now put the players in place
+	for i = 1 to PlayerCnt()
+		plyrname = GetPlayerName(i)
+		locname = GetPlayerLoc(i)
+		&apos; now find the location if they are on Galactica or Colonial 1
+		if left(locname,8) &lt;&gt; &quot;Stranded&quot; and left(locname,6) &lt;&gt; &quot;Sector&quot; then
+			for j=0 to ubound(locations)
+				if locations(j) = locname then
+					locid = j
+					exit for
+				end if
+			next j
+			
+			offset=1
+			do while BoardSheet.GetCellByPosition(LocCol(locid),LocRow(locid)+offset).string &lt;&gt; &quot;&quot; 
+				offset=offset+1
+			loop
+			BoardSheet.GetCellByPosition(LocCol(locid),LocRow(locid)+offset).string = plyrname
+		end if
+	next i
+
+end sub
+
+sub Board_RefreshLocationDamage
+	InitializeLocations
+	GetBS
+
+	dim locid as integer
+	&apos; clear the locations
+	
+	for locid=0 to GetHumanLocCnt()
+		if IsDamaged(Locations(locid)) then
+			BoardSheet.GetCellByPosition(LocCol(locid),LocRow(locid)).CellBackColor = _red
+		elseif LocCol(locID) &gt; 0 then
+			BoardSheet.GetCellByPosition(LocCol(locid),LocRow(locid)).CellBackColor = _bluegrey
+		end if
+	next locid
+
+end sub
+
+sub Board_SetCurrentPlayer
+	dim i, j as integer
+	GetBS
+
+	for i=1 to PlayerCnt()
+		if i = GetCurrentPlayer() then
+			for j= 0 to 4
+				BoardSheet.GetCellByPosition(_BoardPlayerCol+j,_BoardPlayerRow+i).CellBackColor = _yellow
+			next j
+		else
+			for j= 0 to 4
+				BoardSheet.GetCellByPosition(_BoardPlayerCol+j,_BoardPlayerRow+i).CellBackColor = _orange
+			next j
+		end if
+	next i
+end sub
+
+sub Board_RefreshPlayerTitles
+	dim titlestr as string
+	dim PresID, AdmID, CAGID, i as integer
+	GetBS
+	
+	if GetInitFlag() then
+		exit sub
+	end if
+	
+	PresID = GetTitle(_TitlePresident)
+	AdmID = GetTitle(_TitleAdmiral)
+	CAGID = GetTitle(_TitleCAG)
+
+	for i = 1 to 7
+		titlestr = &quot;&quot;
+		if PresID = i then
+			if AdmID = i then
+				if CAGID = i then
+					titlestr = &quot;P/A/C&quot;
+				else
+					titlestr = &quot;Pres/Adm&quot;
+				end if
+			elseif CAGID = i then
+				titlestr = &quot;Pres/CAG&quot;
+			else
+				titlestr = &quot;President&quot;
+			end if
+			
+		elseif AdmID = i then
+			if CAGID = i then
+				titlestr = &quot;Adm/CAG&quot;
+			else
+				titlestr = &quot;Admiral&quot;
+			end if
+			
+		elseif CAGID = i then
+			titlestr = &quot;CAG&quot;
+			
+		elseif IsSympathetic(i) then
+			if GameTypeIsPegasus() then
+				titlestr = &quot;Sympathetic Cylon&quot;			
+			else
+				titlestr = &quot;Sympathizer&quot;			
+			end if
+			
+		elseif IsRevealed(i) then
+			titlestr = &quot;CYLON&quot;
+		end if
+		BoardSheet.GetCellByPosition(_BoardPlayerTitleCol,_BoardPlayerRow+i).string = titlestr
+	next i
+end sub		&apos;Board_RefreshPlayerTitles
+
+
+sub Board_RefreshPlayerAssignments
+	&apos; get assignments from the quorum deck
+	&apos; there are only 3 possible assignments
+	dim asgnCnt, asgnID as integer
+	dim player as string
+	GetBS
+	
+	if GetInitFlag() then
+		exit sub
+	end if
+	
+	for asgnID = 0 to 3
+		BoardSheet.GetCellByPosition(_AssignmentCol,_AssignmentRow + asgnID).string = &quot;&quot;
+		BoardSheet.GetCellByPosition(_AssignmentCol + 1,_AssignmentRow + asgnID).string = &quot;&quot;
+	next asgnID
+			
+	asgnCnt = 0
+	&apos; special check for a stranded Helo
+	if GetPlayerID(&quot;Helo&quot;) &gt; 0 then
+		if GetPlayerLoc(GetPlayerID(&quot;Helo&quot;)) = &quot;Stranded on Caprica&quot; then
+			BoardSheet.GetCellByPosition(_AssignmentCol,_AssignmentRow).string = &quot;Helo&quot;
+			BoardSheet.GetCellByPosition(_AssignmentCol + 1,_AssignmentRow).string = &quot;STRANDED on Caprica&quot;
+			asgnCnt = 1
+		end if
+	end if
+			
+	player = &quot;&quot;
+	for asgnID = 1 to 7
+		player=GetAssigned(asgnID)
+		if player &lt;&gt; &quot;&quot; then 
+			BoardSheet.GetCellByPosition(_AssignmentCol,_AssignmentRow + asgnCnt).string = player
+			BoardSheet.GetCellByPosition(_AssignmentCol + 1,_AssignmentRow + asgnCnt).string = StripAssign(GetAssignmentName(asgnID))
+			asgnCnt = asgnCnt +1
+		end if
+		player = &quot;&quot;
+	next asgnID
+end sub		&apos;Board_RefreshPlayerAssignments
+
+sub Board_RefreshVipers
+	dim viperstr as string
+	dim sectorID, viperidx, ShipCnt, vipercnt, shiptype, playerID as integer
+
+	if GetInitFlag() then
+		exit sub
+	end if
+
+	InitializeSectors
+	GetBS
+		
+	for sectorID = 1 to 6
+		for viperidx = 1 to 4
+			BoardSheet.GetCellByPosition(SectorCol(sectorID)+1,SectorRow(sectorID)+_ViperRowOffset + viperidx).string = &quot;&quot;
+		next viperidx
+
+		ShipCnt = 0		
+		vipercnt = GetVipersBySector(sectorID, _ShipViper)
+		if vipercnt &gt; 0 then
+			ShipCnt = ShipCnt + 1
+			BoardSheet.GetCellByPosition(SectorCol(sectorID)+1,SectorRow(sectorID)+_ViperRowOffset+ShipCnt).string = &quot;Viper x&quot; &amp; vipercnt
+		end if
+
+		vipercnt = GetVipersBySector(sectorID, _ShipMarkVII)
+		if vipercnt &gt; 0 then
+			ShipCnt = ShipCnt + 1
+			BoardSheet.GetCellByPosition(SectorCol(sectorID) + 1, SectorRow(sectorID) + _ViperRowOffset+ShipCnt).string = &quot;Mark VII x&quot; &amp; vipercnt
+		end if
+		
+		vipercnt = GetVipersBySector(sectorID, _ShipAssaultRaptor)
+		if vipercnt &gt; 0 then
+			ShipCnt = ShipCnt + 1
+			BoardSheet.GetCellByPosition(SectorCol(sectorID) + 1, SectorRow(sectorID) + _ViperRowOFfset + shipcnt).string	= &quot;Assault Raptor x&quot; &amp; vipercnt
+		end if
+		
+		for playerID = 1 to PlayerCnt()
+			viperstr = &quot;&quot;
+			if GetPlayerLoc(playerID) = &quot;Sector &quot; &amp; sectorID then
+				ShipCnt = ShipCnt + 1
+				if GetPlayerViper(playerID) &lt; 10 then
+					viperstr = &quot; (V)&quot;
+				elseif GetPlayerViper(playerID) &lt; 20 then
+					viperstr = &quot; (M)&quot;
+				else
+					viperstr = &quot; (A)&quot;
+				end if
+				BoardSheet.GetCellByPosition(SectorCol(sectorID)+1,SectorRow(sectorID)+_ViperRowOffset+ShipCnt).string = GetPlayerName(playerID) &amp; viperstr
+			end if
+		next playerID
+	next sectorID
+end sub
+
+sub Board_RefreshCivilians
+	dim ShipID, ShipCount, ShipRowOffset, ShipColOffset, j as integer
+	dim sectorID
+	dim ShipName as string
+
+	if GetInitFlag() then
+		exit sub
+	end if
+		
+	InitializeSectors
+	GetBS 
+	
+	for sectorID = 1 to 6
+		&apos;clear out the sector first
+		for j = 1 to 6
+			BoardSheet.GetCellByPosition(SectorCol(sectorID)+2,SectorRow(sectorID)+j).string = &quot;&quot;
+			BoardSheet.GetCellByPosition(SectorCol(sectorID)+3,SectorRow(sectorID)+j).string = &quot;&quot;
+		next j
+		ShipCount=0
+		ShipID= GetCivilianBySector (sectorID, 0)
+		do while ShipID &gt; 0 
+			ShipCount=ShipCount+1
+			shipname=GetShipName (_ShipCivilian, ShipID)
+			if ShipCount &lt; 7 then
+				ShipRowOffset=ShipCount
+				ShipColOffset=2
+			else
+				ShipRowOffset=ShipCount-6
+				ShipColOffset=3
+			end if
+			BoardSheet.GetCellByPosition(SectorCol(sectorID)+ShipColOffset,SectorRow(sectorID)+ShipRowOffset).string = shipname
+			ShipID= GetCivilianBySector (sectorID, ShipID)
+		loop
+	next sectorID		
+end sub		&apos;Board_RefreshCivilians
+
+function ColonialOneAvailable as boolean
+	GetBS
+	ColonialOneAvailable=(BoardSheet.GetCellByPosition(_Colonial1Col,_Colonial1Row).String = &quot;&quot; and IsGamePhase(_PhaseInSpace))
+end function
+
+function PegasusAvailable as boolean
+	GetBS
+	PegasusAvailable=(GameTypeIsPegasus() and BoardSheet.GetCellByPosition(_PegasusCol,_PegasusRow).String = &quot;&quot;)
+end function
+
+sub Board_SetSpecial (effect as string)
+	GetBS 
+	dim offseth,offsetv, i,j as integer
+	dim foundeffect as boolean
+	foundeffect=TRUE
+
+	if effect = &quot;Colonial One&quot; then
+		BoardSheet.GetCellByPosition(_Colonial1Col,_Colonial1Row).String = &quot;Colonial One Destroyed&quot;
+		BoardSheet.GetCellByPosition(_Colonial1Col,_Colonial1Row).CellBackColor = _red
+		BoardSheet.GetCellByPosition(_Colonial1Col,_Colonial1Row+1).CellBackColor = _red
+		for i=_Colonial1Col to _Colonial1Col +2
+			for j=_Colonial1Row +2 to _Colonial1Row +5
+				BoardSheet.GetCellByPosition(i,j).CellBackColor = _red
+			next j
+		next i
+		
+	elseif effect = &quot;Detector Sabotage&quot; then
+		BoardSheet.GetCellByPosition(_DetectorCol,_DetectorRow).String = &quot;Detector Sabotage&quot;
+		BoardSheet.GetCellByPosition(_DetectorCol,_DetectorRow).CellBackColor = _red
+
+	elseif effect = &quot;Pegasus&quot; then
+		BoardSheet.GetCellByPosition(_PegasusCol,_PegasusRow).String = &quot;Pegasus Destroyed&quot;
+		BoardSheet.GetCellByPosition(_PegasusCol,_PegasusRow).CellBackColor = _red
+		BoardSheet.GetCellByPosition(_PegasusCol,_PegasusRow+1).CellBackColor = _red
+		for i=_PegasusCol to _PegasusCol +3
+			for j=_PegasusRow +2 to _PegasusRow +5
+				BoardSheet.GetCellByPosition(i,j).CellBackColor = _red
+			next j
+		next i
+	
+	else
+		select case effect 	
+			case &quot;Ambush&quot;
+				offseth = 0
+				offsetv = 0
+			case &quot;Cylon Swarm&quot;
+				offseth = 2
+				offsetv = 0
+			case &quot;Jammed Assault&quot;
+				offseth = 5
+				offsetv = 0
+			case &quot;Thirty-Three&quot;
+				offseth = 7
+				offsetv = 0
+			case &quot;Dogfight&quot;
+				offseth = 0
+				offsetv = -4
+			case &quot;Scar&quot;
+				offseth = 3
+				offsetv = -4
+			case &quot;The Guardians&quot;
+				offseth = 7
+				offsetv = -4
+			case else
+				foundeffect = FALSE
+		end select
+		
+		if foundeffect then
+			BoardSheet.GetCellByPosition(_SpecialsCol+ offseth,_SpecialsRow+ offsetv).String = effect
+			BoardSheet.GetCellByPosition(_SpecialsCol+ offseth,_SpecialsRow+ offsetv).CellBackColor = _red
+		end if
+	end if
+end sub
+
+sub Board_ClearSpecial (which as string)
+	GetBS 
+	dim i as integer
+
+&apos;+== clean up specials
+	if which = &quot;Thirty-Three&quot; then
+		if BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow).String &lt;&gt; &quot;&quot; then
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow).CellBackColor = _white
+			MsgBox &quot;Special: Thirty-Three is no longer in effect.&quot;
+			LogThis &quot;Special: Thirty-Three is no longer in effect.&quot;
+		end if
+	
+	elseif which = &quot;Jump&quot; or which=&quot;All&quot; then
+		if BoardSheet.GetCellByPosition(_SpecialsCol,_SpecialsRow).String &lt;&gt; &quot;&quot; then
+			BoardSheet.GetCellByPosition(_SpecialsCol,_SpecialsRow).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_SpecialsCol,_SpecialsRow).CellBackColor = _white
+			if which &lt;&gt; &quot;All&quot; then
+				MsgBox &quot;Special: Ambush is no longer in effect.&quot;
+				LogThis &quot;Special: Ambush is no longer in effect.&quot;
+			end if
+		end if
+		if BoardSheet.GetCellByPosition(_SpecialsCol+2,_SpecialsRow).String &lt;&gt; &quot;&quot; then
+			BoardSheet.GetCellByPosition(_SpecialsCol+2,_SpecialsRow).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_SpecialsCol+2,_SpecialsRow).CellBackColor = _white
+			if which &lt;&gt; &quot;All&quot; then
+				MsgBox &quot;Special: Cylon Swarm is no longer in effect.&quot;
+				LogThis &quot;Special: Cylon Swarm is no longer in effect.&quot;
+			end if
+		end if
+		if BoardSheet.GetCellByPosition(_SpecialsCol+5,_SpecialsRow).String &lt;&gt; &quot;&quot; then
+			BoardSheet.GetCellByPosition(_SpecialsCol+5,_SpecialsRow).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_SpecialsCol+5,_SpecialsRow).CellBackColor = _white
+			if which &lt;&gt; &quot;All&quot; then
+				MsgBox &quot;Special: Jammed Assault is no longer in effect.&quot;
+				LogThis &quot;Special: Jammed Assault is no longer in effect.&quot;
+			end if
+		end if
+		if BoardSheet.GetCellByPosition(_SpecialsCol,_SpecialsRow-4).String &lt;&gt; &quot;&quot; then
+			BoardSheet.GetCellByPosition(_SpecialsCol,_SpecialsRow-4).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_SpecialsCol,_SpecialsRow-4).CellBackColor = _white
+			if which &lt;&gt; &quot;All&quot; then
+				MsgBox &quot;Special: Dogfight is no longer in effect.&quot;
+				LogThis &quot;Special: Dogfight is no longer in effect.&quot;
+			end if
+		end if
+		if BoardSheet.GetCellByPosition(_SpecialsCol+3,_SpecialsRow-4).String &lt;&gt; &quot;&quot; then
+			BoardSheet.GetCellByPosition(_SpecialsCol+3,_SpecialsRow-4).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_SpecialsCol+3,_SpecialsRow-4).CellBackColor = _white
+			if which &lt;&gt; &quot;All&quot; then
+				MsgBox &quot;Special: Scar is no longer in effect.&quot;
+				LogThis &quot;Special: Scar is no longer in effect.&quot;
+			end if
+		end if
+		if BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-4).String &lt;&gt; &quot;&quot; then
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-4).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-4).CellBackColor = _white
+			if which &lt;&gt; &quot;All&quot; then
+				MsgBox &quot;Special: The Guardians are no longer in effect.&quot;
+				LogThis &quot;Special: The Guardians are no longer in effect.&quot;
+			end if
+		end if
+		
+		if which = &quot;All&quot; then
+			BoardSheet.GetCellByPosition(_DetectorCol,_DetectorRow).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_DetectorCol,_DetectorRow).CellBackColor = _white
+		
+			BoardSheet.GetCellByPosition(_Colonial1Col,_Colonial1Row).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_Colonial1Col,_Colonial1Row).CellBackColor = _white
+			BoardSheet.GetCellByPosition(_Colonial1Col,_Colonial1Row+1).CellBackColor = _bluegrey
+			for i=_Colonial1Col to _Colonial1Col +2
+				for j=_Colonial1Row +2 to _Colonial1Row +5
+					BoardSheet.GetCellByPosition(i,j).CellBackColor = _bluegrey
+				next j
+			next i
+			
+			BoardSheet.GetCellByPosition(_PegasusCol,_PegasusRow).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_PegasusCol,_PegasusRow).CellBackColor = _white
+			BoardSheet.GetCellByPosition(_PegasusCol,_PegasusRow+1).CellBackColor = _bluegrey
+			for i=_PegasusCol to _PegasusCol +3
+				for j=_PegasusRow +2 to _PegasusRow +5
+					BoardSheet.GetCellByPosition(i,j).CellBackColor = _bluegrey
+				next j
+			next i
+
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow).CellBackColor = _white
+			DisableThirtyThree
+		end if
+	elseif which=&quot;Scar&quot; then
+		if BoardSheet.GetCellByPosition(_SpecialsCol+3,_SpecialsRow-4).String &lt;&gt; &quot;&quot; then
+			BoardSheet.GetCellByPosition(_SpecialsCol+3,_SpecialsRow-4).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_SpecialsCol+3,_SpecialsRow-4).CellBackColor = _white
+			MsgBox &quot;Special: Scar is no longer in effect.&quot;
+			LogThis &quot;Special: Scar is no longer in effect.&quot;
+		end if
+	elseif which=&quot;DogFight&quot; then
+		if BoardSheet.GetCellByPosition(_SpecialsCol,_SpecialsRow-4).String &lt;&gt; &quot;&quot; then
+			BoardSheet.GetCellByPosition(_SpecialsCol,_SpecialsRow-4).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_SpecialsCol,_SpecialsRow-4).CellBackColor = _white
+			MsgBox &quot;Special: Dogfight is no longer in effect.&quot;
+			LogThis &quot;Special: Dogfight is no longer in effect.&quot;
+		end if
+	end if
+end sub
+
+
+sub Board_EmptyGraves
+	dim i as integer
+	GetBS
+	
+	for i = 0 to 9
+		Boardsheet.GetCellByPosition(_GraveCol,_GraveRow+i).String = &quot;&quot;
+	next i
+end sub
+
+sub DumpBody (corpse as String)
+	dim i as integer
+	GetBS
+
+	i = 0
+	do until Boardsheet.GetCellByPosition(_GraveCol,_GraveRow+i).String = &quot;&quot;
+		i = i+1
+	loop
+	Boardsheet.GetCellByPosition(_GraveCol,_GraveRow+i).String = corpse
+end sub
+
+function IsACorpse (playername as string) as boolean
+	dim currow as integer
+	GetBS
+	
+	IsACorpse=FALSE
+	currow = _GraveRow
+	do until Boardsheet.GetCellByPosition(_GraveCol,currow).String = &quot;&quot;
+		if Boardsheet.GetCellByPosition(_GraveCol,currow).String = playername then
+			IsACorpse=TRUE
+			exit do
+		end if
+		currow = currow + 1
+	loop
+end function &apos;IsACorpse
+
+sub Board_SetJumpTrack (jumpstate as integer)
+	dim i as integer
+	GetBS
+	
+	for i = 0 to 4
+		if jumpstate = i then
+			if i &lt; 3 then
+				BoardSheet.GetCellByPosition(_JumpTrackCol+i,_JumpTrackRow).CellBackColor = _red
+			else
+				BoardSheet.GetCellByPosition(_JumpTrackCol+i,_JumpTrackRow).CellBackColor = _blue
+			end if
+		else
+			BoardSheet.GetCellByPosition(_JumpTrackCol+i,_JumpTrackRow).CellBackColor = _bluegrey
+		end if
+	next i
+end sub
+
+sub Board_SetPursuitTrack (pursuitState as integer)
+	dim i as integer
+	GetBS
+	
+	for i = 0 to 3
+		if pursuitState = i then
+			BoardSheet.GetCellByPosition(_PursuitTrackCol+i,_PursuitTrackRow).CellBackColor = _red
+		else
+			BoardSheet.GetCellByPosition(_PursuitTrackCol+i,_PursuitTrackRow).CellBackColor = _bluegrey
+		end if
+	next i
+end sub
+
+sub Initialize_Board
+
+	Board_RefreshLocationDamage
+	Board_RefreshPlayerAssignments
+	Board_RefreshPlayerLoc
+	Board_RefreshPlayerTitles
+	Board_RefreshVipers
+	Board_RefreshCivilians
+	Board_ClearSpecial(&quot;All&quot;)
+	Board_EmptyGraves	
+	
+end sub
+</script:module>

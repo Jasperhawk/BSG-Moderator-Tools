@@ -1,0 +1,2568 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="GameState" script:language="StarBasic">REM  *****  BASIC  *****
+option explicit
+
+dim GameSheet as object
+dim GameForm as object
+
+const _PlayerStartRow=1
+
+const _ResourceCol = 16
+const _ResNameRow = 1
+const _ResTrackRow = 18
+
+const _NukeCol = 2
+const _NukeRow = 19
+
+const _PlayerCol = 1			&apos; player name (bgg id)
+const _PlayerNameCol = 4		&apos; character name
+const _PlayerLoyaltyCol = _PlayerNameCol + 1
+const _PlayerPresCol = _PlayerNameCol + 2
+const _PlayerAdmCol = _PlayerNameCol + 3
+const _PlayerCAGCol = _PlayerNameCol + 4
+const _PlayerViperCol = _PlayerNameCol + 5
+const _PlayerOPGCol = _PlayerNameCol + 6
+const _PlayerCylonCol = _PlayerNameCol + 7
+const _PlayerSuperCol = _PlayerNameCol + 8
+const _PlayerLocCol = _PlayerNameCol + 9
+const _PlayerEmailCol = _PlayerNameCol - 3
+const _PlayerInfiltrateCol = _PlayerNameCol - 1
+
+const _TurnRow = 0
+const _TurnCol = 11
+
+const _LogViewCol = 7
+const _LogViewRow = 23
+
+const _JumpPrepCol = 15
+const _JumpPrepRow = 27
+
+const _PursuitCol = 15
+const _PursuitRow = 35
+
+const _GamePhaseCol = 18
+const _GamePhaseRow = 29
+
+const _GamePhaseTextCol = 13
+const _GamePhaseTextRow = 26
+
+const _GalDmgCol = 22
+const _GalDmgRow = 1
+const _PegDmgCol = 27
+const _PegDmgRow = 1
+
+const _KatLocCol = 12
+const _KatLocRow = 13
+
+const _DieRollCol = 11
+const _DieRollRow = 20
+
+const _ModuleRow = 34
+const _ModuleCol = 12
+const _ModulePeg = 1
+const _ModuleEx = 2
+const _ModulePG = 3
+const _ModuleFF = 4
+const _ModuleCFB = 5
+const _ModuleDay = 6
+const _ModuleRev = 7
+const _ModuleCCW = 8
+const _ModuleNum = 8
+
+global const _ResourceFuel = 0
+global const _ResourceFood = 1
+global const _ResourceMorale = 2
+global const _ResourcePopulation = 3
+
+global const _PhaseInSpace = 1
+global const _PhaseOnNewCaprica = 2
+global const _PhaseGalacticaReturns = 3
+
+sub GetGS
+	if GameSheet &lt;&gt; NULL then
+		exit sub
+	end if 
+	
+	GameSheet	= ThisComponent.Sheets.getByName(&quot;Game State&quot;)
+	GameForm	= GameSheet.DrawPage.Forms.GetByName(&quot;formGameState&quot;)
+
+	Randomize
+end sub
+
+
+sub PopulatePlayers
+	dim playerlst(8) as string
+	dim i as integer
+	
+	GetGS
+	GetSF
+	GetIonNeb
+	GetMutinySheet
+
+	for i = 1 to PlayerCnt()
+		playerlst(i)	= GetPlayerName(i)
+	next i
+	GameForm.getByName(&quot;lstPlayers&quot;).StringItemList		= playerlst()
+	SkillForm.getByName(&quot;lstPlayers&quot;).StringItemList	= playerlst()
+	IonNebForm.getByName(&quot;lstPlayers&quot;).StringItemList	= playerlst()
+	MutinyForm.getByName(&quot;lstPlayers&quot;).StringItemList	= playerlst()
+	
+	SetPlayerSelect 1
+end sub
+
+&apos; Populate the location list based on the player, phase of the game, and current location
+&apos; Possible permutations:
+&apos; PlayerType = Human (&amp; unrevealed cylon), Revealed Cylon, Leader, Sympathetic
+&apos; Phases = _PhaseInSpace, _PhaseOnNewCaprica,_PhaseGalacticaReturns
+
+sub UpdateLocations
+	dim loclst() as string
+	dim playerID as integer
+	dim playername as string
+	dim isfirst as boolean
+	dim tmpidx, locidx, cursector as integer
+	dim LocGal(), LocC1(), LocPeg(), LocNC(), LocCylon(), LocDem(), LocRBBDay(), LocRBBRev(), LocColony() as string
+	GetGS
+
+	if GetInitFlag() then
+		exit sub
+	end if
+	playerID 	= GetSelected(_ListGamePlayers)
+	playername	= GetPlayerName (playerID)
+	locidx 		= 1
+	isfirst 	= TRUE
+	
+	LocGal		= Array(&quot;Admiral&apos;s Quarters&quot;,&quot;Armory&quot;,&quot;Brig&quot;,&quot;Command&quot;,&quot;Communications&quot;,&quot;FTL Control&quot;,&quot;Hangar Deck&quot;,&quot;Research Lab&quot;,&quot;Sickbay&quot;,&quot;Weapons Control&quot;)
+	LocC1		= Array(&quot;Administration&quot;,&quot;President&apos;s Office&quot;,&quot;Press Room&quot;)
+	LocPeg		= Array(&quot;Pegasus CIC&quot;,&quot;Airlock&quot;,&quot;Main Batteries&quot;,&quot;Engine Room&quot;)
+	LocNC		= Array(&quot;Resistance HQ&quot;,&quot;Occupation Authority&quot;,&quot;Breeder&apos;s Canyon&quot;,&quot;Shipyard&quot;,&quot;Medical Center&quot;,&quot;Detention&quot;)
+	LocCylon	= Array(&quot;Caprica&quot;,&quot;Cylon Fleet&quot;,&quot;Human Fleet&quot;,&quot;Resurrection Ship&quot;)
+	LocDem		= Array(&quot;Bridge&quot;,&quot;Tactical Plot&quot;,&quot;Captain&apos;s Cabin&quot;)
+	LocRBBDay	= Array(&quot;Hybrid Tank&quot;,&quot;Datastream&quot;,&quot;Raider Bay&quot;)
+	LocRBBRev	= Array(&quot;Missile Batteries&quot;,&quot;Rebel Hybrid&quot;,&quot;Basestar Control&quot;,&quot;Meditation Chamber&quot;)
+	LocColony	= Array(&quot;The Opera House&quot;,&quot;Colony Turret&quot;,&quot;Communication Node&quot;,&quot;Colony Defenses&quot;,&quot;Cylon Command&quot;)
+	&apos; Treat the Assault Track the way we treat Space Areas.
+
+&apos; For Revealed Cylon OR CylonLeader/Symp
+&apos;	if _PhaseInSpace OR _PhaseGalacticaReturns
+&apos;		Cylon Locations
+&apos;	end if
+
+	&apos;IsRevealed includes cylon leaders and sympathetic cylons
+	if IsRevealed(playerID) and not IsInfiltrating(playerID) then &apos;or IsSympathetic(playerID) or IsCylonLeader(playerID) then
+		if IsGamePhase(_PhaseInSpace) or IsGamePhase(_PhaseGalacticaReturns) then
+			if UseCylonFleet() then
+				redim preserve loclst(locidx) as string
+				loclst(locidx)	= &quot;Basestar Bridge&quot;
+				locidx	= locidx + 1
+			end if
+			
+			for tmpidx = 0 to ubound(locCylon)
+				redim preserve loclst(locidx) as string
+				loclst(locidx)	= locCylon(tmpidx)
+				locidx	= locidx + 1
+			next tmpidx
+			
+&apos;			if HubDestroyed() then
+&apos;				loclst(4)	= &quot;Hub Destroyed&quot;
+&apos;			end if
+			
+&apos;			if DaybreakRebelBasestarAvailable() and RebelBasestarAllegiance() = &quot;Cylon&quot; then
+&apos;				redim preserve loclst(locidx) as string
+&apos;				loclst(locidx) = &quot;---------------&quot;
+&apos;				locidx	= locidx + 1
+&apos;				
+&apos;				for tmpidx = 0 to ubound(locRBBDay)
+&apos;					redim preserve loclst(locidx) as string
+&apos;					loclst(locidx)	= locRBBDay(tmpidx)
+&apos;					locidx	= locidx + 1
+&apos;				next tmpidx
+&apos;			end if
+			isfirst = FALSE
+		end if
+	end if
+			
+	if (Not IsRevealed(playerID)) or isInfiltrating(playerID) then	
+		if IsGamePhase(_PhaseInSpace) or IsGamePhase(_PhaseGalacticaReturns) then
+			&apos; deal with pilots here....
+			if IsPilot(playername) and Not (IsRevealed(playerID) and Not isInfiltrating(playerID)) then
+				if IsSpaceLoc(GetPlayerLoc(playerID)) then
+					cursector = val(right(GetPlayerLoc(playerID), 2))
+					if GetPlayerViper(playerID) &gt; 10 and GetPlayerViper(playerID) &lt; 20 then	&apos;Mark VII
+						redim preserve loclst(4) as string
+						loclst(1) = &quot;Sector &quot; &amp; MoveDown(MoveDown(cursector))
+						loclst(2) = &quot;Sector &quot; &amp; MoveDown(cursector)
+						loclst(3) = &quot;Sector &quot; &amp; MoveUp(cursector)
+						loclst(4) = &quot;Sector &quot; &amp; MoveUp(MoveUp(cursector))
+						locidx	= 5
+					else
+						redim preserve loclst(2) as string
+						loclst(1) = &quot;Sector &quot; &amp; MoveDown(cursector)
+						loclst(2) = &quot;Sector &quot; &amp; MoveUp(cursector)
+						locidx	= 3
+					end if
+					
+					if playername &lt;&gt; &quot;Hot Dog&quot; and GetPlayerViper(playerID) &lt; 20 then
+						redim preserve loclst(locidx) as string
+						loclst(locidx)	= &quot;Damage Viper&quot;
+						locidx	= locidx + 1
+					end if
+					
+					redim preserve loclst(locidx) as string
+					if GetPlayerViper(playerID) &gt; 20 then
+						loclst(locidx)	= &quot;Destroy Raptor&quot;
+					else
+						loclst(locidx) = &quot;Destroy Viper&quot;
+					end if
+					locidx	= locidx + 1
+				else
+					redim preserve loclst(2) as string
+					loclst(1) = &quot;Sector 5&quot;
+					loclst(2) = &quot;Sector 6&quot;
+					locidx	= 3
+				end if
+				isFirst = FALSE
+			end if
+			
+			if not isFirst then
+				redim preserve loclst(locidx) as string
+				loclst(locidx) = &quot;---------------&quot;
+				locidx	= locidx + 1
+			end if
+			
+			for tmpidx = 0 to ubound(locGal)
+				redim preserve loclst(locidx) as string
+				loclst(locidx)	= locGal(tmpidx)
+				locidx	= locidx + 1
+			next tmpidx
+			
+			if PegasusAvailable() then 
+				redim preserve loclst(locidx) as string
+				loclst(locidx) = &quot;---------------&quot;
+				locidx	= locidx + 1
+				for tmpidx = 0 to ubound(locPeg)
+					redim preserve loclst(locidx) as string
+					loclst(locidx)	= locPeg(tmpidx)
+					locidx	= locidx + 1
+				next tmpidx
+			end if
+			
+			if ColonialOneAvailable() then
+				redim preserve loclst(locidx) as string
+				loclst(locidx) = &quot;---------------&quot;
+				locidx	= locidx + 1
+				
+				if GameTypeIsDaybreak() then
+					redim preserve loclst(locidx) as string
+					loclst(locidx)	= &quot;Quorum Chamber&quot;
+					locidx	= locidx + 1
+				end if
+				
+				for tmpidx = 0 to ubound(locC1)
+					redim preserve loclst(locidx) as string
+					loclst(locidx)	= locC1(tmpidx)
+					locidx	= locidx + 1
+				next tmpidx
+			end if
+			
+			if ObjectiveIsEarth() then
+				redim preserve loclst(locidx) as string
+				loclst(locidx) = &quot;---------------&quot;
+				locidx	= locidx + 1
+				
+				for tmpidx = 0 to ubound(locDem)
+					redim preserve loclst(locidx) as string
+					loclst(locidx)	= locC1(tmpidx)
+					locidx	= locidx + 1
+				next tmpidx
+			
+&apos;				if DaybreakRebelBasestarAvailable() and RebelBasestarAllegiance() = &quot;Human&quot; then
+&apos;					redim preserve loclst(locidx) as string
+&apos;					loclst(locidx) = &quot;---------------&quot;
+&apos;					locidx	= locidx + 1
+&apos;					
+&apos;					for tmpidx = 0 to ubound(locRBBDay)
+&apos;						redim preserve loclst(locidx) as string
+&apos;						loclst(locidx)	= locRBBDay(tmpidx)
+&apos;						locidx	= locidx + 1
+&apos;					next tmpidx
+&apos;				end if
+			end if
+			isfirst = FALSE
+		end if
+	end if
+	
+	if IsGamePhase(_PhaseOnNewCaprica) or IsGamePhase(_PhaseGalacticaReturns) then
+		if not isFirst then
+			redim preserve loclst(locidx) as string
+			loclst(locidx) = &quot;---------------&quot;
+			locidx	= locidx + 1
+		end if
+		
+		for tmpidx = 0 to ubound(locNC)
+			redim preserve loclst(locidx) as string
+			loclst(locidx)	= locNC(tmpidx)
+			locidx	= locidx + 1
+		next tmpidx
+	end if
+	
+	GameForm.getByName(&quot;lstLocations&quot;).StringItemList	= g_emptylst()	
+	GameForm.getByName(&quot;lstLocations&quot;).StringItemList	= loclst()
+	ConfigureButtons
+	GameForm.getByName(&quot;btnMovePlayer&quot;).enabled = FALSE
+end sub		&apos;UpdateLocations
+
+sub EnableMoveBtn
+	GetGS
+	GameForm.getByName(&quot;btnMovePlayer&quot;).enabled = TRUE
+end sub
+
+&apos; Sets the player&apos;s userid
+sub SetPlayer (playerid as integer, player as string)
+	GetGS
+	
+	GameSheet.GetCellByPosition(_PlayerCol,_PlayerStartRow + playerID).String = player
+end sub
+
+&apos; Sets the player&apos;s name (character)
+sub SetPlayerName(playerid as integer, playername as string)
+	GetGS
+	
+	GameSheet.GetCellByPosition(_PlayerNameCol,_PlayerStartRow + playerID).String = playername
+end sub
+
+function GetPlayerName (playerID as integer) as string
+	GetGS
+	if playerID = 0 or playerID = _DestinyPlayerID then
+		GetPlayerName = &quot;Destiny&quot;
+	else
+		GetPlayerName = GameSheet.GetCellByPosition(_PlayerNameCol,_PlayerStartRow + playerID).String
+	end if
+end function
+
+function GetPlayerID (playername as string) as integer
+	dim playerID as integer
+	GetGS
+	GetPlayerID = 0
+	for playerID = 1 to PlayerCnt()
+		if GameSheet.GetCellByPosition(_PlayerNameCol,_PlayerStartRow + playerID).String = playername then
+			GetPlayerID = PlayerID
+			exit for
+		end if
+	next playerID
+end function
+
+function GetPlayerLoc (playerID as integer) as string
+	GetGS
+	GetPlayerLoc = GameSheet.GetCellByPosition(_PlayerLocCol,_PlayerStartRow + playerID).String
+end function
+
+function IsSick (playerID as integer) as boolean
+	IsSick = (GetPlayerLoc(playerID) = &quot;Sickbay&quot; OR GetPlayerLoc(playerID) = &quot;Medical Center&quot;)
+end function
+
+&apos;IsRevealed applies to a revealed cylon, a Cylon Leader (infiltrating or not), or a Human Sympathizer
+function IsRevealed (playerID as integer) as boolean
+	GetGS
+	IsRevealed = (GameSheet.GetCellByPosition(_PlayerCylonCol,_PlayerStartRow + playerID).String &lt;&gt; &quot;&quot;)
+end function
+
+sub SetRevealed (playerID as integer, optional clear as boolean)
+	if IsMissing(clear) then 
+		clear=FALSE
+	end if
+
+	if clear then
+		GameSheet.GetCellByPosition(_PlayerCylonCol,_PlayerStartRow + playerID).String = &quot;&quot;
+	else
+		GameSheet.GetCellByPosition(_PlayerCylonCol,_PlayerStartRow + playerID).String = &quot;X&quot;
+	end if
+end sub
+
+function IsInfiltrating (playerID as integer) as boolean
+	GetGS
+	IsInfiltrating = (GameSheet.GetCellByPosition(_PlayerInfiltrateCol,_PlayerStartRow + playerID).String = &quot;X&quot;)
+end function
+
+sub SetInfiltrate (playerID as integer, infflag as boolean)
+	if infflag then
+		GameSheet.GetCellByPosition(_PlayerInfiltrateCol,_PlayerStartRow + playerID).String = &quot;X&quot;		
+	else
+		GameSheet.GetCellByPosition(_PlayerInfiltrateCol,_PlayerStartRow + playerID).String = &quot;&quot;
+	end if
+end sub
+
+function IsCylon (playerID as integer) as boolean
+	GetGS
+	
+	IsCylon = (GameSheet.GetCellByPosition(_PlayerLoyaltyCol,_PlayerStartRow + playerID).String &lt;&gt; &quot;H&quot;)
+end function
+
+function GetSuperCnt (playerID as integer) as integer
+	GetGS
+	
+	GetSuperCnt	= GameSheet.getCellByPosition(_PlayerSuperCol, _PlayerStartRow + playerID).value
+end function
+
+function IsCylonLeaderByName (playername as string) as boolean
+	IsCylonLeaderByName = (playername = &quot;Cavil&quot; or playername = &quot;Leoben&quot; or playername = &quot;D&apos;Anna&quot; or playername = &quot;Simon&quot; or playername = &quot;Doral&quot; or playername = &quot;Six&quot; or playername = &quot;Athena&quot;)
+end function
+
+function IsCylonLeader (playerid as integer) as boolean
+	IsCylonLeader = IsCylonLeaderByName(GetPlayerName(playerID))
+end function
+
+function IsPilot (plyrname as string) as boolean
+	if plyrname = &quot;Apollo&quot; or plyrname = &quot;Lee&quot; or plyrname = &quot;Starbuck&quot; or plyrname = &quot;Kat&quot; or plyrname = &quot;Hot Dog&quot; or plyrname = &quot;Boomer&quot; or plyrname = &quot;Racetrack&quot; or plyrname = &quot;Anders&quot; or plyrname = &quot;Helo&quot; or plyrname = &quot;Karl&quot; or plyrname = &quot;Seelix&quot; or plyrname = &quot;Athena&quot; then
+		IsPilot	= TRUE
+	else
+		IsPilot	= FALSE
+	end if
+end function
+
+function IsSpaceLoc (locstr as string) as boolean
+	IsSpaceLoc = (left(locstr,6) = &quot;Sector&quot;)
+end function
+
+function IsCylonLoc (locstr as string) as boolean
+	IsCylonLoc = (locstr = &quot;Caprica&quot; or locstr = &quot;Cylon Fleet&quot; or locstr = &quot;Human Fleet&quot; or locstr = &quot;Resurrection Ship&quot; or locstr = &quot;Basestar Bridge&quot; or locstr = &quot;Hub Destroyed&quot;)
+end function
+
+function IsGalacticaLoc (locstr as string) as boolean
+	IsGalacticaLoc	= (locstr = &quot;FTL Control&quot; or locstr = &quot;Weapons Control&quot; or locstr = &quot;Command&quot; or locstr = &quot;Communications&quot; or locstr = &quot;Admiral&apos;s Quarters&quot; or locstr = &quot;Research Lab&quot; or locstr = &quot;Hangar Deck&quot; or locstr = &quot;Armory&quot; or locstr = &quot;Sickbay&quot; or locstr = &quot;Brig&quot;)
+end function
+
+function IsPegasusLoc (locstr as string) as boolean
+	IsPegasusLoc = (locstr = &quot;Pegasus CIC&quot; or locstr = &quot;Airlock&quot; or locstr = &quot;Main Batteries&quot; or locstr = &quot;Engine Room&quot;)
+end function
+
+function IsColonialOneLoc (locstr as string) as boolean
+ 	IsColonialOneLoc = (locstr = &quot;Press Room&quot; or locstr = &quot;President&apos;s Office&quot; or locstr = &quot;Administration&quot; or locstr = &quot;Quorum Chamber&quot;)
+end function
+
+function IsHazardous (locstr as string) as boolean
+	IsHazardous	= (locstr = &quot;Sickbay&quot; or locstr = &quot;Brig&quot; or locstr = &quot;Resurrection Ship&quot; or locstr = &quot;Hub Destroyed&quot; or locstr = &quot;Medical Center&quot; or locstr = &quot;Detention&quot;)
+end function
+
+sub SetPlayerLoc (playerid as integer, locstr as string)
+	dim prevloc, admID as string
+	dim wasSick as boolean
+	GetGS
+
+	wasSick = IsSick(playerID)
+		
+	prevloc = GameSheet.GetCellByPosition(_PlayerLocCol,_PlayerStartRow + playerID).string
+	GameSheet.GetCellByPosition(_PlayerLocCol,_PlayerStartRow + playerID).string = locstr
+
+	if locstr = &quot;Brig&quot; and prevloc &lt;&gt; &quot;Brig&quot; then
+		if GetTitle(_TitleAdmiral) = playerID then
+			&apos; if the admiral was just brigged, we need to change the admiral
+			admID = GetNextTitle(_TitleAdmiral)
+			MsgBox &quot;The Admiral has been brigged!&quot; &amp; chr(13) &amp; GetPlayerName(admID) &amp; &quot; is now the Admiral&quot;
+			UpdateTitle admID, _TitleAdmiral
+			LogThis GetPlayerName(admID) &amp; &quot; is now the Admiral!&quot;
+		end if
+		if GetTitle(_TitleCAG) = playerID then
+			admID = GetNextTitle(_TitleCAG)
+			MsgBox &quot;The CAG has been brigged!&quot; &amp; chr(13) &amp; GetPlayerName(admID) &amp; &quot; is now the CAG&quot;
+			UpdateTitle admID, _TitleCAG
+			LogThis GetPlayerName(admID) &amp; &quot; is now the CAG!&quot;
+		end if
+	end if
+	
+	if ObjectiveIsIonianNebula and GetCurrentPlayer() = playerID then
+		EncounterLocationAllies(locstr)
+	end if
+	
+	Board_RefreshPlayerLoc
+	Board_RefreshPlayerAssignments
+	UpdateLocations
+end sub
+
+sub SetGamePhase (newphase as integer)
+	GetGS
+	dim phases() as string
+
+	phases = Array (,&quot;IN SPACE&quot;,&quot;ON NEW CAPRICA&quot;,&quot;GALACTICA RETURNS&quot;)
+	GameSheet.GetCellByPosition(_GamePhaseCol,_GamePhaseRow).value = newphase
+	GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow).string = phases(newphase)
+	UpdateShipTypeList
+end sub
+
+function IsGamePhase (whichphase as integer) as boolean
+	GetGS
+	
+	IsGamePhase = (GameSheet.GetCellByPosition(_GamePhaseCol,_GamePhaseRow).value = whichphase)
+end function
+
+function OnNewCaprica as boolean
+	OnNewCaprica = (IsGamePhase(_PhaseOnNewCaprica) or IsGamePhase(_PhaseGalacticaReturns))
+end function
+	
+sub NextTurn
+	dim curmaj,curmin as integer
+	dim i, rtncd, playerid as integer
+	dim tmploc as string
+	
+	GetGS
+	
+	if Not IsSkillCheckClear() then
+		MsgBox &quot;Please clear the skill check before you advance the turn.&quot;
+		exit sub
+	end if
+	
+	rtncd = MsgBox (&quot;Advance the Turn?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	&apos; add in checks for hand size
+	for playerid = 1 to PlayerCnt()
+		if HandCardCnt(playerid) &gt; 10 or (HandCardCnt(playerID) &gt; 8 and GetPlayerName(PlayerID) = &quot;Chief&quot; and not IsRevealed(playerID)) then
+			rtncd = MsgBox (GetPlayerName(PlayerID) &amp; &quot; is over the hand limit and must discard, do you want to end the turn anyway?&quot;,4)
+			if rtncd &lt;&gt; 6 then
+				exit sub
+			end if
+		elseif GetPlayerName(playerID) = &quot;Tigh&quot; and HandCardCnt(playerID) = 1 and not IsRevealed(playerID) then
+			MsgBox &quot;Tigh has only one card in his hand and will discard it due to alcholism.&quot;
+			LogThis &quot;Tigh is an alcoholic.&quot;
+			RemoveFromHand playerID, 1, FALSE
+		end if
+	next playerid
+
+	if Not CheckQrmHandLimit then
+		rtncd = MsgBox (GetPlayerName(GetTitle(_TitlePresident)) &amp; &quot; is over the Quorum hand limit and must discard, do you want to end the turn anyway?&quot;,4)
+		if rtncd &lt;&gt; 6 then
+			exit sub
+		end if
+	end if		
+		
+	curmaj=GameSheet.GetCellByPosition(_TurnCol,_TurnRow).value
+	curmin=GameSheet.GetCellByPosition(_TurnCol+1,_TurnRow).value
+
+
+	if GetCrisisFlag (FALSE) = TRUE then
+		rtncd = MsgBox (&quot;Did you activate cylon ships per the crisis?&quot;,4)
+		if rtncd &lt;&gt; 6 then
+			exit sub
+		end if
+	end if
+	if GetCrisisFlag (TRUE) = TRUE then
+		rtncd = MsgBox (&quot;You did not advance the Jump Track per the crisis, do you still want to procede?&quot;,4)
+		if rtncd &lt;&gt; 6 then
+			exit sub
+		end if
+	end if
+	
+	if not IsRevealed(curmin) then
+		if GetPlayerName(curmin) = &quot;Boomer&quot; then
+			rtncd = MsgBox (&quot;Did Boomer do her Recon ability?&quot;,4)
+			if rtncd &lt;&gt; 6 then
+				exit sub
+			end if
+		elseif GetPlayerName(curmin) = &quot;Baltar&quot; then
+			rtncd = MsgBox (&quot;Did Baltar get his extra resource card for his Delusional Intuition?&quot;,4)
+			if rtncd &lt;&gt; 6 then
+				exit sub
+			end if
+		elseif GetPlayerName(curmin) = &quot;Kat&quot; and (GetPlayerLoc(curmin) &lt;&gt; &quot;Brig&quot; and GetPlayerLoc(curmin) &lt;&gt; &quot;Detention&quot;) then
+			if GetPlayerLoc(curmin) = GameSheet.GetCellByPosition(_KatLocCol, _KatLocRow).string then
+				if IsGamePhase(_PhaseOnNewCaprica) then
+					tmploc = &quot;Medical Center&quot;
+				else
+					tmploc = &quot;Sickbay&quot;
+				end if
+				MsgBox &quot;Kat did not move this turn and is being sent to &quot; &amp; tmploc &amp; &quot; since she&apos;s a stim junkie&quot;
+				SetPlayerLoc (curmin, tmploc)
+			end if
+		end if
+	end if
+
+	if GameForm.getByName(&quot;chkAutoCreate&quot;).state = 1 then
+		GenerateBoardImage
+	end if
+	
+	&apos;+== make saveversion optional, or save the entire file.
+	SaveVersion	&apos;this sets a version checkpoint in the file so we could go back and recover it
+
+	if curmin = PlayerCnt() then
+		curmaj = curmaj + 1
+		curmin=1
+	else
+		curmin=curmin+1
+	end if
+	LogThis &quot;************************************&quot;
+
+	GameSheet.GetCellByPosition(_TurnCol,_TurnRow).value = curmaj
+	GameSheet.GetCellByPosition(_TurnCol+1,_TurnRow).value = curmin
+	
+	LogThis &quot;************************************&quot;
+	LogThis &quot;Beginning Round &quot; &amp; curmaj &amp; &quot;.&quot; &amp; curmin
+	HighlightCurrentPlayer
+
+	if GetPlayerName(curmin) = &quot;Kat&quot; then	&apos;store her current location
+		GameSheet.GetCellByPosition(_KatLocCol, _KatLocRow).string = GetPlayerLoc(curmin)	
+	end if
+	
+	Board_SetCurrentPlayer 
+	Skills_SetCurrentPlayer 
+	ConfigureButtons
+	SetSuperCrisisBtns
+	SetCrisisStartButton
+	ClearCrisisFlags
+	SortHands
+	SetPlayerSelect curmin
+	
+	if GetPlayerName(curmin) = &quot;Athena&quot; and IsHazardous(GetPlayerLoc(curmin)) then
+		MsgBox &quot;Athena is Grieving, and draws no cards this turn.&quot;
+	elseif GetPlayerLoc(GetCurrentPlayer()) = &quot;Hub Destroyed&quot; then
+		MsgBox GetPlayerName(GetCurrentPlayer()) &amp; &quot; starts in the Hub Destroyed Location and must discard their Super Crisis Cards.&quot;
+	elseif IsSick(GetCurrentPlayer()) then
+		MsgBox GetPlayerName(GetCurrentPlayer()) &amp; &quot; is in &quot; &amp; GetPlayerLoc(GetCurrentPlayer()) &amp; &quot; and only receives 1 card this turn.&quot;, 0, &quot;Sickness&quot;
+	elseif GetPlayerName(curmin) = &quot;Doral&quot; and IsInfiltrating(curmin) then
+		MsgBox &quot;Doral is Infiltrating and draws two extra cards instead of one.&quot;
+	elseif GetPlayerName(curmin) = &quot;Karl&quot; and not IsGalacticaLoc(GetPlayerLoc(curmin)) then
+		MsgBox &quot;Karl is not on Galactica and draws only 4 cards this turn.&quot;
+	end if
+	
+	if ObjectiveIsIonianNebula() then
+		if GetPlayerLoc(GetCurrentPlayer()) = &quot;Brig&quot; or GetPlayerLoc(GetCurrentPlayer()) = &quot;Sickbay&quot; then
+			if MsgBox(GetPlayerName(GetCurrentPlayer()) &amp; &quot; is in &quot; &amp; GetPlayerLoc(GetCurrentPlayer()) &amp; &quot;, draw the Trauma token there?&quot;, 4, &quot;Trauma&quot;) = 6 then
+				DrawLocTrauma(GetCurrentPlayer(), GetPlayerLoc(GetCurrentPlayer()))
+			end if
+		end if
+	end if
+	
+	&apos;set the raw value for the log viewer
+	GameSheet.GetCellByPosition(_LogViewCol,_LogViewRow).value = (curmaj -1)*PlayerCnt() + curmin
+	ViewLog
+end sub 	&apos;NextTurn
+
+function GetCurTurn as string
+	GetGS
+	
+	GetCurTurn = GameSheet.GetCellByPosition(_TurnCol,_TurnRow).value &amp; &quot;.&quot; &amp; GameSheet.GetCellByPosition(_TurnCol+1,_TurnRow).value
+end function
+
+Sub MovePlayer
+	dim tmplst() as string
+	dim playerID, locID, rtncd as integer
+	dim plyrname, destname as string
+	dim viperid, mark7ID, assault, sectorid, viperType as integer
+	dim pilotmove as boolean
+	
+	GetGS
+	
+	playerID = GetSelected(_ListGamePlayers)
+	if playerID = -1 then
+		MsgBox &quot;Please select a Character to move.&quot;,0,&quot;Move Player&quot;
+		exit sub
+	end if
+	
+	plyrname	= GetPlayerName(playerid)
+	locID 		= GetSelected(_ListGameLocations)	
+	if locID = -1 then
+		MsgBox &quot;Please select a valid destination.&quot;,0,&quot;Move Player&quot;
+		exit sub
+	end if
+	
+	destname = GameForm.getByName(&quot;lstLocations&quot;).StringItemList(locID)
+	if destname = &quot;---------------&quot; then
+		MsgBox &quot;Please select a valid destination.&quot;,0,&quot;Move Player&quot;
+		exit sub
+	end if
+	
+	if destname = &quot;Damage Viper&quot; or destname = &quot;Destroy Viper&quot; or destname = &quot;Destroy Raptor&quot; then
+		rtncd = MsgBox (&quot;Do you really want to &quot; &amp; trim(left(destname, 7)) &amp; &quot; &quot; &amp; plyrname &amp; &quot;&apos;s Viper?&quot;, 4, &quot;Move Player&quot;)
+	else
+		rtncd = MsgBox (&quot;Move &quot; &amp; plyrname &amp; &quot; to &quot; &amp; destname &amp; &quot;?&quot;, 4, &quot;Move Player&quot;)
+	end if 
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	pilotmove = FALSE
+	&apos;special check here if it&apos;s a pilot...could be moving to or from a viper
+	if IsSpaceLoc(GetPlayerLoc(PlayerID)) or IsSpaceLoc(destname) then
+		&apos;3 options...ship to viper, viper to ship, viper:sector to sector
+		if Not IsSpaceLoc(GetPlayerLoc(playerid)) then
+			&apos; Check for available ships
+			viperid = GetAvailableShip(_ShipViper)
+			mark7ID = GetAvailableShip(_ShipMarkVII)
+			assault	= GetAvailableShip(_ShipAssaultRaptor)
+			
+			if viperID + mark7ID + assault = 0 then	
+				Msgbox &quot;No available ships in the reserves!&quot;, 0, &quot;Move Player&quot;
+				exit sub
+			end if
+			
+			&apos; Assault Raptors
+			if assault &gt; 0 then
+				if viperID + mark7ID = 0 then
+					&apos; If there are only Assault Raptors
+					rtncd	= 6
+				else
+					rtncd = MsgBox(&quot;Launch &quot; &amp; plyrname &amp; &quot; in an Assault Raptor?&quot;, 4, &quot;Move Player&quot;)
+				endif
+				if rtncd = 6 then
+					SetViperPilot playerID, assault, _ShipAssaultRaptor
+					SetPlayerViper playerID, assault + 20
+					SetShipStatus _ShipAssaultRaptor, assault, _ShipStatusActivate
+					mark7ID	= 0	&apos; Skip the other ships.
+					viperid	= 0
+					pilotmove = TRUE
+					LogThis plyrname &amp; &quot; LAUNCHED Assault Raptor &quot; &amp; assault &amp; &quot; into &quot; &amp; destname
+				end if
+			end if
+			
+			&apos; Viper MkVIIs
+			if mark7ID &gt; 0 then
+				if viperID = 0 then
+					&apos; No normal Vipers left
+					rtncd	= 6
+				else
+					rtncd = MsgBox(&quot;Launch &quot; &amp; plyrname &amp; &quot; in a Viper MkVII?&quot;, 4, &quot;Move Player&quot;)
+				endif
+				if rtncd = 6 then
+					SetViperPilot playerID, mark7ID, _ShipMarkVII
+					SetPlayerViper playerID, mark7ID + 10
+					SetShipStatus _ShipMarkVII, mark7ID, _ShipStatusActivate
+					viperid	= 0	&apos; Skip the normal Vipers
+					pilotmove = TRUE
+					LogThis plyrname &amp; &quot; LAUNCHED Viper Mark VII &quot; &amp; mark7ID &amp; &quot; into &quot; &amp; destname
+				end if
+			end if
+			
+			&apos; Vipers
+			if viperID &gt; 0 then
+				SetViperPilot playerID, viperID, _ShipViper
+				SetPlayerViper playerID, viperID
+				SetShipStatus _ShipViper, viperID, _ShipStatusActivate
+				pilotmove = TRUE
+				LogThis plyrname &amp; &quot; LAUNCHED Viper &quot; &amp; ViperID &amp; &quot; into &quot; &amp; destname
+			end if
+			
+			UpdateShips
+			
+		elseif IsSpaceLoc(destname) then
+			&apos;moving from Sector to Sector
+			&apos;find which viper the pilot is in, move the viper
+			viperID = GetPlayerViper(playerid)
+			if viperID &gt; 20 then
+				LogThis plyrname &amp; &quot; in Assault Raptor &quot; &amp; ViperID - 20 &amp; &quot; moves to &quot; &amp; destname
+			elseif viperID &gt; 10 then
+				LogThis plyrname &amp; &quot; in Viper Mark VII &quot; &amp; ViperID - 10 &amp; &quot; moves to &quot; &amp; destname
+			else
+				LogThis plyrname &amp; &quot; in Viper &quot; &amp; ViperID &amp; &quot; moves to &quot; &amp; destname
+			end if			
+		else
+			&apos;returning to a ship from space
+			&apos;find which viper the pilot is in, clear pilot&apos;s viper, clear viper&apos;s pilot, 
+			&apos;		return viper to [reserves | damaged | destroyed], if needed, move pilot to Sickbay
+			
+			viperID = GetPlayerViper(playerid)
+			SetPlayerViper PlayerID, 0
+			if viperID &gt; 20 then
+				viperType	= _ShipAssaultRaptor
+				viperID		= viperID - 20
+			elseif viperID &gt; 10 then
+				viperType	= _ShipMarkVII
+				viperID		= viperID - 10
+			else
+				viperType	= _ShipViper
+			end if
+			
+			SetViperPilot 0, ViperID, viperType
+
+			if left(destname, 6) = &quot;Damage&quot; then
+				SetShipStatus viperType, ViperID, 7
+				destname	= &quot;Sickbay&quot;
+				LogThis &quot;Viper &quot; &amp; ViperID &amp; &quot; is Damaged.  &quot; &amp; plyrname &amp; &quot; moves to Sickbay&quot;
+				
+			elseif left(destname, 7) = &quot;Destroy&quot; then
+				SetShipStatus viperType, ViperID, 8
+				destname=&quot;Sickbay&quot;
+				LogThis &quot;Viper &quot; &amp; ViperID &amp; &quot; is Destroyed.  &quot; &amp; plyrname &amp; &quot; moves to Sickbay&quot;
+			else
+				SetShipStatus viperType, ViperID, 0
+				LogThis plyrname &amp; &quot; moves to &quot; &amp; destname &amp; &quot; and returns Viper &quot; &amp; ViperID &amp; &quot; to the Reserves&quot;
+			end if
+			UpdateShips
+		
+		end if
+	else
+		LogThis	plyrname &amp; &quot; moved to &quot; &amp; destname	
+	end if
+	SetPlayerLoc(playerID, destname)
+	if pilotmove then
+		Board_RefreshVipers
+	end if
+	
+	SetDrawCards playerID
+end sub	&apos;MovePlayer
+
+sub MakePresident
+	SetTitle _TitlePresident
+end sub
+
+sub MakeAdmiral
+	SetTitle _TitleAdmiral
+end sub
+
+sub MakeCAG
+	SetTitle _TitleCag
+end sub
+
+
+sub SetTitle (titleFlag as integer)
+	dim playerID, TitleCol, rtncd, i as integer
+	dim TitleStr as string
+
+	select case titleFlag
+		case _TitlePresident
+			TitleStr = &quot;PRESIDENT&quot;
+		case _TitleAdmiral
+			TitleStr = &quot;ADMIRAL&quot;
+		case _TitleCAG
+			TitleStr = &quot;CAG&quot;
+	end select
+
+	playerID = GetSelected(_ListGamePlayers)
+	if PlayerID = -1 then
+		MsgBox &quot;Please select a Character to make &quot; &amp; TitleStr
+		exit sub
+	elseif IsRevealed(playerID) then
+		msgBox &quot;Don&apos;t be ridiculous, a Revealed Cylon can&apos;t be &quot; &amp; TitleStr
+		exit sub
+	else
+		rtncd = MsgBox(&quot;Are you sure you want to make &quot; &amp; GetPlayerName(playerID) &amp; &quot; the &quot; &amp; TitleStr,4)
+		if rtncd &lt;&gt; 6 then
+			exit sub
+		end if
+	end if
+	
+	UpdateTitle playerID, titleFlag
+	LogThis GetPlayerName(playerID) &amp; &quot; is now the &quot; &amp; TitleStr
+
+end sub	&apos;SetTitle
+
+sub UpdateTitle (playerID as integer, titleflag as integer)
+	dim i, titleCol as integer
+	GetGS
+
+	select case titleflag
+		case _TitlePresident
+			titleCol = _PlayerPresCol
+		case _TitleAdmiral
+			titleCol = _PlayerAdmCol
+		case _TitleCAG
+			titleCol = _PlayerCAGCol
+	end select
+	
+	for i = 1 to 7
+		if i = playerID then
+			GameSheet.GetCellByPosition(titleCol,_PlayerStartRow + i).string = &quot;X&quot;
+		else
+			GameSheet.GetCellByPosition(titleCol,_PlayerStartRow + i).string = &quot;&quot;
+		end if
+	next i
+	
+	Board_RefreshPlayerTitles
+	ConfigureButtons
+end sub		&apos;UpdateTitle
+
+sub SetLoyaltyHuman (playerID as integer)
+	GetGS
+
+	GameSheet.GetCellByPosition(_PlayerLoyaltyCol,_PlayerStartRow + playerID).string = &quot;H&quot;
+	GameSheet.GetCellByPosition(_PlayerLoyaltyCol,_PlayerStartRow + playerID).CharColor = _black
+	SetRevealed playerID, TRUE
+end sub
+
+sub SetLoyaltyCylon (playerID as integer)
+	GetGS
+	
+	if IsCylonLeader(playerID) then
+		if GameTypeIsDaybreak then
+			GameSheet.GetCellByPosition(_PlayerLoyaltyCol, _PlayerStartRow + playerID).string	= &quot;L&quot;
+		elseif PlayerCnt() = 4 or PlayerCnt() = 6 then
+			GameSheet.GetCellByPosition(_PlayerLoyaltyCol, _PlayerStartRow + playerID).string	= &quot;LS&quot;
+		else
+			GameSheet.GetCellByPosition(_PlayerLoyaltyCol, _PlayerStartRow + playerID).string	= &quot;LH&quot;
+		end if
+		GameSheet.GetCellByPosition(_PlayerLoyaltyCol,_PlayerStartRow + playerID).CharColor = _blue
+	else
+		GameSheet.GetCellByPosition(_PlayerLoyaltyCol,_PlayerStartRow + playerID).string = &quot;C&quot;
+		GameSheet.GetCellByPosition(_PlayerLoyaltyCol,_PlayerStartRow + playerID).CharColor = _red
+	end if
+end sub
+
+sub SetLoyaltySympathetic (playerID as integer)
+	GetGS
+	GameSheet.GetCellByPosition(_PlayerLoyaltyCol,_PlayerStartRow + playerID).string = &quot;S&quot;
+	GameSheet.GetCellByPosition(_PlayerLoyaltyCol,_PlayerStartRow + playerID).CharColor = _blue
+end sub
+
+sub SetLoyaltyBlank (playerID as integer)
+	GetGS
+
+	GameSheet.GetCellByPosition(_PlayerLoyaltyCol,_PlayerStartRow + playerID).string = &quot;&quot;
+	GameSheet.GetCellByPosition(_PlayerLoyaltyCol,_PlayerStartRow + playerID).CharColor = _black
+end sub
+
+
+sub RevealCylon
+	dim playerID, rtncd, cardtouse as integer
+	dim msgstr as string
+	dim cardlst as variant
+	GetGS
+	
+	playerID = GetSelected(_ListGamePlayers)
+	if PlayerID = -1 then
+		MsgBox &quot;Please select a Character to REVEAL as a Cylon&quot;
+		exit sub
+	elseif IsRevealed(playerID) then
+		MsgBox GetPlayerName(playerID) &amp; &quot; is already a revealed Cylon!&quot;
+		exit sub
+	else
+		rtncd = MsgBox(&quot;Are you sure you want to REVEAL &quot; &amp; GetPlayerName(playerID) &amp; &quot; as a Cylon?&quot;,4)
+		if rtncd &lt;&gt; 6 then
+			exit sub
+		end if
+	end if
+
+	cardlst = GetCylonCards(playerID)
+	cardtouse = 1
+	if ubound(cardlst) = 2 then
+		msgstr = GetPlayerName(playerID) &amp; &quot; has 2 &apos;You are a Cylon&apos; loyalty cards.&quot; &amp; chr(13) &amp; &quot;Is &apos;&quot; &amp; cardlst(1) &amp; &quot;&apos; the one that is being played to Reveal?&quot;
+		rtnCd = MsgBox(msgstr, 4, &quot;Select Loyalty Card to Use&quot;)
+		if rtnCd &lt;&gt; 6 then
+			cardtouse	= 2
+		end if
+	end if
+	if GameTypeIsDaybreak() then
+		MsgBox &quot;Mutiny Discarded.&quot;
+		DiscardAllMutiny(playerID)
+		SetOPG(playerID, 0)
+	end if
+		
+	DiscardLoyalty playerID, cardlst(cardtouse)
+	if VariantFlaws() then
+		DiscardFlaw playerID
+	end if
+
+	LogThis GetPlayerName(playerID) &amp; &quot; REVEALED as a Cylon&quot;
+	MakeCylon playerID, TRUE
+end sub 	&apos;RevealCylon
+
+&apos; This is used to indicate a Sympathizer Human in the base game or a Sympathetic Cylon in Pegasus
+function IsSympathetic (playerID as integer) as boolean
+	GetGS
+	IsSympathetic = (GameSheet.GetCellByPosition(_PlayerLoyaltyCol,_PlayerStartRow + playerID).String = &quot;S&quot;)	
+end function
+
+sub MakeCylon (playerID as integer, asCylon as boolean)
+	dim ViperID, rtncd as integer
+	GetGS
+		
+&apos;+== clean up the logic for revealing a cylon
+
+	if asCylon then
+		SetRevealed playerID
+		rtncd = MsgBox(&quot;Does &quot; + GetPlayerName(playerID) + &quot; receive a Super Crisis card?&quot;,4)
+		if rtncd = 6 then
+			DealSuperCrisis playerID
+		end if
+	else
+		&apos;Sympathizer with resources blue or a Sympathetic Cylon
+		SetRevealed playerID
+		SetLoyaltySympathetic playerID
+	end if
+
+	&apos;special check if we&apos;re a pilot in a viper
+	if IsSpaceLoc(GetPlayerLoc(PlayerID)) then
+		&apos;find which viper the pilot is in, clear pilot&apos;s viper, clear viper&apos;s pilot, 
+		&apos;		return viper to reserves 
+		viperID = GetPlayerViper(playerid)
+		SetPlayerViper PlayerID, 0
+		if viperID &lt; 10 then
+			SetViperPilot 0, ViperID, _ShipViper
+			SetShipStatus _ShipViper, ViperID, 0
+			LogThis &quot;Viper &quot; &amp; ViperID &amp; &quot; returns to the Reserves&quot;
+		elseif viperID &lt; 20 then
+			viperID = viperID - 10
+			SetViperPilot 0, ViperID, _ShipMarkVII
+			SetShipStatus _ShipMarkVII, ViperID, 0
+			LogThis &quot;Viper Mark VII &quot; &amp; ViperID &amp; &quot; returns to the Reserves&quot;
+		else
+			viperID = viperID - 20
+			SetViperPilot 0, ViperID, _ShipAssaultRaptor
+			SetShipStatus _ShipAssaultRaptor, ViperID, 0
+			LogThis &quot;Assault Raptor &quot; &amp; ViperID &amp; &quot; returns to the Reserves&quot;
+		end if		
+		UpdateShips
+	end if
+	
+	if IsGamePhase(_PhaseOnNewCaprica) then
+		SetPlayerLoc playerID, &quot;Medical Center&quot;
+		LogThis GetPlayerName(playerID) &amp; &quot; moved to Medical Center&quot;
+	else
+		SetPlayerLoc playerID, &quot;Resurrection Ship&quot;
+		LogThis	GetPlayerName(playerID) &amp; &quot; moved to Resurrection Ship&quot;
+	end if
+	
+	if GetTitle(_TitlePresident) = playerID then
+		UpdateTitle GetNextTitle(_TitlePresident), _TitlePresident
+		MsgBox GetPlayerName(GetTitle(_TitlePresident)) &amp; &quot; is now the President.&quot;
+		LogThis GetPlayerName(GetTitle(_TitlePresident)) &amp; &quot; is now the President.&quot;
+	end if
+	if GetTitle(_TitleAdmiral) = playerID then
+		UpdateTitle GetNextTitle(_TitleAdmiral), _TitleAdmiral
+		MsgBox GetPlayerName(GetTitle(_TitleAdmiral)) &amp; &quot; is now the Admiral.&quot;
+		LogThis GetPlayerName(GetTitle(_TitleAdmiral)) &amp; &quot; is now the Admiral.&quot;
+	end if
+	if UseCylonFleet and GetTitle(_TitleCAG) = playerID then
+		UpdateTitle GetNextTitle(_TitleCAG), _TitleCAG
+		MsgBox GetPlayerName(GetTitle(_TitleCAG)) &amp; &quot; is now the CAG.&quot;
+		LogThis GetPlayerName(GetTitle(_TitleCAG)) &amp; &quot; is now the CAG.&quot;
+	end if
+	
+		
+	if GetPlayerName(playerID) = &quot;Roslin&quot; then
+		EnableSP FALSE
+	elseif GetPlayerName(playerID) = &quot;Adama&quot; then
+		EnableCommandAuthority FALSE
+	end if
+	
+	SetOPG playerID, 0
+	RemoveAssignments playerID
+	SetDrawCards playerID
+	ConfigureButtons
+	SetInfiltrate playerID, FALSE
+
+	MsgBox &quot;Go to the Loyalty tab to hand off loyalty cards.&quot;
+end sub		&apos;MakeCylon
+
+sub ConfigureButtons
+	dim playerid, namecnt, i as integer
+	dim namelst() as string
+	dim allnames as variant
+	
+	if GetInitFlag() then
+		exit sub
+	end if
+	
+	GetGS
+	GetCrisisSheet
+
+	playerID = GetSelected(_ListGamePlayers)
+	GameForm.getByName(&quot;btnPresident&quot;).enabled			= FALSE
+	GameForm.getByName(&quot;btnAdmiral&quot;).enabled			= FALSE
+	GameForm.getByName(&quot;btnCAG&quot;).enabled				= FALSE
+	GameForm.getByName(&quot;btnReveal&quot;).enabled				= FALSE	
+	GameForm.getByName(&quot;btnNuke&quot;).enabled				= FALSE	
+	GameForm.getByName(&quot;btnOPG&quot;).enabled				= FALSE
+	GameForm.getByName(&quot;btnMiracle&quot;).enabled			= FALSE
+	GameForm.getByName(&quot;btnInfiltrate&quot;).enabled			= FALSE
+	CrisisForm.getByName(&quot;btnDealSuper&quot;).enabled		= FALSE
+	CrisisForm.getByName(&quot;btnPlaySuperCrisis&quot;).enabled	= FALSE
+	
+	if playerID = -1 then
+		exit sub
+	end if
+	
+	if Not IsRevealed(playerID) then
+		if GetTitle(_TitlePresident) &lt;&gt; playerID then
+			GameForm.getByName(&quot;btnPresident&quot;).enabled = TRUE
+		end if
+		if GetTitle(_TitleAdmiral) &lt;&gt; playerID then
+			GameForm.getByName(&quot;btnAdmiral&quot;).enabled = TRUE
+		else
+			if GameSheet.GetCellByPosition(_NukeCol,_NukeRow).value	&gt; 0 then
+				GameForm.getByName(&quot;btnNuke&quot;).enabled = TRUE	
+			end if
+		end if
+		if GetTitle(_TitleCAG) &lt;&gt; playerID and UseCylonFleet() then
+			GameForm.getByName(&quot;btnCAG&quot;).enabled = TRUE
+		end if
+		if IsCylon(playerID) then 
+			GameForm.getByName(&quot;btnReveal&quot;).enabled = TRUE	
+		end if
+		if not OPGUsed(playerID) then
+			GameForm.getByName(&quot;btnOPG&quot;).enabled = TRUE
+		end if
+		if GameTypeIsDaybreak() then
+			if OPGUsed(playerID) or (GetPlayerName(playerID) = &quot;Gaius&quot; and GetMiracles(playerID) &lt; 3) then
+				GameForm.getByName(&quot;btnMiracle&quot;).enabled	= TRUE
+			end if
+		end if
+	else
+		CrisisForm.getByName(&quot;btnDealSuper&quot;).enabled = TRUE
+		if GameSheet.GetCellByPosition(_PlayerSuperCol, _PlayerStartRow + playerID).Value &gt; 0 then
+			CrisisForm.getByName(&quot;btnPlaySuperCrisis&quot;).enabled = TRUE
+		end if
+		if (IsCylonLeader(playerID) or (IsSympathetic(playerID) and OptionIsSympatheticCylon())) then
+			GameForm.getByName(&quot;btnInfiltrate&quot;).enabled = TRUE
+			if IsInfiltrating(playerID) then
+				GameForm.getByName(&quot;btnInfiltrate&quot;).label	= &quot;Exfiltrate&quot;
+			else
+				GameForm.getByName(&quot;btnInfiltrate&quot;).label	= &quot;Infiltrate&quot;
+			end if
+		end if
+		if (not OPGUsed(playerID)) and IsCylonLeader(playerID) then
+			GameForm.getByName(&quot;btnOPG&quot;).enabled = TRUE
+		end if
+		if GameTypeIsDaybreak() then
+			if OPGUsed(playerID) and IsCylonLeader(playerID) and IsInfiltrating(playerID) then
+				GameForm.getByName(&quot;btnMiracle&quot;).enabled	= TRUE		
+			end if
+		end if
+	end if
+	if GameTypeIsPegasus() OR GameTypeIsExodus() then
+		if not IsCylonLoc(GetPlayerLoc(playerID)) then
+			GameForm.getByName(&quot;btnExecute&quot;).enabled = TRUE
+			if Not IsCylon(playerID) then
+				&apos;+== populate the list of possible execution replacements
+				allnames = GetFullCharacterSet()
+				namecnt = 0
+				for i = 0 to ubound(allnames)
+					if GetPlayerID(allnames(i)) = 0 and NOT IsACorpse(allnames(i)) and NOT IsCylonLeaderByName(allnames(i)) then
+						namecnt = namecnt + 1
+						redim preserve namelst(namecnt) as string
+						namelst(namecnt) = allnames(i)
+					end if
+				next i
+				GameForm.getByName(&quot;lstExecute&quot;).StringItemList = namelst()
+			else
+				GameForm.getByName(&quot;lstExecute&quot;).StringItemList = g_emptylst()
+			end if
+		else
+			GameForm.getByName(&quot;btnExecute&quot;).enabled = FALSE
+			GameForm.getByName(&quot;lstExecute&quot;).StringItemList = g_emptylst()
+		end if
+	end if
+end sub	&apos;ConfigureButtons
+	
+	
+
+sub SetPlayerViper (playerid, viperid as integer)
+
+	if viperid = 0 then
+		GameSheet.GetCellByPosition(_PlayerViperCol,_PlayerStartRow + playerID).string = &quot;&quot;
+	else
+		GameSheet.GetCellByPosition(_PlayerViperCol,_PlayerStartRow + playerID).value = viperid
+	end if
+end sub		&apos;SetPlayerViper
+
+function GetPlayerViper (playerid) as integer
+	&apos;what viper does this player have (if any)
+	GetPlayerViper = val(GameSheet.GetCellByPosition(_PlayerViperCol,_PlayerStartRow + playerID).string )
+end function
+
+function GetTitle (titleFlag as integer) as integer
+	dim TitleCol as integer
+	dim k as integer
+	GetGS
+		
+	select case titleFlag
+		case _TitlePresident
+			TitleCol = _PlayerPresCol
+		case _TitleAdmiral
+			TitleCol = _PlayerAdmCol
+		case _TitleCAG
+			TitleCol = _PlayerCAGCol
+	end select
+
+	GetTitle = 0	
+	for k =1 to PlayerCnt()
+		if GameSheet.GetCellByPosition(TitleCol,_PlayerStartRow + k).string = &quot;X&quot; then
+			GetTitle=k
+			exit for
+		end if
+	next k
+end function	&apos;GetTitle
+
+
+sub UpdateResource
+	dim whichres as integer
+	GetGS
+			
+	for whichres = _ResourceCol to _ResourceCol+3
+		if GameSheet.GetCellByPosition(whichres, _ResTrackRow).value &gt; GameSheet.GetCellByPosition(whichres, _ResTrackRow+2).value then
+			LogThis ucase(GameSheet.GetCellByPosition(whichres, _ResNameRow).string) &amp; &quot; increased to &quot; &amp; GameSheet.GetCellByPosition(whichres, _ResTrackRow).value 
+		elseif GameSheet.GetCellByPosition(whichres, _ResTrackRow).value &lt; GameSheet.GetCellByPosition(whichres, _ResTrackRow+2).value then
+			LogThis ucase(GameSheet.GetCellByPosition(whichres, _ResNameRow).string) &amp; &quot; decreased to &quot; &amp; GameSheet.GetCellByPosition(whichres, _ResTrackRow).value 
+		end if
+		GameSheet.GetCellByPosition(whichres, _ResTrackRow+2).value = GameSheet.GetCellByPosition(whichres, _ResTrackRow).value
+	next whichres
+end sub
+
+function ResourcesAreBlue as boolean
+	dim ResID as integer
+	dim ResBlueMin as variant
+	GetGS
+
+	ResBlueMin = Array(5,5,6,7)
+	ResourcesAreBlue=TRUE
+	for resID = 0 to 3
+		if GameSheet.GetCellByPosition(_ResourceCol + resID, _ResTrackRow).value &lt; ResBlueMin(resID) then
+			ResourcesAreBlue = FALSE
+			exit function
+		end if
+	next resID
+end function
+
+
+
+sub NukeIt
+	dim nukecnt, rtncd as integer
+	GetGS
+	
+	nukecnt = GameSheet.GetCellByPosition(_NukeCol,_NukeRow).value
+	if nukecnt &lt; 1 then
+		Msgbox &quot;No Nukes left!&quot;
+		exit sub
+	else
+		rtncd = MsgBox(&quot;Do you really want to use a Nuke?&quot;,4,&quot;Launch Nuke&quot;)
+		if rtncd &lt;&gt; 6 then
+			exit sub
+		end if
+		LogThis &quot;Nuke launched&quot;
+		GameSheet.GetCellByPosition(_NukeCol,_NukeRow).value = nukecnt -1
+	end if
+	
+	if Nukecnt=1 then
+		&apos;that was the last one...
+		GameForm.getByName(&quot;btnNuke&quot;).enabled = FALSE
+	end if
+end sub
+
+function AddNuke as boolean
+	dim nukecnt, rtncd as integer
+	GetGS
+	
+	&apos;this can only be called from an Exodus/Build Nuke play
+	if GameSheet.GetCellByPosition(_NukeCol,_NukeRow).value &lt; 3 then
+		GameSheet.GetCellByPosition(_NukeCol,_NukeRow).value = 	GameSheet.GetCellByPosition(_NukeCol,_NukeRow).value + 1
+		MsgBox &quot;Nuke Added! &quot; &amp; 	GameSheet.GetCellByPosition(_NukeCol,_NukeRow).value &amp; &quot; now available.&quot;,0,&quot;Build Nuke&quot;
+		LogThis &quot;Nuke added.&quot;
+		AddNuke=TRUE
+	else
+		MsgBox &quot;You many not build another nuke.&quot;,0,&quot;Build Nuke&quot;
+		AddNuke=FALSE
+	end if
+end function
+
+
+sub UpdateJumpPrep
+	dim jumpstate, rtncd, i as integer
+
+	GetGS
+
+	jumpstate = GameSheet.GetCellByPosition(_JumpPrepCol+2, _JumpPrepRow+2).value
+	if jumpstate = 5 then
+		if IsGamePhase(_PhaseInSpace) then
+			rtncd = MsgBox(&quot;Advancing the Jump Track will trigger an Auto-Jump.  Do you want to proceed with Auto-Jump and remove all ships from the board?&quot;,4,&quot;Auto-Jump&quot;)
+			if rtncd &lt;&gt; 6 then
+				MsgBox &quot;Jump Aborted&quot;,0,&quot;Auto-Jump&quot;
+				exit sub
+			end if
+			LogThis &quot;Auto-jumping the fleet.&quot;
+			ActivateJump FALSE
+			jumpstate = 0
+		elseif IsGamePhase(_PhaseOnNewCaprica) then
+			rtncd = MsgBox(&quot;Advancing the Jump Track will trigger Galactica&apos;s return, do you want to continue?&quot;,4,&quot;Auto-Jump&quot;)
+			if rtncd &lt;&gt; 6 then
+				MsgBox &quot;Jump Aborted&quot;
+				exit sub
+			end if
+			LogThis &quot;Galactica Returns&quot;
+			GameForm.getByName(&quot;spinJumpPrep&quot;).enabled = FALSE
+			GalacticaReturns
+			jumpstate = 0
+		end if
+	end if
+	SetJumpTrack jumpstate
+end sub
+
+sub GalacticaReturns
+	BattleOfNewCaprica
+	SetGamePhase _PhaseGalacticaReturns
+	MsgBox &quot;Galactica has returned!&quot;
+end sub &apos;GalacticaReturns
+
+
+sub SetJumpTrack (jumpstate as integer)
+	GetGS
+	dim i as integer
+	dim jpstr as variant
+
+	GameSheet.GetCellByPosition(_JumpPrepCol+2, _JumpPrepRow+2).value = jumpstate
+
+	for i = 0 to 4
+		if jumpstate = i then
+			GameSheet.GetCellByPosition(_JumpPrepCol+i, _JumpPrepRow).string = &quot;x&quot;
+		else
+			GameSheet.GetCellByPosition(_JumpPrepCol+i, _JumpPrepRow).string = &quot;&quot;
+		end if
+	next i
+	Board_SetJumpTrack jumpstate
+	SetCrisisFlag TRUE, &quot;&quot;
+	jpstr = Array(&quot;Start&quot;,&quot;Red 1&quot;,&quot;Red 2&quot;,&quot;Blue(-3)&quot;,&quot;Blue(-1)&quot;)	
+	LogThis &quot;Jump Prep track Set to &quot; &amp; jpstr(jumpstate)
+end sub	&apos;SetJumpTrack
+
+
+sub UpdatePursuit
+	dim pursuitState, rtncd, i as integer
+	GetGS
+
+	&apos;not sure why the spin control doesn&apos;t deactivate properly, so...
+	if not UseCylonFleet() then
+		exit sub
+	end if
+	pursuitState = GameSheet.GetCellByPosition(_PursuitCol+2, _PursuitRow+2).value
+	if pursuitState = 4 then
+		rtncd = MsgBox(&quot;Advancing the Pursuit Track will trigger an Attack.  Do you want to procede with the Cylon Attack and move all ships from the Pursuit Board to the Main Board?&quot;,4,&quot;Pursuit Track&quot;)
+		if rtncd &lt;&gt; 6 then
+			MsgBox &quot;Attack Aborted&quot;,0,&quot;Pursuit&quot;
+			SetPursuitTrack 3
+		else
+			LogThis &quot;Initiating Cylon Attack.&quot;
+			AttackTheFleet FALSE
+		end if
+	else
+		SetPursuitTrack pursuitState
+	end if
+end sub
+
+sub SetPursuitTrack (pursuitstate as integer)
+	GetGS
+	dim i as integer
+	dim jpstr as variant
+
+	GameSheet.GetCellByPosition(_PursuitCol+2, _PursuitRow+2).value = pursuitstate
+
+	for i = 0 to 3
+		if pursuitstate = i then
+			GameSheet.GetCellByPosition(_PursuitCol+i, _PursuitRow).string = &quot;x&quot;
+		else
+			GameSheet.GetCellByPosition(_PursuitCol+i, _PursuitRow).string = &quot;&quot;
+		end if
+	next i
+	Board_SetPursuitTrack pursuitstate
+
+	jpstr = Array(&quot;Start&quot;,&quot;1 (1 Civ)&quot;,&quot;2&quot;,&quot;3 (2 Civs)&quot;)	
+	LogThis &quot;Pursuit track Set to &quot; &amp; jpstr(pursuitstate)
+end sub
+
+sub RandomDieRoll
+	dim diesize as integer
+	GetGS
+	Randomize
+
+	diesize = GameSheet.GetCellByPosition(_DieRollCol,_DieRollRow).value
+	MsgBox &quot;Random # from 1 - &quot; &amp; diesize &amp; &quot; = &quot; &amp; Int(RND()*diesize)+1,0,&quot;Die Roll&quot;
+end sub
+
+
+sub UpdateGalDamList
+	dim loclst(8) as string
+	dim i, damcnt, sel(1) as integer
+	GetGS
+
+	damcnt = 0
+	for i =1 to 8
+		if GameSheet.GetCellByPosition(_GalDmgCol+1, _GalDmgRow+i).string = &quot;&quot; and GameSheet.GetCellByPosition(_GalDmgCol+2, _GalDmgRow+i).string = &quot;&quot; then
+			loclst(damcnt) = GameSheet.GetCellByPosition(_GalDmgCol, _GalDmgRow+i).string 
+			damcnt=damcnt+1
+		end if
+	next i
+	
+	GameForm.getByName(&quot;lstSelectGalDamage&quot;).StringItemList=g_emptylst()	
+	GameForm.getByName(&quot;lstSelectGalDamage&quot;).StringItemList=loclst()
+	
+	sel(0)=0
+	GameForm.getByName(&quot;lstSelectGalDamage&quot;).SelectedItems()=sel()
+
+end sub
+
+&apos;+== do we want to consolidate the functions around galactica &amp; pegasus damage?
+
+sub DamageGalactica
+	dim dmgID, resID, dmgcnt, i as integer
+	dim dmgstr as string
+	dim rtncd as integer
+	dim dmgloclst(6) as string
+	GetGS
+	
+	dmgstr=GameForm.getByName(&quot;lstSelectGalDamage&quot;).StringItemList(	GameForm.getByName(&quot;lstSelectGalDamage&quot;).SelectedItems(0))
+	
+	rtncd = MsgBox (&quot;Do you really want to damage &quot; &amp; dmgstr &amp; &quot;?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	&apos;find the damage token
+	for i =1 to 8
+		if GameSheet.GetCellByPosition(_GalDmgCol, _GalDmgRow+i).string = dmgstr then
+			dmgid = i
+			exit for
+		end if
+	next i
+	
+	&apos;lets find out what type it is	
+	if instr(dmgstr,&quot;Resource&quot;) &gt; 0 then
+		&apos;loss of food or fuel
+		if left(dmgstr,4) = &quot;Fuel&quot; then
+			resID = 0
+		else
+			resID = 1
+		end if
+		GameSheet.GetCellByPosition(_GalDmgCol+2, _GalDmgRow + dmgID).string = &quot;X&quot;
+		LogThis &quot;Galactica DAMAGED - Loss of &quot; &amp; left(dmgstr,4)
+		ReduceResource resID
+		
+	else
+		&apos;damage a location
+		GameSheet.GetCellByPosition(_GalDmgCol+1, _GalDmgRow + dmgID).string = &quot;X&quot;
+		dmgcnt = 0
+		for i = 1 to 8
+			if GameSheet.GetCellByPosition(_GalDmgCol+1, _GalDmgRow+i).string = &quot;X&quot; then
+				dmgcnt=dmgcnt+1
+				dmgloclst(dmgcnt) = GameSheet.GetCellByPosition(_GalDmgCol, _GalDmgRow+i).string 
+			end if
+		next i
+		
+		GameForm.getByName(&quot;lstDamaged&quot;).StringItemList=g_emptylst()	
+		GameForm.getByName(&quot;lstDamaged&quot;).StringItemList=dmgloclst()
+		
+		GameForm.getByName(&quot;btnRepairGalactica&quot;).enabled=TRUE
+		LogThis dmgstr &amp; &quot; DAMAGED&quot;
+		DamageLocation dmgstr
+		Board_RefreshLocationDamage
+	end if
+	UpdateGalDamList
+end sub		&apos;DamageGalactica
+
+&apos; if a location is damaged, send anyone who is there to sickbay
+sub DamageLocation (locname as string)
+	dim i as integer
+	
+	for i = 1 to playercnt()
+		if GetPlayerLoc(i) = locname then
+			SetPlayerLoc i, &quot;Sickbay&quot;
+			LogThis GetPlayerName(i) &amp; &quot; sent to Sickbay.&quot;
+			MsgBox GetPlayerName(i) &amp; &quot; sent to Sickbay!&quot;
+		end if
+	next i
+	
+	if ObjectiveIsIonianNebula then
+		InactivateAllyLocation(locname)
+	end if
+end sub
+
+sub ReduceResource (resid as integer) 
+	GetGS
+	GameSheet.GetCellByPosition(_ResourceCol + resID, _ResTrackRow).value = GameSheet.GetCellByPosition(_ResourceCol + resID, _ResTrackRow).value -1
+	UpdateResource
+end sub
+
+sub IncreaseResource (resid as integer)
+	GetGS
+	GameSheet.GetCellByPosition(_ResourceCol + resID, _ResTrackRow).value = GameSheet.GetCellByPosition(_ResourceCol + resID, _ResTrackRow).value +1
+	UpdateResource
+end sub
+
+function GetResource (resID as integer) as integer
+	GetGS
+	GetResource = GameSheet.GetCellByPosition(_ResourceCol + resID, _ResTrackRow).value 
+end function
+
+
+function IsDamaged (locstr as string) as boolean
+	dim i as integer
+	GetGS
+	
+	IsDamaged=FALSE	
+	for i =1 to 8
+		if GameSheet.GetCellByPosition(_GalDmgCol, _GalDmgRow+i).string = locstr then
+			if GameSheet.GetCellByPosition(_GalDmgCol+1, _GalDmgRow+i).string = &quot;X&quot; then
+				IsDamaged=TRUE
+			end if
+			exit for
+		end if
+	next i
+	for i =1 to 4
+		if GameSheet.GetCellByPosition(_PegDmgCol, _PegDmgRow+i).string = locstr then
+			if GameSheet.GetCellByPosition(_PegDmgCol+1, _PegDmgRow+i).string = &quot;X&quot; then
+				IsDamaged=TRUE
+			end if
+			exit for
+		end if
+	next i
+
+end function		&apos;IsDamaged
+
+sub RepairGalactica
+	dim dmgID, dmgcnt, rtncd, i,j as integer
+	dim dmgstr, tmpstr as string
+	dim dmgloclst(6) as string
+		
+	GetGS
+	dmgID = GetSelected(_ListGameDamaged)
+	if dmgID = -1 then
+		MsgBox &quot;Please select a location to REPAIR.&quot;
+		exit sub
+	end if
+	dmgstr = GameForm.getByName(&quot;lstDamaged&quot;).StringItemList(dmgid)
+	
+	rtncd = MsgBox (&quot;REPAIR the &quot; &amp; dmgstr &amp; &quot;?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+
+	&apos;find the actual location
+	for i = 1 to 8
+		if GameSheet.GetCellByPosition(_GalDmgCol, _GalDmgRow+i).string = dmgstr then
+			dmgid = i
+			exit for
+		end if
+	next i
+
+	&apos;repair the location, then reshuffle the damage tokens
+	GameForm.getByName(&quot;lstDamaged&quot;).StringItemList=g_emptylst()	
+	GameSheet.GetCellByPosition(_GalDmgCol+1, _GalDmgRow + dmgID).string = &quot;&quot;
+	dmgcnt = 0
+	for i = 1 to 8
+		if GameSheet.GetCellByPosition(_GalDmgCol+1, _GalDmgRow+i).string = &quot;X&quot; then
+			dmgcnt=dmgcnt+1
+			dmgloclst(dmgcnt) = GameSheet.GetCellByPosition(_GalDmgCol, _GalDmgRow+i).string
+		end if
+	next i
+
+	if dmgcnt &gt; 0 then
+		GameForm.getByName(&quot;lstDamaged&quot;).StringItemList=dmgloclst()
+		GameForm.getByName(&quot;btnRepairGalactica&quot;).enabled=TRUE
+	else
+		GameForm.getByName(&quot;btnRepairGalactica&quot;).enabled=FALSE
+	end if
+	LogThis dmgstr &amp; &quot; REPAIRED&quot;
+	Board_RefreshLocationDamage
+	
+	ShuffleDamage
+end sub		&apos;RepairGalactica
+
+
+sub ShuffleDamage
+	dim dmgID, i, j as integer
+	dim dmgsort(8), tmpval as double
+	dim tmpstr as string
+	
+	for dmgID = 1 to 8
+		if GameSheet.GetCellByPosition(_GalDmgCol+1, _GalDmgRow+dmgID).string = &quot;X&quot; then
+			dmgsort(dmgID) = 2
+			
+		elseif GameSheet.GetCellByPosition(_GalDmgCol+2, _GalDmgRow+dmgID).string = &quot;X&quot; then
+			dmgsort(dmgID) = 3
+			
+		else
+			dmgsort(dmgID) = rnd()
+		end if
+	next dmgID
+		
+	for i= 1 to 7
+		for j = i+1 to 8
+			if dmgsort(i) &gt; dmgsort(j) then
+				tmpval = dmgsort(i)
+				tmpstr = GameSheet.GetCellByPosition(_GalDmgCol, _GalDmgRow+i).string
+				
+				dmgsort(i) = dmgsort(j)
+				GameSheet.GetCellByPosition(_GalDmgCol, _GalDmgRow+i).string = GameSheet.GetCellByPosition(_GalDmgCol, _GalDmgRow+j).string
+				
+				dmgsort(j) = tmpval
+				GameSheet.GetCellByPosition(_GalDmgCol, _GalDmgRow+j).string = tmpstr
+			end if
+		next j
+	next i
+	for i = 1 to 8
+		if dmgsort(i) = 2 then
+			GameSheet.GetCellByPosition(_GalDmgCol+1, _GalDmgRow+i).string	= &quot;X&quot;
+		else
+			GameSheet.GetCellByPosition(_GalDmgCol+1, _GalDmgRow+i).string	= &quot;&quot;
+		end if
+		if dmgsort(i) = 3 then
+			GameSheet.GetCellByPosition(_GalDmgCol+2, _GalDmgRow+i).string	= &quot;X&quot;
+		else
+			GameSheet.GetCellByPosition(_GalDmgCol+2, _GalDmgRow+i).string	= &quot;&quot;
+		end if
+	next i
+	UpdateGalDamList
+end sub		&apos;ShuffleDamage
+
+sub UpdatePegDamList
+	dim loclst(8) as string
+	dim i, damcnt, sel(1) as integer
+	GetGS
+
+	damcnt = 0
+	for i =1 to 4
+		if GameSheet.GetCellByPosition(_PegDmgCol+1, _PegDmgRow+i).string = &quot;&quot; and GameSheet.GetCellByPosition(_PegDmgCol+2, _PegDmgRow+i).string = &quot;&quot; then
+			loclst(damcnt) = GameSheet.GetCellByPosition(_PegDmgCol, _PegDmgRow+i).string 
+			damcnt=damcnt+1
+		end if
+	next i
+	
+	GameForm.getByName(&quot;lstSelectPegDamage&quot;).StringItemList=g_emptylst()	
+	GameForm.getByName(&quot;lstSelectPegDamage&quot;).StringItemList=loclst()
+	
+	sel(0)=0
+	GameForm.getByName(&quot;lstSelectPegDamage&quot;).SelectedItems()=sel()
+
+end sub	&apos;UpdatePegDamList
+
+
+sub DamagePegasus
+	dim dmgID, resID, dmgcnt, i, playerID as integer
+	dim dmgstr as string
+	dim rtncd as integer
+	dim dmgloclst(4) as string
+	
+	GetGS
+	dmgstr=GameForm.getByName(&quot;lstSelectPegDamage&quot;).StringItemList(	GameForm.getByName(&quot;lstSelectPegDamage&quot;).SelectedItems(0))
+	
+	rtncd = MsgBox (&quot;Do you really want to damage &quot; &amp; dmgstr &amp; &quot;?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	&apos;find the damage token
+	for i =1 to 8
+		if GameSheet.GetCellByPosition(_PegDmgCol, _PegDmgRow+i).string = dmgstr then
+			dmgid = i
+			exit for
+		end if
+	next i
+	
+	&apos;damage a location
+	GameSheet.GetCellByPosition(_PegDmgCol+1, _PegDmgRow + dmgID).string = &quot;X&quot;
+	dmgcnt = 0
+	for i = 1 to 4
+		if GameSheet.GetCellByPosition(_PegDmgCol+1, _PegDmgRow+i).string = &quot;X&quot; then
+			dmgcnt=dmgcnt+1
+			dmgloclst(dmgcnt) = GameSheet.GetCellByPosition(_PegDmgCol, _PegDmgRow+i).string 
+		end if
+	next i
+		
+	GameForm.getByName(&quot;lstDamagedPeg&quot;).StringItemList=g_emptylst()	
+	GameForm.getByName(&quot;lstDamagedPeg&quot;).StringItemList=dmgloclst()
+		
+	GameForm.getByName(&quot;btnRepairPegasus&quot;).enabled=TRUE
+	LogThis dmgstr &amp; &quot; DAMAGED&quot;
+	DamageLocation dmgstr
+	Board_RefreshLocationDamage
+	UpdatePegDamList
+	
+	if dmgcnt = 4 then
+		MsgBox &quot;Pegasus has been DESTROYED!&quot;
+		LogThis &quot;Pegasus DESTROYED!&quot;
+		Board_SetSpecial &quot;Pegasus&quot;
+		GameForm.getByName(&quot;btnDamagePegasus&quot;).enabled=FALSE
+		GameForm.getByName(&quot;btnRepairPegasus&quot;).enabled=FALSE
+		for playerid=1 to PlayerCnt()
+			if IsPegasusLoc(GetPlayerLoc(playerid)) then
+				SetPlayerLoc playerid, &quot;Sickbay&quot;
+				MsgBox GetPlayerName(playerID) &amp; &quot; sent to Sickbay.&quot;
+				LogThis GetPlayerName(playerID) &amp; &quot; sent to Sickbay.&quot;
+			end if
+		next playerid
+		
+		if ObjectiveIsIonianNebula() then
+			ClearLocationAllies &quot;Pegasus&quot;
+		end if
+	end if
+end sub		&apos;DamagePegasus
+
+
+sub RepairPegasus
+	dim dmgID, dmgcnt, rtncd, i,j as integer
+	dim dmgstr, tmpstr as string
+	dim dmgloclst(4) as string
+		
+	GetGS
+	dmgID = GetSelected(_ListGameDamagedPeg)
+	if dmgID = -1 then
+		MsgBox &quot;Please select a location to REPAIR.&quot;
+		exit sub
+	end if
+	dmgstr = GameForm.getByName(&quot;lstDamagedPeg&quot;).StringItemList(dmgid)
+	
+	rtncd = MsgBox (&quot;REPAIR the &quot; &amp; dmgstr &amp; &quot;?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+
+	&apos;find the actual location
+	for i = 1 to 4
+		if GameSheet.GetCellByPosition(_PegDmgCol, _PegDmgRow+i).string = dmgstr then
+			dmgid = i
+			exit for
+		end if
+	next i
+
+	&apos;repair the location, then reshuffle the damage tokens
+	GameForm.getByName(&quot;lstDamagedPeg&quot;).StringItemList=g_emptylst()
+	GameSheet.GetCellByPosition(_PegDmgCol+1, _PegDmgRow + dmgID).string = &quot;&quot;
+	dmgcnt = 0
+	for i = 1 to 4
+		if GameSheet.GetCellByPosition(_PegDmgCol+1, _PegDmgRow+i).string = &quot;X&quot; then
+			dmgcnt=dmgcnt+1
+			dmgloclst(dmgcnt) = GameSheet.GetCellByPosition(_PegDmgCol, _PegDmgRow+i).string
+		end if
+	next i
+
+	if dmgcnt &gt; 0 then
+		GameForm.getByName(&quot;lstDamagedPeg&quot;).StringItemList=dmgloclst()
+		GameForm.getByName(&quot;btnRepairPegasus&quot;).enabled=TRUE
+	else
+		GameForm.getByName(&quot;btnRepairPegasus&quot;).enabled=FALSE
+	end if
+	LogThis dmgstr &amp; &quot; REPAIRED&quot;
+	Board_RefreshLocationDamage
+	
+	ShuffleDamagePeg
+end sub		&apos;RepairPegasus
+
+
+sub ShuffleDamagePeg
+	dim dmgID, i, j as integer
+	dim dmgsort(4), tmpval as double
+	dim tmpstr as string
+	
+	for dmgID = 1 to 4
+		if GameSheet.GetCellByPosition(_PegDmgCol+1, _PegDmgRow+dmgID).string = &quot;X&quot; then
+			dmgsort(dmgID) = 2
+			
+		elseif GameSheet.GetCellByPosition(_PegDmgCol+2, _PegDmgRow+dmgID).string = &quot;X&quot; then
+			dmgsort(dmgID) = 3
+			
+		else
+			dmgsort(dmgID) = rnd()
+		end if
+	next dmgID
+		
+	for i= 1 to 3
+		for j = i+1 to 4
+			if dmgsort(i) &gt; dmgsort(j) then
+				tmpval = dmgsort(i)
+				tmpstr = GameSheet.GetCellByPosition(_PegDmgCol, _PegDmgRow+i).string
+				
+				dmgsort(i) = dmgsort(j)
+				GameSheet.GetCellByPosition(_PegDmgCol, _PegDmgRow+i).string = GameSheet.GetCellByPosition(_PegDmgCol, _PegDmgRow+j).string
+				
+				dmgsort(j) = tmpval
+				GameSheet.GetCellByPosition(_PegDmgCol, _PegDmgRow+j).string = tmpstr
+			end if
+		next j
+	next i
+	for i = 1 to 4
+		if dmgsort(i) = 2 then
+			GameSheet.GetCellByPosition(_PegDmgCol+1, _PegDmgRow+i).string	= &quot;X&quot;
+		else
+			GameSheet.GetCellByPosition(_PegDmgCol+1, _PegDmgRow+i).string	= &quot;&quot;
+		end if
+		if dmgsort(i) = 3 then
+			GameSheet.GetCellByPosition(_PegDmgCol+2, _PegDmgRow+i).string	= &quot;X&quot;
+		else
+			GameSheet.GetCellByPosition(_PegDmgCol+2, _PegDmgRow+i).string	= &quot;&quot;
+		end if
+	next i
+	UpdatePegDamList
+end sub		&apos;ShuffleDamagePeg
+
+
+
+sub RefreshViewLog
+	&apos;this is called by LogThis...we only want to bother if the current turn is being viewed
+	GetGS
+
+	if GameSheet.GetCellByPosition(_LogViewCol,_LogViewRow).value = GameForm.getByName(&quot;spinLog&quot;).SpinValueMax then
+		ViewLog
+	end if
+end sub
+
+sub ViewLog 
+	&apos;load the list box with the rows for the selected turn.  
+	dim rawturn as integer
+	dim turnID as string
+	GetGS
+
+	&apos;first, make sure the spin button has the current max
+	rawturn = GameSheet.GetCellByPosition(_LogViewCol,_LogViewRow).value
+	if rawturn &gt; GameForm.getByName(&quot;spinLog&quot;).SpinValueMax then
+		GameForm.getByName(&quot;spinLog&quot;).SpinValueMax = rawturn
+		&apos;change and reset the value to reset the spinner
+		GameSheet.GetCellByPosition(_LogViewCol,_LogViewRow).value=rawturn+1
+		GameSheet.GetCellByPosition(_LogViewCol,_LogViewRow).value=rawturn
+	end if
+	
+	&apos;next, load the list
+	turnID = int ((rawturn-1)/PlayerCnt()) +1 &amp; &quot;.&quot; &amp; ((rawturn-1) MOD PlayerCnt())+1
+
+	GameForm.getByName(&quot;lblLogView&quot;).label = &quot;View Game Log for turn &quot; &amp; turnID
+	
+	GameForm.getByName(&quot;lstLogView&quot;).StringItemList=g_emptylst()	
+	GameForm.getByName(&quot;lstLogView&quot;).StringItemList=GetLogByTurn(turnID)
+end sub
+
+function GetCurrentPlayer as integer
+	GetGS
+	GetCurrentPlayer = GameSheet.GetCellByPosition(_TurnCol+1,_TurnRow).value
+end function	
+
+
+function GetNextTitle (titleFlag as integer, optional mutineer as integer) as integer
+	dim playerID, titleID, lastRank as integer
+	
+	if IsMissing(mutineer) then
+		mutineer	= 0
+	end if
+	
+	titleID = 0
+	lastRank = 99
+	for playerID = 1 to PlayerCnt()
+		if RefTitleRank(GetPlayerName(playerID), titleFlag) &lt; lastRank AND playerID &lt;&gt; mutineer and _
+			Not IsRevealed(playerID) and (GetPlayerLoc(playerID) &lt;&gt; &quot;Brig&quot; or titleFlag = _TitlePresident) then
+			titleID = playerID
+			lastRank = RefTitleRank(GetPlayerName(playerID), titleflag)
+		end if
+	next playerID
+	
+	if titleID = 0 then
+		&apos; this can only happen if everyone is in the brig and we&apos;re looking for an admiral or CAG
+		&apos;	so try it again with slighly less stringent restrictions..
+		for playerID = 1 to PlayerCnt()
+			if RefTitleRank(GetPlayerName(playerID), titleflag) &lt; lastRank AND Not IsRevealed(playerID) then
+				titleID = playerID
+				lastRank = RefTitleRank(GetPlayerName(playerID), titleflag)
+			end if
+		next playerID
+	end if
+
+	GetNextTitle = titleID
+end function	&apos;GetNextTitle
+
+function GetSCCount (playerID as integer) as integer
+	GetGS
+	
+	GetSCCount = GameSheet.GetCellByPosition(_PlayerSuperCol,_PlayerStartRow + playerID).Value
+end function
+
+sub SetSCCount (playerID as integer, sccnt as integer)
+	GetGS
+	
+	GameSheet.GetCellByPosition(_PlayerSuperCol,_PlayerStartRow + playerID).Value = sccnt
+end sub
+		
+sub Initialize_GameState
+	dim playerLoc, refstart, refalt as string
+	dim playerID, presID, admID, viperID as integer
+	dim resID, jumpstate as integer
+	dim ResStart as variant
+
+	PopulatePlayers
+	
+	for playerID = 1 to 7
+		SetPlayerViper playerID, 0
+		SetOPG playerID, 1
+		SetSCCount playerID, 0
+		SetInfiltrate playerID, FALSE
+		SetRevealed playerID, TRUE	&apos; Yes it&apos;s wonky, the toggle is actually meant as &quot;clear&quot;
+		GameSheet.GetCellByPosition(_PlayerLocCol, _PlayerStartRow + playerID).string = &quot;&quot;
+		if playerID &gt; PlayerCnt() then
+			SetLoyaltyBlank playerID
+			GameSheet.GetCellByPosition(_PlayerOPGCol, _PlayerStartRow + playerID).string = &quot;&quot;
+			GameSheet.GetCellByPosition(_PlayerCylonCol, _PlayerStartRow + playerID).string = &quot;&quot;
+		end if
+	next playerID
+
+	&apos; set initial President, Admiral, and starting location
+	UpdateTitle GetNextTitle(_TitlePresident), _TitlePresident
+	UpdateTitle GetNextTitle(_TitleAdmiral), _TitleAdmiral
+	if UseCylonFleet() then
+		UpdateTitle GetNextTitle(_TitleCAG), _TitleCAG
+	else
+		UpdateTitle 0, _TitleCAG
+	end if
+
+	for playerID = 1 to PlayerCnt()
+		refstart = RefStartLocation(GetPlayerName(playerID))
+		if instr(refStart,&quot;/&quot;) &gt; 0 then
+			refAlt = Mid(refStart,instr(refStart,&quot;/&quot;)+2)
+			refStart = Left(refstart, instr(refStart,&quot;/&quot;)-2)
+		else
+			refAlt = &quot;&quot;
+		end if
+		
+		SetPlayerLoc playerid, refStart
+		
+		if left(refStart,6)=&quot;Sector&quot; then
+			viperid = GetAvailableShip(_ShipViper)
+		
+			SetViperPilot PlayerID, ViperID, _ShipViper
+			SetPlayerViper PlayerID, ViperID
+			SetShipStatus _ShipViper, ViperID, _ShipStatusActivate
+		end if
+		
+		if GetPlayerName(playerID) = &quot;Athena&quot; then
+			SetInfiltrate(playerID, TRUE)
+		end if
+		
+		if refAlt &lt;&gt; &quot;&quot; then
+			MsgBox GetPlayerName(playerID) &amp; &quot; has been temporarily placed in &quot; &amp; refStart &amp; &quot;; be sure to check if the starting location should be &quot; &amp; refAlt &amp; &quot;, instead.&quot;,0,&quot;Starting Locations&quot;
+		end if
+	next playerID
+	
+	&apos; reset all resource counters
+	ResStart = Array (8,8,10,12)
+	for resID = 0 to 3
+		GameSheet.GetCellByPosition(_ResourceCol + resID, _ResTrackRow).value = ResStart(resID)
+	next resID
+	UpdateResource
+	
+	&apos; reset Nukes
+	GameSheet.GetCellByPosition(_NukeCol,_NukeRow).value = 2
+	GameForm.getByName(&quot;btnNuke&quot;).enabled = TRUE
+
+	&apos; reset Jump Track to the start
+	GameForm.getByName(&quot;spinJumpPrep&quot;).enabled = TRUE
+	GameSheet.GetCellByPosition(_JumpPrepCol+2, _JumpPrepRow+2).value = 0
+	for jumpstate = 0 to 4
+		if jumpstate = 0 then
+			GameSheet.GetCellByPosition(_JumpPrepCol+jumpstate, _JumpPrepRow).string = &quot;x&quot;
+		else
+			GameSheet.GetCellByPosition(_JumpPrepCol+jumpstate, _JumpPrepRow).string = &quot;&quot;
+		end if
+	next jumpstate
+	SetJumpTrack 0
+	SetPursuitTrack 0
+
+	&apos; clear any damage and shuffle the Galactia Damage tokens
+	for resID = 1 to 8
+		GameSheet.GetCellByPosition(_GalDmgCol+1, _GalDmgRow+resID).string = &quot;&quot;
+		GameSheet.GetCellByPosition(_GalDmgCol+2, _GalDmgRow+resID).string = &quot;&quot;
+	next resID
+	
+	&apos; clear damage and shuffle Pegasus tokens
+	for resID = 1 to 4
+		GameSheet.GetCellByPosition(_PegDmgCol+1, _PegDmgRow+resID).string = &quot;&quot;
+		GameSheet.GetCellByPosition(_PegDmgCol+2, _PegDmgRow+resID).string = &quot;&quot;
+	next resID
+	GameForm.getByName(&quot;lstDamaged&quot;).StringItemList=g_emptylst()	
+	GameForm.getByName(&quot;btnRepairGalactica&quot;).enabled=FALSE
+	GameForm.getByName(&quot;lstDamagedPeg&quot;).StringItemList=g_emptylst()	
+	GameForm.getByName(&quot;btnDamagePegasus&quot;).enabled=TRUE
+	GameForm.getByName(&quot;btnRepairPegasus&quot;).enabled=FALSE
+
+	ShuffleDamage
+	ShuffleDamagePeg
+
+	&apos; reset various buttons/controls
+	GameSheet.GetCellByPosition(_DieRollCol,_DieRollRow).value = 8
+
+	Configure_GameState	
+	
+	&apos; reset the turn to 1.1
+	GameSheet.GetCellByPosition(_TurnCol,_TurnRow).value = 1
+	GameSheet.GetCellByPosition(_TurnCol+1,_TurnRow).value = 1
+	HighlightCurrentPlayer
+
+	GameSheet.GetCellByPosition(_LogViewCol,_LogViewRow).value = 1
+	GameForm.getByName(&quot;spinLog&quot;).SpinValueMax=1
+	Board_SetCurrentPlayer 
+	Skills_SetCurrentPlayer 
+	SetGamePhase _PhaseInSpace
+	if ObjectiveIsColony() then
+		GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow+3).string = &quot;Colony&quot;
+	elseif ObjectiveIsEarth() then
+		GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow+3).string = &quot;Earth&quot;
+	elseif ObjectiveIsNewCaprica() then
+		GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow+3).string = &quot;New Caprica&quot;
+	elseif ObjectiveIsIonianNebula() then
+		GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow+3).string = &quot;Ionian Nebula&quot;
+	else
+		GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow+3).string = &quot;Kobol&quot;
+	end if
+	if UseCylonFleet() then
+		GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow+6).string = &quot;Cylon Fleet&quot;
+	else
+		GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow+6).string = &quot;Standard&quot;
+	end if
+	SetInitFlag FALSE
+	UpdateLocations
+	ConfigureButtons
+	SetInitFlag TRUE
+	SetModuleFlags
+end sub	&apos;Initialize_GameState
+
+sub HighlightCurrentPlayer
+	dim playerID, resID as integer
+	
+	for playerID = 1 to PlayerCnt()
+		for resID=_PlayerEmailCol to _PlayerLocCol
+			if resID &lt;&gt; _PlayerCAGCol OR UseCylonFleet() then
+				if playerID = GetCurrentPlayer() then
+					GameSheet.GetCellByPosition(resID,_PlayerStartRow+playerID).CellBackColor=_yellow
+				else
+					GameSheet.GetCellByPosition(resID,_PlayerStartRow+playerID).CellBackColor=_white
+				end if
+			end if
+		next resID
+	next playerID
+end sub
+
+
+&apos;Enable/disable and hide/show elements of the tab based on the game and expansions
+&apos;Note: location list is managed in the UpdateLocations procedure already
+Sub Configure_GameState
+	dim isPeg,  isExodus as boolean
+	dim iRow, iCol as integer
+	dim btnTmp as object
+	dim tmp2 as object
+	dim tmpclr as variant
+	GetGS
+
+	isPeg = GameTypeIsPegasus()
+	isExodus = GameTypeIsExodus()
+		
+	GameForm.getByName(&quot;lblDamagePeg&quot;).enabled = isPeg
+	GameForm.getByName(&quot;lstSelectPegDamage&quot;).enabled = isPeg
+	GameForm.getByName(&quot;btnDamagePegasus&quot;).enabled = isPeg
+	GameForm.getByName(&quot;lblRepairPeg&quot;).enabled = isPeg
+	GameForm.getByName(&quot;lstDamagedPeg&quot;).enabled = isPeg
+	GameForm.getByName(&quot;lstExecute&quot;).enabled = (isPeg OR isExodus)
+	GameForm.getByName(&quot;btnCAG&quot;).enabled = UseCylonFleet()
+	
+	for iCol = _PegDmgCol to _PegDmgCol+2
+		for iRow = _PegDmgRow to _PegDmgRow+4
+			if isPeg then
+				GameSheet.GetCellByPosition(iCol, iRow).CellBackColor = _white
+			else
+				GameSheet.GetCellByPosition(iCol, iRow).CellBackColor = _grey
+			end if
+		next iRow
+	next iCol
+	
+	&apos;grey out the CAG row for non-Exodus/cylon fleet games
+	for iRow = 1 to 7
+		if UseCylonFleet() or iRow &gt; PlayerCnt() then
+			GameSheet.GetCellByPosition(_PlayerCAGCol, _PlayerStartRow + iRow).CellBackColor = _white
+		else
+			GameSheet.GetCellByPosition(_PlayerCAGCol, _PlayerStartRow + iRow).CellBackColor = _grey
+		end if
+	next iRow
+
+	for icol = _PursuitCol to _PursuitCol + 4
+		if UseCylonFleet() then
+			GameSheet.GetCellByPosition(icol, _PursuitRow).CellBackColor = _white
+			GameSheet.GetCellByPosition(icol, _PursuitRow -1).CellBackColor = _white
+		else	
+			GameSheet.GetCellByPosition(icol, _PursuitRow).CellBackColor = _grey
+			GameSheet.GetCellByPosition(icol, _PursuitRow -1).CellBackColor = _grey
+		end if
+	next iCol
+	GameForm.getByName(&quot;spinPursuit&quot;).enabled = UseCylonFleet()
+		
+end sub	&apos;Configure_Gamestate
+
+sub SetOPG (playerID as integer, num as integer)
+	GetGS
+	
+	GameSheet.GetCellByPosition(_PlayerOPGCol, _PlayerStartRow + playerID).value = num
+end sub
+
+function GetMiracles (playerID as integer)
+	GetGS
+	GetMiracles	= GameSheet.GetCellByPosition(_PlayerOPGCol, _PlayerStartRow + playerID).value
+end function
+
+function OPGUsed (playerid as integer) as Boolean
+	GetGS
+	OPGUsed = (GameSheet.GetCellByPosition(_PlayerOPGCol, _PlayerStartRow + playerID).value = 0)
+end function
+
+sub GainMiracle
+	GetGS
+	dim playerID, rtncd as integer
+	
+	playerID = GetSelected(_ListGamePlayers)
+	
+	if PlayerID = -1 then
+		MsgBox &quot;Please select a Character.&quot;,0,&quot;OPG&quot;
+		exit sub
+	end if
+	
+	if GameTypeIsDaybreak() then
+		SetOPG (playerID, GetMiracles(playerID) + 1)
+		LogThis GetPlayerName(playerID) &amp; &quot; gains a Miracle Token!&quot;
+	end if
+	ConfigureButtons
+end sub
+
+sub UseOPG
+	GetGS
+	dim playerID, rtncd as integer
+	
+	playerID = GetSelected(_ListGamePlayers)
+	
+	if PlayerID = -1 then
+		MsgBox &quot;Please select a Character.&quot;,0,&quot;OPG&quot;
+		exit sub
+	else
+		if GetPlayerName(playerID) = &quot;Gaius&quot; then
+			if GetMiracles(playerID) = 3 then
+				rtncd 	= MsgBox(&quot;Use Broadcast?&quot;, 4, &quot;OPG&quot;)
+				if rtncd = 6 then
+					SetOPG playerID, 0
+					GameForm.getByName(&quot;btnOPG&quot;).enabled = FALSE
+					LogThis &quot;Gaius spends 3 Miracle Tokens on Broadcast.&quot;
+					exit sub
+				end if
+			end if
+			
+			rtncd	= MsgBox(&quot;Gaius hands off a Miracle Token?&quot;, 4, &quot;OPG&quot;)
+			if rtncd = 6 then
+				SetOPG playerID, GetMiracles(playerID) - 1
+				LogThis &quot;Gaius hands off a Miracle Token.&quot;
+				exit sub
+			end if
+		else
+			rtncd = MsgBox(&quot;Use &quot; &amp; GetPlayerName(playerID) &amp; &quot;&apos;s Once-per-game ability?&quot;,4,&quot;OPG&quot;)
+			if rtncd &lt;&gt; 6 then
+				exit sub
+			end if
+			SetOPG playerID, 0
+			LogThis GetPlayerName(playerID) &amp; &quot; uses their Once-Per-Game ability.&quot;
+			GameForm.getByName(&quot;btnOPG&quot;).enabled = FALSE
+		end if
+	end if
+end sub
+
+sub SetPlayerSelect (playerID as integer)
+	&apos;selects the current player in both the player select boxes
+	dim tmplst(7) as string
+&apos;	tmplst= GameForm.getByName(&quot;lstPlayers&quot;).SelectedItems()
+	tmplst(0) = playerID
+	GameForm.getByName(&quot;lstPlayers&quot;).SelectedItems=tmplst
+	UpdateLocations
+	SkillForm.getByName(&quot;lstPlayers&quot;).SelectedItems=tmplst
+	Populate_Handlist
+end sub
+
+
+sub GenerateBoardImage
+	dim gimpexe, gimpparm, batchname as string
+	dim viewoption as boolean
+	GetGS
+	
+	gimpexe=GetGIMPPath()
+	gimpparm=&quot;&quot;
+
+	if Not FileExists(gimpexe) then
+		MsgBox &quot;Selected GIMP exe file does not exist.  Please go to the &apos;Setup&apos; tab and correct this.&quot;,48,&quot;Image Generation&quot;
+		exit sub
+	end if
+	if not FileExists(GetPath(FALSE) &amp; GetXCFMasterName() ) then
+		MsgBox &quot;Master Image file does not exist:  &quot; &amp; GetPath(FALSE) &amp; GetXCFMasterName(),48,&quot;Image Generation&quot;
+		exit sub
+	end if
+
+	&apos;is the interactive option set?
+			
+	viewoption= (GameForm.getByName(&quot;chkViewGIMP&quot;).state = 1)
+	if not viewoption then
+		gimpparm=&quot;-i &quot;
+	end if
+
+&apos;	if GameTypeIsPegasus() then
+		batchname=&quot;script-fu-BSGP-Run-Batch&quot;
+&apos;	else
+&apos;		batchname=&quot;script-fu-BSG-Run-Batch&quot;
+&apos;	end if
+
+&apos;	need the command line to be slightly different for windows or unix
+	if Instr(gimpexe,&quot;\&quot;) &gt; 0 then
+		&apos;windows
+		gimpparm=gimpparm &amp; &quot;-b &quot;&quot;(&quot; &amp; batchname &amp; &quot; \&quot;&quot;&quot; &amp; GetPath(TRUE) &amp; GetCSVFName() &amp; &quot;\&quot;&quot;)&quot;&quot;&quot;
+		
+		if not viewoption then
+			gimpparm = gimpparm &amp; &quot; -b &quot;&quot;(gimp-quit 1)&quot;&quot;&quot;
+		end if
+	else
+		&apos;unix
+		gimpparm=gimpparm &amp; &quot;-b &apos;(&quot; &amp; batchname &amp; &quot; &quot;&quot;&quot; &amp; GetPath(FALSE) &amp; GetCSVFName() &amp; &quot;&quot;&quot;)&apos;&quot;
+		
+		if not viewoption then
+			gimpparm = gimpparm &amp; &quot; -b &apos;(gimp-quit 1)&apos;&quot;
+		end if
+	end if
+	
+	SaveCSV
+	shell (gimpexe, 0, gimpparm)
+end sub
+
+sub LandPlayers
+	dim playerID as integer	
+	GetGS
+	
+	for playerID = 1 to PlayerCnt()
+		if IsRevealed(playerID) and NOT IsInfiltrating(playerID) then
+			SetPlayerLoc playerID, &quot;Occupation Authority&quot;
+			LogThis	GetPlayerName(playerID) &amp; &quot; moved to Occupation Authority&quot;
+		else
+			SetPlayerLoc playerID, &quot;Resistance HQ&quot;
+			LogThis	GetPlayerName(playerID) &amp; &quot; moved to Resistance HQ&quot;
+		end if
+	next playerID
+	
+end sub
+
+sub Infiltrate
+	dim playerID as integer
+	dim resship as string
+	GetGS
+	
+	playerID = GetSelected(_ListGamePlayers)
+	if IsInfiltrating(playerID) then
+&apos;		if HubDestroyed() then
+&apos;			resship = &quot;Hub Destroyed&quot;
+&apos;		else
+			resship = &quot;Resurrection Ship&quot;
+&apos;		end if
+		if MsgBox(&quot;Exfiltrate &quot; &amp; GetPlayerName(playerID) &amp; &quot; to the &quot; &amp; resship &amp; &quot;?&quot;, 4, &quot;Exfiltrate&quot;) = 6 then
+			if GetPlayerLoc(playerID) = &quot;Brig&quot; then
+				MsgBox &quot;Don&apos;t forget to discard down to 3 Skill Cards.&quot;
+			end if
+			if GameTypeIsDaybreak() then
+				MsgBox &quot;Mutiny Discarded.&quot;
+				DiscardAllMutiny(playerID)
+			end if
+			LogThis GetPlayerName(playerID) &amp; &quot; exfiltrates to the &quot; &amp; resship &amp; &quot;.&quot;
+			SetPlayerLoc(playerID, resship)
+			SetInfiltrate playerID, FALSE
+		end if
+	else
+		SetInfiltrate playerID, TRUE
+		LogThis GetPlayerName(playerID) &amp; &quot; has infiltrated as a Human&quot;
+	end if
+	UpdateLocations
+end sub &apos;Infiltrate
+
+sub BtnExecute
+	dim playerID as integer
+	GetGS
+	
+	playerID = GetSelected(_ListGamePlayers)
+	if playerID = 0 then
+		MsgBox &quot;Select a player first&quot;
+		exit sub
+	else
+		Execute(playerID)
+	end if
+end sub
+
+
+sub Execute (playerID as integer)
+	dim rtncd, srcCard, curcard, viperID, i, cardtouse as integer
+	dim newChar, oldChar, loyaltycard, startloc as string
+	dim tmplst() as string
+	dim cardlst as variant
+	dim foundname, flaw as boolean
+	dim namelst as variant
+	GetGS
+
+	if (MsgBox (&quot;Do you really want to execute &quot; &amp; GetPlayerName(playerID) &amp; &quot;?&quot;,4,&quot;Execution&quot;)) &lt;&gt; 6 then
+		exit sub
+	end if
+
+	if IsSpaceLoc(GetPlayerLoc(PlayerID)) then
+		&apos;find which viper the pilot is in, clear pilot&apos;s viper, clear viper&apos;s pilot, 
+		&apos;		return viper to reserves 
+		viperID = GetPlayerViper(playerid)
+		SetPlayerViper PlayerID, 0
+		if viperID &lt; 10 then
+			SetViperPilot 0, ViperID, _ShipViper
+			SetShipStatus _ShipViper, ViperID, 0
+			LogThis &quot;Viper &quot; &amp; ViperID &amp; &quot; returns to the Reserves&quot;
+		elseif viperID &lt; 20 then
+			viperID = viperID - 10
+			SetViperPilot 0, ViperID, _ShipMarkVII
+			SetShipStatus _ShipMarkVII, ViperID, 0
+			LogThis &quot;Viper Mark VII &quot; &amp; ViperID &amp; &quot; returns to the Reserves&quot;
+		else
+			viperID = viperID - 20
+			SetViperPilot 0, ViperID, _ShipAssaultRaptor
+			SetShipStatus _ShipAssaultRaptor, ViperID, 0
+			LogThis &quot;Assault Raptor &quot; &amp; ViperID &amp; &quot; returns to the Reserves&quot;
+		end if		
+		UpdateShips
+	end if
+	
+	if not IsCylon(playerID) then
+		oldChar = GetPlayerName(playerID)
+		tmplst = GameForm.getByName(&quot;lstExecute&quot;).SelectedItems()
+		if ubound(tmplst) = -1 then
+			MsgBox &quot;Select the name of the character to return as after execution.&quot;, 0, &quot;Execution&quot;
+			exit sub
+		end if
+		
+		&apos; Discard Mutiny Cards and Miracle Tokens
+		if GameTypeIsDaybreak() then
+			MsgBox &quot;Mutiny Discarded.&quot;
+			DiscardAllMutiny(playerID)
+			SetOPG(playerID, 0)
+		end if
+
+		newChar = GameForm.getByName(&quot;lstExecute&quot;).StringItemList(val(tmplst(0))
+		SetPlayerName playerID, newChar
+		if IsGamePhase(_PhaseOnNewCaprica) then
+			&apos; if we&apos;re on new New Caprica, everyone comes back in Medical Center
+			SetPlayerLoc playerID, &quot;Medical Center&quot;
+		else
+			startloc = RefStartLocation(newChar)
+			if Not ColonialOneAvailable() and (startloc = &quot;Administration&quot; or startloc = &quot;President&apos;s Office&quot; or startloc = &quot;Press Room&quot;) then
+				startloc = &quot;Sickbay&quot;
+			end if
+			SetPlayerLoc playerID, startloc
+		end if
+		
+		select case newChar
+			case &quot;Baltar&quot;
+				if GetTotalDistance() &lt; 4 then	
+					&apos;not yet sleeper
+					if GameTypeIsExodus() then
+						AddToLoyaltyDeck _DeckLoyalty, GetFromLoyaltyDeck(_DeckNotACylon)
+					else
+						AddToLoyaltyDeck _DeckLoyalty, &quot;You Are Not a Cylon&quot;	
+					end if
+					ShuffleLoyaltyDeck _DeckLoyalty
+					LoyaltyToPlayer playerID, GetFromLoyaltyDeck(_DeckLoyalty)
+
+					MsgBox &quot;Extra Loyalty card added to Loyalty Deck, and one dealt to the new Baltar.&quot;,0,&quot;Execution&quot;
+				else
+					&apos; post sleeper
+					if not GameTypeIsExodus() then
+						SetOPG(playerID, 0)
+						MsgBox &quot;Post sleeper, Baltar&apos;s OPG is unavailable&quot;,0,&quot;Execution&quot;
+					end if
+				end if
+				
+			case &quot;Apollo&quot;
+				if IsGamePhase(_PhaseInSpace) or IsGamePhase(_PhaseGalacticaReturns) then
+					MsgBox &quot;Apollo is in the Hangar Deck. If a viper is in reserves, launch him in it.&quot;,0,&quot;Execution&quot;
+				end if
+
+			case &quot;Helo&quot;
+				MsgBox &quot;Helo is stranded on his next turn&quot;,0,&quot;Execution&quot;
+				
+			case &quot;Boomer&quot;
+				&apos;slightly different rules here...
+				&apos;Pegasus:  If we&apos;re pre-sleeper, add an extra &quot;you are not a cylon&quot; to the deck and be done
+				&apos;Exodus: Add an extra card from &quot;you are not a cylon&quot; to the loyalty deck;
+				&apos;	then if we&apos;re post-sleeper, deal an extra loyalty card
+				&apos;Either: throw in brig/detention if we are post sleeper
+				
+				if GameTypeIsExodus() then
+					AddToLoyaltyDeck _DeckLoyalty, GetFromLoyaltyDeck(_DeckNotACylon)
+					ShuffleLoyaltyDeck _DeckLoyalty
+					MsgBox &quot;Extra card added to the Loyalty deck.&quot;,0,&quot;Execution&quot;
+
+				elseif GetTotalDistance() &lt; 4 then
+					AddToLoyaltyDeck _DeckLoyalty, &quot;You Are Not a Cylon&quot;
+					ShuffleLoyaltyDeck _DeckLoyalty
+					MsgBox &quot;Extra card added to the Loyalty deck.&quot;, 0, &quot;Execution&quot;
+				end if
+				
+				if GetTotalDistance() &gt; 3 then
+					if IsGamePhase(_PhaseInSpace) or IsGamePhase(_PhaseGalacticReturns) then
+						SetPlayerLoc playerID, &quot;Brig&quot;
+					else
+						SetPlayerLoc playerID, &quot;Detention&quot;
+					end if
+					If GameTypeIsExodus() then
+						LoyaltyToPlayer playerID, GetFromLoyaltyDeck(_DeckLoyalty)
+					end if
+				end if
+			
+			case &quot;Cain&quot;
+				if (IsGamePhase(_PhaseInSpace) or IsGamePhase(_PhaseGalacticaReturns)) then
+					if PegasusAvailable() then
+						MsgBox &quot;Cain has been placed in Pegasus CIC, move her is she&apos;s supposed to be in Command.&quot;,0,&quot;Execution&quot;
+					else
+						SetPlayerLoc playerID, &quot;Command&quot;
+					end if
+				end if
+		end select
+		
+		&apos;discard skill cards
+		do while HandCardCnt(playerid) &gt; 0
+			RemoveFromHand playerID, 1, FALSE
+		loop
+		MsgBox &quot;Skill Cards discarded.&quot;, 0, &quot;Execution&quot;
+		RemoveAssignments playerID
+	
+		&apos;discard loyalty cards
+		do while DiscardLoyalty(playerID, &quot;*&quot;) loop
+		
+		if VariantFlaws() then
+			flaw = FlawRevealed(playerID)
+			DiscardFlaw(playerID)
+			if (GetTotalDistance &lt; 4) or flaw then
+				LoyaltyToPlayer playerID, GetFromLoyaltyDeck(_DeckFlaws), _LoyaltyFlaw
+				if flaw then
+					RevealFlaw(playerID, true)
+				end if
+			end if
+		end if
+	
+		if GameTypeIsExodus() then
+			AddToLoyaltyDeck _DeckLoyalty, GetFromLoyaltyDeck(_DeckNotACylon)
+			ShuffleLoyaltyDeck _DeckLoyalty
+			LoyaltyToPlayer playerID, GetFromLoyaltyDeck(_DeckLoyalty)
+		end if
+		
+		if ObjectiveIsIonianNebula() then
+			InactivateAllyPlayer(playerID)
+			DiscardAllTokens(playerID)
+			for i = 1 to 3
+				UpdatePlayerTTCnt(playerID, GetTTFromPool(TRUE), 1)	&apos;TRUE in the GetTTFromPool call for no disasters
+			next i
+			MsgBox &quot;Old Trauma tokens have been discarded and three new ones drawn.&quot;
+		end if
+
+			
+		if oldChar = &quot;Dee&quot; and GameSheet.GetCellByPosition(_ResourceCol + 2, _ResTrackRow).value &lt; 3 then
+			MsgBox &quot;Morale remains unaffected&quot;,0,&quot;Execution&quot;
+		else
+			ReduceResource(_ResourceMorale)
+			LogThis &quot;Morale REDUCED to &quot; &amp; GetResource(_ResourceMorale)
+			MsgBox &quot;Morale reduced by 1&quot;,0,&quot;Execution&quot;
+			UpdateResource
+		end if
+		
+		if oldChar = &quot;Boomer&quot; and GetTotalDistance() &lt; 4 then
+			LoyaltyToPlayer playerID, GetFromLoyaltyDeck(_DeckLoyalty)
+
+			MsgBox &quot;Extra Loyalty card dealt to &quot; &amp; newChar &amp; &quot; as Boomer&apos;s successor.&quot;,0,&quot;Execution&quot;
+		end if
+
+		DumpBody(oldChar)
+		LogThis oldChar &amp; &quot; has been dumped in the graveyard.&quot;
+
+		if GetTitle(_TitlePresident) = playerID then
+			UpdateTitle GetNextTitle(_TitlePresident), _TitlePresident
+			MsgBox GetPlayerName(GetTitle(_TitlePresident)) &amp; &quot; is now the President.&quot;,0,&quot;Execution&quot;
+			LogThis GetPlayerName(GetTitle(_TitlePresident)) &amp; &quot; is now the President.&quot;
+		end if
+		if GetTitle(_TitleAdmiral) = playerID then
+			UpdateTitle GetNextTitle(_TitleAdmiral), _TitleAdmiral
+			MsgBox GetPlayerName(GetTitle(_TitleAdmiral)) &amp; &quot; is now the Admiral.&quot;,0,&quot;Execution&quot;
+			LogThis GetPlayerName(GetTitle(_TitleAdmiral)) &amp; &quot; is now the Admiral.&quot;
+		end if
+		
+		if IsMutineer(playerID) then
+			&apos; New character receives the Mutineer card again - after getting the Titles they should have.
+			MsgBox GetPlayerName(playerID) &amp; &quot; is now the Mutineer.&quot;
+			MakeMutineer(playerID)
+		end if
+		
+		if GetPlayerName(playerID) = &quot;Roslin&quot; and not OPGUsed(playerID) then
+			EnableSP TRUE
+		elseif GetPlayerName(playerID) = &quot;Adama&quot; and not OPGUsed(playerID) then
+			EnableCommandAuthority TRUE
+		end if
+	
+		SetDrawCards playerID
+		PopulatePlayers
+		ConfigureButtons
+
+	else	&apos;cylon is executed
+			do while HandCardCnt(playerid) &gt; 0
+				RemoveFromHand playerID, 1, FALSE
+			loop
+			MsgBox &quot;Hand discarded&quot;,0,&quot;Execution&quot;
+			
+			if GameTypeIsDaybreak() then
+				MsgBox &quot;Mutiny Discarded.&quot;
+				DiscardAllMutiny(playerID)
+				SetOPG(playerID)
+			end if
+		
+			if IsRevealed(playerID) then	&apos;infiltrating cylon or we&apos;re on NC
+				if IsGamePhase(_PhaseInSpace) or IsGamePhase(_PhaseGalacticaReturns) then
+					SetPlayerLoc playerID, &quot;Resurrection Ship&quot;
+					LogThis	GetPlayerName(playerID) &amp; &quot; moved to Resurrection Ship&quot;
+				else
+					SetPlayerLoc playerID, &quot;Medical Center&quot;
+					LogThis GetPlayerName(playerID) &amp; &quot; moved to Medical Center&quot;
+				end if
+			else
+
+				MakeCylon(playerID, TRUE)
+				&apos; discard ONE &quot;you are a Cylon&quot; loyalty card
+				cardlst = GetCylonCards(playerID)
+				cardtouse = 1
+				if ubound(cardlst) = 2 then
+					msgstr = GetPlayerName(playerID) &amp; &quot; has 2 &apos;You are a Cylon&apos; loyalty cards.&quot; &amp; chr(13) &amp; &quot;Is &apos;&quot; &amp; cardlst(1) &amp; &quot;&apos; the one that is being shown?&quot;
+					rtnCd = MsgBox(msgstr,4,&quot;Execution: Select Loyalty Card to Display&quot;)
+					if rtnCd &lt;&gt; 6 then
+						cardtouse=2
+					end if
+				end if
+				DiscardLoyalty playerID, cardlst(cardtouse)
+				
+				if VariantFlaws() then
+					DiscardFlaw(playerID)
+				end if
+			end if
+			SetInfiltrate playerID, FALSE  &apos;just in case the cylon was infiltrating
+	end if
+
+end sub &apos;Execute
+
+
+sub SetModuleFlags
+	dim i as integer
+	GetGS
+
+	for i = 1 to _ModuleNum
+		GameSheet.getCellByPosition(_ModuleCol, _ModuleRow + i).string = &quot;&quot;
+	next i	
+			
+	if GameTypeIsPegasus() then
+		GameSheet.getCellByPosition(_ModuleCol, _ModuleRow + _ModulePeg).string = &quot;X&quot;
+	end if
+	if GameTypeIsExodus() then
+		GameSheet.getCellByPosition(_ModuleCol, _ModuleRow + _ModuleEx).string = &quot;X&quot;
+	end if
+	if UsePersonalGoals() then
+		GameSheet.getCellByPosition(_ModuleCol, _ModuleRow + _ModulePG).string = &quot;X&quot;
+	end if
+	if UseFinalFive() then
+		GameSheet.getCellByPosition(_ModuleCol, _ModuleRow + _ModuleFF).string = &quot;X&quot;
+	end if
+	if UseCylonFleet() then
+		GameSheet.getCellByPosition(_ModuleCol, _ModuleRow + _ModuleCFB).string = &quot;X&quot;
+	end if
+	if GameTypeIsDaybreak() then
+		GameSheet.getCellByPosition(_ModuleCol, _ModuleRow + _ModuleDay).string = &quot;X&quot;
+	end if
+	if GameTypeIsRevelations() then
+		GameSheet.getCellByPosition(_ModuleCol, _ModuleRow + _ModuleRev).string = &quot;X&quot;
+	end if
+	if UseCivilWar() then
+		GameSheet.getCellByPosition(_ModuleCol, _ModuleRow + _ModuleCCW).string = &quot;X&quot;
+	end if
+end sub
+</script:module>

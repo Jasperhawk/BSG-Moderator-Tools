@@ -1,0 +1,1053 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Loyalty" script:language="StarBasic">Option Explicit
+
+dim LoyaltySheet, LoyaltyForm as object
+
+&apos;old values
+const _LoyaltyStartCol = 1
+const _LoyaltySleeperCol = 3
+const _LoyaltySleeperDataCol = 6
+
+global const _LoyaltyRow = 2
+
+const _LoyaltyRefRow = 230
+const _GoalsRefOffset = 1
+const _FinalFiveRefOffset = 1
+const _FlawRefRow = 261
+
+const _NumFlaws = 9
+
+const _NumMotives		= 14
+const _NumMotivesDealt	= 4
+
+const _LoyaltyGameRefCol = 0
+const _LoyaltyTextRefCol = 1
+
+&apos; new values
+global const _LoyaltyAgendaRow = 2
+const _LoyaltyFlawRow = _LoyaltyAgendaRow
+const _LoyaltyStartRow = _LoyaltyAgendaRow + 1
+const _LoyaltySleeperRow = _LoyaltyAgendaRow + 3
+const _LoyaltyOtherRow = _LoyaltyAgendaRow + 5
+global const _MaxLoyaltyInHand = 10
+
+const _LoyaltyCol = 0
+
+const _MutineerCol	= 4
+const _MutineerRow	= 17
+
+const _LoyaltyDeckCol = 1
+const _LoyaltyDeckRow = 17
+
+const _LoyaltyCntRow = 13
+
+const _LoyaltyNotCylonCol = _LoyaltyDeckCol + 1
+const _LoyaltyNotCylonRow = _LoyaltyDeckRow
+
+const _LoyaltyStart = 0
+const _LoyaltySleeper = 1
+const _LoyaltyOther = 2
+const _LoyaltyAgenda = 3
+global const _LoyaltyFlaw = 4
+
+global const _DeckLoyalty = 0
+global const _DeckNotACylon = 1
+global const _DeckFlaws = 2
+
+sub GetLoyalty
+	if LoyaltySheet &lt;&gt; NULL then
+		exit sub
+	end if 
+	
+	LoyaltySheet= ThisComponent.Sheets.getByName(&quot;Loyalty&quot;)
+	LoyaltyForm = LoyaltySheet.DrawPage.Forms.GetByName(&quot;formLoyalty&quot;)
+	Randomize
+end sub
+
+function PlayerLoyaltyCol (playerID as integer) as integer
+	PlayerLoyaltyCol = _LoyaltyCol + playerID
+end function
+
+function LoyaltyCardColor (cardtxt as string) as variant
+	if InStr(cardtxt, &quot;Not&quot;) &gt; 0 then
+		LoyaltyCardColor	= _black
+	elseif InStr(cardtxt, &quot;Sympath&quot;) &gt; 0 then
+		LoyaltyCardColor 	= _blue
+	elseif InStr(cardtxt,&quot;Personal&quot;) &gt; 0 or InStr(cardtxt,&quot;Final Five&quot;) &gt; 0 then
+		LoyaltyCardColor	= _green1
+	elseif InStr(cardtxt, &quot;Mutineer&quot;) &gt; 0 then
+		LoyaltyCardColor	= _brown
+	elseif InStr(cardtxt, &quot;Human&quot;) &gt; 0 then &apos; Human Allegiance Motive
+		LoyaltyCardColor	= _blue3
+	elseif InStr(cardtxt, &quot;Allegiance&quot;) &gt; 0 then &apos; Cylon Allegiance Motive
+		LoyaltyCardColor	= _red2
+	elseif InStr(cardtxt,&quot;Cylon&quot;) &gt; 0 then
+		LoyaltyCardColor	= _red
+	else &apos;leader
+		LoyaltyCardColor	= _purple
+	end if
+
+end function
+
+&apos;+== The source for agendas should be moved into reference tables
+function Deal_Agenda () as string
+	dim agendacards as variant
+	dim leadercard as integer
+	
+	if (PlayerCnt() = 4) or (PlayerCnt() = 6) then
+		&apos; Sympathetic Agendas
+		agendacards = Array (&quot;Salvage their Equipment&quot;,&quot;The Illusion of Hope&quot;,&quot;Prove Their Worth&quot;,&quot;Convert the Infidels&quot;,_
+		&quot;Join the Colonials&quot;,&quot;Guide Them to Destiny&quot;)
+	else
+		&apos; Hostile Agendas
+		agendacards = Array (&quot;Mutual Annihilation&quot;,&quot;Genocide&quot;,&quot;Grant Mercy&quot;,&quot;Show Their True Nature&quot;,&quot;Reduce Them to Ruins&quot;,_
+		&quot;Siege Warfare&quot;)
+	end if
+	
+	leadercard = Int(RND() * 6)
+	
+	Deal_Agenda = agendacards(leadercard)
+end function
+
+
+function GetCylonCards (playerID as integer) as variant
+	dim currow, cardcnt as integer
+	dim cards() as string
+	GetLoyalty
+	
+	currow = _LoyaltyStartRow
+	cardcnt = 0
+	do until currow &gt; _LoyaltyStartRow + _MaxLoyaltyInHand
+		if InStr(LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), currow).string, &quot;You Are a Cylon&quot;) &gt; 0 then
+			cardcnt = cardcnt +1
+			redim preserve cards(cardcnt) as string
+			cards(cardcnt) = LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), currow).string
+		end if
+		currow = currow +1		
+	loop
+	GetCylonCards = cards()
+end function	&apos;GetCylonCards
+
+function IsMutineer (playerID as integer) as boolean
+	dim currow, col, cardcnt as integer
+	GetLoyalty
+	
+	IsMutineer	= (GetMutineer = playerID)
+end function
+
+sub SetMutineer (playerID as integer)
+	GetLoyalty
+	
+	LoyaltySheet.getCellByPosition(_MutineerCol, _MutineerRow).value	= playerID
+end sub
+
+function GetMutineer as integer
+	GetLoyalty
+	
+	GetMutineer	= LoyaltySheet.getCellByPosition(_MutineerCol, _MutineerRow).value
+end function
+
+function  DiscardLoyalty (playerID as integer, cardtxt as string) as boolean
+	dim currow, col as integer
+	GetLoyalty
+	&apos;find the first instance of cardtxt and discard it by greying out the background
+	&apos;if cardtxt = &quot;*&quot; then we are discarding the whole hand (execution)
+	
+	DiscardLoyalty	= FALSE	&apos; return false if there are no cards to discard
+	currow			= _LoyaltyStartRow
+	col				= PlayerLoyaltyCol(playerID)
+	do until currow &gt; _LoyaltyStartRow + _MaxLoyaltyInHand
+		if (ucase(LoyaltySheet.getCellByPosition(col, currow).string) = ucase(cardtxt) OR _
+			(cardtxt = &quot;*&quot; and LoyaltySheet.getCellByPosition(col, currow).string &lt;&gt; &quot;&quot; and LoyaltySheet.getCellByPosition(col, currow).string &lt;&gt; &quot;You are a Mutineer&quot;)) AND _
+			LoyaltySheet.getCellByPosition(col, currow).CellBackColor = _white _
+		then
+			LoyaltySheet.getCellByPosition(col, currow).CellBackColor = _grey
+			LogThis GetPlayerName(playerID) &amp; &quot; showed/discarded &apos;&quot; &amp; LoyaltySheet.getCellByPosition(col, currow).string &amp; &quot;&apos;.&quot;
+			DiscardLoyalty = TRUE
+			exit do
+		end if
+	
+		currow = currow + 1
+	loop
+	UpdateLoyaltyCount
+end function	&apos;DiscardLoyalty
+
+
+sub UpdateLoyaltyCount ()
+	dim currow, cardcnt, playerID as integer
+	GetLoyalty
+	&apos; we need to count how many cards are in the player&apos;s hand, which is designated by a white background at this point
+	
+	for playerID = 1 to 7
+		cardcnt = 0
+		currow = _LoyaltyStartRow
+		do until currow &gt; _LoyaltyStartRow + _MaxLoyaltyInHand
+			if LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), currow).string &lt;&gt; &quot;&quot; and _
+					LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), currow).string &lt;&gt; &quot;You are a Mutineer&quot; and _
+					LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), currow).CellBackColor = _white then
+				cardcnt=cardcnt + 1
+			end if			
+			currow = currow + 1
+		loop
+		LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyCntRow).value = cardcnt
+	next playerID	
+end sub &apos;UpdateLoyaltyCount
+
+function GetLoyaltyCount(playerID as integer) as integer
+	GetLoyalty
+	
+	GetLoyaltyCount	= LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyCntRow).value
+end function
+
+&apos;+== should this stuff come from a reference tab?
+sub BuildLoyaltyDecks 
+	dim i, curLoyaltyCard, notCnt, cyloncardcnt, cylon1, cylon2 as integer
+	dim cylonCards(1) as string
+	dim notCylonCards(22) as string
+	GetLoyalty
+	GetRef
+
+	&apos;clear the Loyalty Decks
+	do until GetFromLoyaltyDeck(_DeckLoyalty) = &quot;&quot;
+	loop
+	do until GetFromLoyaltyDeck(_DeckNotACylon) = &quot;&quot;
+	loop
+	do until GetFromLoyaltyDeck(_DeckFlaws) = &quot;&quot;
+	loop
+
+	cyloncardcnt = 0
+	curLoyaltyCard = 0
+	
+	&apos;first lets put our Cylon cards in the deck
+	do while (RefSheet.getCellByPosition(_LoyaltyGameRefCol, _LoyaltyRefRow + curLoyaltyCard).string = &quot;B&quot;)
+		cyloncardcnt = cyloncardcnt + 1
+		redim preserve cylonCards(cyloncardcnt) as string
+		cylonCards(cyloncardcnt) = RefSheet.getCellByPosition(_LoyaltyTextRefCol, _LoyaltyRefRow + curLoyaltyCard).string 
+		curLoyaltyCard = curLoyaltyCard + 1
+	loop
+	
+	do while (RefSheet.getCellByPosition(_LoyaltyGameRefCol, _LoyaltyRefRow + curLoyaltyCard).string = &quot;P&quot;)
+		if GameTypeIsPegasus() then
+			cyloncardcnt = cyloncardcnt + 1
+			redim preserve cylonCards(cyloncardcnt) as string
+			cylonCards(cyloncardcnt) = RefSheet.getCellByPosition(_LoyaltyTextRefCol, _LoyaltyRefRow + curLoyaltyCard).string
+		end if
+		curLoyaltyCard = curLoyaltyCard + 1
+	loop
+
+	do while (RefSheet.getCellByPosition(_LoyaltyGameRefCol, _LoyaltyRefRow + curLoyaltyCard).string = &quot;E&quot;)
+		if GameTypeIsExodus() then
+			cyloncardcnt = cyloncardcnt + 1
+			redim preserve cylonCards(cyloncardcnt) as string
+			cylonCards(cyloncardcnt) = RefSheet.getCellByPosition(_LoyaltyTextRefCol, _LoyaltyRefRow + curLoyaltyCard).string
+		end if
+		curLoyaltyCard = curLoyaltyCard + 1
+	loop
+
+	do while (RefSheet.getCellByPosition(_LoyaltyGameRefCol, _LoyaltyRefRow + curLoyaltyCard).string = &quot;R&quot;)
+		if GameTypeIsRevelations() then
+			cyloncardcnt = cyloncardcnt + 1
+			redim preserve cylonCards(cyloncardcnt) as string
+			cylonCards(cyloncardcnt) = RefSheet.getCellByPosition(_LoyaltyTextRefCol, _LoyaltyRefRow + curLoyaltyCard).string
+		end if
+		curLoyaltyCard = curLoyaltyCard + 1
+	loop
+	
+	do while (RefSheet.getCellByPosition(_LoyaltyGameRefCol, _LoyaltyRefRow + curLoyaltyCard).string = &quot;C&quot;)
+		if VariantCustomLoyalty() then
+			cyloncardcnt = cyloncardcnt + 1
+			redim preserve cylonCards(cyloncardcnt) as string
+			cylonCards(cyloncardcnt) = RefSheet.getCellByPosition(_LoyaltyTextRefCol, _LoyaltyRefRow + curLoyaltyCard).string
+		end if
+		curLoyaltyCard = curLoyaltyCard + 1
+	loop
+
+	cylon1 = Int(RND() * cyloncardcnt)
+	do while CylonCards(cylon1) = &quot;&quot;
+		cylon1 = Int(RND() * cyloncardcnt) + 1	
+	loop
+	AddToLoyaltyDeck _DeckLoyalty, CylonCards(cylon1)
+	if PlayerCnt() &gt; 5 or (PlayerCnt() = 5 and Not HasLeader()) then
+		cylon2 = Int(RND() * cyloncardcnt) + 1 
+		do while cylon1 = cylon2 or CylonCards(cylon2) = &quot;&quot;
+			cylon2 = Int(RND()* cyloncardcnt) + 1
+		loop
+		AddToLoyaltyDeck _DeckLoyalty, CylonCards(cylon2)
+	end if
+	
+	if GameTypeIsExodus() then 
+		notCnt = 16
+	else
+		notCnt = 12
+	end if
+	&apos;now lets build our &apos;Not&apos; deck
+	for i = 1 to notCnt
+		AddToLoyaltyDeck _DeckNotACylon, &quot;You are NOT a Cylon&quot;
+	next i
+
+	curLoyaltyCard = curLoyaltyCard + _GoalsRefOffset	&apos;increment by one to get past the PG Header
+	do while (RefSheet.getCellByPosition(_LoyaltyGameRefCol, _LoyaltyRefRow + curLoyaltyCard).string = &quot;E&quot;)
+		if UsePersonalGoals then
+			AddToLoyaltyDeck _DeckNotACylon, &quot;Personal Goal - &quot; &amp; RefSheet.getCellByPosition(_LoyaltyTextRefCol, _LoyaltyRefRow + curLoyaltyCard).string
+		end if
+		curLoyaltyCard = curLoyaltyCard + 1
+	loop
+	do while (RefSheet.getCellByPosition(_LoyaltyGameRefCol, _LoyaltyRefRow + curLoyaltyCard).string = &quot;C&quot;)
+		if UsePersonalGoals and VariantCustomLoyalty then
+			AddToLoyaltyDeck _DeckNotACylon, &quot;Personal Goal - &quot; &amp; RefSheet.getCellByPosition(_LoyaltyTextRefCol, _LoyaltyRefRow + curLoyaltyCard).string
+		end if
+		curLoyaltyCard = curLoyaltyCard + 1
+	loop
+
+	curLoyaltyCard = curLoyaltyCard + _FinalFiveRefOffset	&apos;increment by one to get past the FF Header
+	do while (RefSheet.getCellByPosition(_LoyaltyGameRefCol, _LoyaltyRefRow + curLoyaltyCard).string = &quot;E&quot;)
+		if UseFinalFive then
+			AddToLoyaltyDeck _DeckNotACylon, &quot;Final Five - &quot; &amp; RefSheet.getCellByPosition(_LoyaltyTextRefCol, _LoyaltyRefRow + curLoyaltyCard).string
+		end if
+		curLoyaltyCard = curLoyaltyCard + 1
+	loop
+	do while (RefSheet.getCellByPosition(_LoyaltyGameRefCol, _LoyaltyRefRow + curLoyaltyCard).string = &quot;C&quot;)
+		if UseFinalFive and VariantCustomLoyalty then
+			AddToLoyaltyDeck _DeckNotACylon, &quot;Final Five - &quot; &amp; RefSheet.getCellByPosition(_LoyaltyTextRefCol, _LoyaltyRefRow + curLoyaltyCard).string
+		end if
+		curLoyaltyCard = curLoyaltyCard + 1
+	loop
+
+&apos;	Flaws
+	if VariantFlaws() then
+		for	curLoyaltyCard = 1 to _NumFlaws
+			AddToLoyaltyDeck _DeckFlaws, RefSheet.getCellByPosition(_LoyaltyGameRefCol, _FlawRefRow + CurLoyaltyCard - 1).string
+			AddToLoyaltyDeck _DeckFlaws, RefSheet.getCellByPosition(_LoyaltyGameRefCol, _FlawRefRow + CurLoyaltyCard - 1).string &apos; Two copies of each.
+		next curLoyaltyCard
+		ShuffleLoyaltyDeck _DeckFlaws
+	end if
+	
+	ShuffleLoyaltyDeck _DeckNotACylon
+	
+	&apos;now deal non-a-cylon cards into the loyalty deck
+	&apos; Two Loyalty Cards per player.
+	notCnt = PlayerCnt() * 2
+	
+	&apos; Except the Cylon Leader.
+	if HasLeader() then
+		notCnt = notCnt - 2
+	end if
+	
+	&apos; Replace a YANAC with a YAAC for each Cylon in the game.
+	if PlayerCnt() &lt;= 4 or (PlayerCnt() = 5 and HasLeader()) then
+		notCnt = notCnt -1
+	else
+		notCnt = notCnt -2
+	end if
+	
+	&apos; If there&apos;s a Sympathizer, replace another card.
+	if (OptionIsSympathizer() or OptionIsSympatheticCylon()) then   
+		notCnt = notCnt - 1	
+	end if
+	
+	if GetPlayerID(&quot;Baltar&quot;) &gt; 0 then
+		notCnt = notCnt + 1
+	end if
+	if GetPlayerID(&quot;Boomer&quot;) &gt; 0 then
+		notCnt = notCnt + 1
+	end if
+	if GameTypeIsExodus() then 
+		notCnt = notCnt + 1
+	end if
+	for i = 1 to notCnt
+		AddToLoyaltyDeck _DeckLoyalty, GetFromLoyaltyDeck(_DeckNotACylon)
+	next i
+	if OptionIsMutineer() then
+		AddToLoyaltyDeck _DeckLoyalty, &quot;You are a Mutineer&quot;
+	end if
+	
+	ShuffleLoyaltyDeck _DeckLoyalty
+end sub &apos;BuildLoyaltyDecks
+
+sub AddSympathizerCard
+	if OptionIsSympatheticCylon() then
+		AddToLoyaltyDeck _DeckLoyalty, &quot;You are a Sympathetic Cylon&quot;
+	else	&apos;standard sympathizer
+		AddToLoyaltyDeck _DeckLoyalty, &quot;You are a Sympathizer&quot;
+	end if
+	ShuffleLoyaltyDeck _DeckLoyalty
+end sub 	&apos;AddSympathizerCard	
+
+sub DealMotives (playerID as integer)
+	dim motive, motiveCnt, dealt as integer
+	dim curMotive, motivesDeck(_NumMotives) as string
+	
+	motivesDeck	= Array(&quot;End the Chase&quot;, &quot;Make an Ally&quot;, &quot;Remove the Threat&quot;, &quot;Improve Efficiency&quot;, &quot;Learn to Cherish&quot;, &quot;Pressure Their Leaders&quot;, &quot;Keep them Docile&quot;, _
+							&quot;A Justified Response&quot;, &quot;No Unnecessary Force&quot;, &quot;Savor their Demise&quot;, &quot;Fight with Honor&quot;, &quot;Subjects for Study&quot;, &quot;A False Sense of Security&quot;, &quot;Harvest their Resources&quot;)
+	
+	for motiveCnt = 1 to _NumMotivesDealt
+		&apos; Grab a Motive
+		do 
+			motive	= Int(Rnd() * _NumMotives)
+			curMotive	= motivesDeck(motive)
+		loop until curMotive &lt;&gt; &quot;&quot;
+		
+		&apos; Remove from the deck
+		motivesDeck(motive)	= &quot;&quot;
+		
+		&apos; Rename motive
+		if motive &lt; 7 then
+			curMotive	= &quot;Human Allegiance: &quot; &amp; curMotive
+		else
+			curMotive	= &quot;Cylon Allegiance: &quot; &amp; curMotive
+		end if
+		
+		&apos; Deal Motive
+		LoyaltyToPlayer(playerID, curMotive, _LoyaltyStart)
+	next motiveCnt
+end sub
+
+sub Initialize_Loyalty
+	dim playerID, i, topofdeck as integer
+	dim loyaltydeck, button as variant
+	GetLoyalty
+	GetSF
+
+	&apos;clear any previous loyalty and blank the fields
+	for playerID = 1 to 7
+		&apos; Reset all the rows to blue.
+		for i = 0 to _MaxLoyaltyInHand
+			LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyAgendaRow + i).string = &quot;&quot;
+			LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyAgendaRow + i).CellBackColor = _bluegrey
+		next i
+		
+		&apos; Make the starting Loyalty white.
+		if playerID &lt;= PlayerCnt() and not IsCylonLeader(playerID) then
+			LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyStartRow).CellBackColor = _white
+			LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltySleeperRow).CellBackColor = _white
+		end if
+		
+		&apos; Mark Boomer&apos;s second Sleeper Loyalty section white, because then the Mod knows there&apos;s a slot open?
+		if GetPlayerName(playerID) = &quot;Boomer&quot; then
+			LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltySleeperRow + 1).CellBackColor = _white
+		end if
+	next playerID
+	
+	SetMutineer(0)
+
+	BuildLoyaltyDecks
+	
+	for playerID = 1 to PlayerCnt()
+		SetLoyaltyHuman playerID
+		if IsCylonLeader(playerID) then
+			if GameTypeIsDaybreak() then
+				&apos; We&apos;re going to deal all four Motives now, because nothing interferes with the Motive deck.
+				DealMotives(playerID)
+				SetRevealed playerID
+			else
+				LoyaltyToPlayer playerID, Deal_Agenda(), _LoyaltyAgenda
+				SetRevealed playerID
+				SkillSheet.getCellByPosition(GetSkillSetCol(_SkillSetHand, playerID), _SkillFlawRow).CharColor = _purple
+			end if
+		else
+			if VariantFlaws() then
+				LoyaltyToPlayer playerID, GetFromLoyaltyDeck(_DeckFlaws), _LoyaltyFlaw
+				SkillSheet.getCellByPosition(GetSkillSetCol(_SkillSetHand, playerID), _SkillFlawRow).CharColor = _blue2
+			end if
+			if not VariantManualLoyalty then
+				LoyaltyToPlayer playerID, GetFromLoyaltyDeck(_DeckLoyalty), _LoyaltyStart
+			
+				if GetPlayerName(playerID) = &quot;Baltar&quot; then
+					LoyaltyToPlayer playerID, GetFromLoyaltyDeck(_DeckLoyalty), _LoyaltyStart
+				end if
+			end if	
+		end if
+	next playerID
+
+&apos;	display the loyalty/Sleeper deck.
+	if OptionIsSympathizer() or OptionIsSympatheticCylon() then
+		AddSympathizerCard
+	end if
+	
+	if Not GameTypeIsExodus() then
+		do until GetFromLoyaltyDeck(_DeckNotACylon) = &quot;&quot;
+		loop
+	end if
+	
+&apos;	if VariantFlaws() then
+&apos;		do until GetFromLoyaltyDeck(_DeckFlaws) = &quot;&quot;
+&apos;		loop
+&apos;	end if
+	
+&apos;	button = LoyaltyForm.getByName(&quot;btnPersonalGoal&quot;)
+	
+	LoyaltyForm.getByName(&quot;btnPersonalGoal&quot;).EnableVisible = UsePersonalGoals or (GameTypeIsDaybreak() and HasLeader)
+	LoyaltyForm.getByName(&quot;lstPersonalGoal&quot;).EnableVisible = UsePersonalGoals or (GameTypeIsDaybreak() and HasLeader)
+	
+	LoyaltyForm.getByName(&quot;btnDealLoyalty&quot;).EnableVisible = VariantManualLoyalty
+	LoyaltyForm.getByName(&quot;btnDealLoyalty&quot;).enabled = VariantManualLoyalty
+	
+	LoyaltyForm.getByName(&quot;btnRevealFlaw&quot;).EnableVisible = VariantFlaws
+	LoyaltyForm.getByName(&quot;btnRevealFlaw&quot;).enabled = VariantFlaws
+	
+	PopulateGiveLoyaltyFrom
+end sub	&apos;Initialize_Loyalty
+
+
+&apos; Pulls the top card of the deck and returns it...compresses the remainder
+function GetFromLoyaltyDeck (whichdeck as integer) as string
+	dim currow, deckcol as integer
+	GetLoyalty
+
+	if whichdeck = _DeckLoyalty then
+		deckcol = _LoyaltyDeckCol
+	elseif whichdeck = _DeckNotACylon then
+		deckcol = _LoyaltyDeckCol + 1
+	else
+		deckCol = _LoyaltyDeckCol + 2
+	end if
+
+	if LoyaltySheet.getCellByPosition(deckcol, _LoyaltyDeckRow).string = &quot;&quot; then
+		GetFromLoyaltyDeck = &quot;&quot;
+		exit function
+	end if
+
+	GetFromLoyaltyDeck = LoyaltySheet.getCellByPosition(deckcol, _LoyaltyDeckRow).string 
+	LoyaltySheet.getCellByPosition(deckcol, _LoyaltyDeckRow).string = &quot;&quot;
+	
+	currow = _LoyaltyDeckRow
+	do until LoyaltySheet.getCellByPosition(deckcol, currow + 1).string = &quot;&quot;
+		LoyaltySheet.getCellByPosition(deckcol, currow).string = LoyaltySheet.getCellByPosition(deckcol, currow + 1).string
+		LoyaltySheet.getCellByPosition(deckcol, currow).CharColor = LoyaltyCardColor(LoyaltySheet.getCellByPosition(deckcol, currow).string)
+		currow	= currow + 1
+	loop
+	LoyaltySheet.getCellByPosition(deckcol, currow).string = &quot;&quot;
+end function	&apos;GetFromLoyaltyDeck
+
+
+&apos; Adds a card to the bottom of the Loyalty Deck
+sub AddToLoyaltyDeck (whichdeck as integer, cardtxt as string)
+	dim currow, deckcol as integer
+	GetLoyalty
+	
+	if whichdeck = _DeckLoyalty then
+		deckcol = _LoyaltyDeckCol
+	elseif whichdeck = _DeckNotACylon then
+		deckcol = _LoyaltyDeckCol + 1
+	else
+		deckCol = _LoyaltyDeckCol + 2
+	end if
+	
+	currow = _LoyaltyDeckRow
+	do while LoyaltySheet.getCellByPosition(deckcol, currow).string &lt;&gt; &quot;&quot;
+		currow=currow+1
+	loop
+	LoyaltySheet.getCellByPosition(deckcol, currow).string = cardtxt
+	LoyaltySheet.getCellByPosition(deckcol, currow).CharColor = LoyaltyCardColor(cardtxt)
+end sub	&apos;AddToLoyaltyDeck
+	
+
+&apos; Puts a Loyalty card in a player&apos;s hand
+&apos; if it makes them a cylon, set their loyalty appropriately
+sub LoyaltyToPlayer (playerID as integer, loyaltycard as string, optional blockID as integer)
+	dim currow, curcol as integer
+	GetLoyalty
+	
+	if IsMissing(blockID) then 
+		blockID = _LoyaltyOther
+	end if
+	curcol = PlayerLoyaltyCol(playerID)
+	select case blockID
+		case _LoyaltyStart
+			currow = _LoyaltyStartRow
+		case _LoyaltySleeper
+			currow = _LoyaltySleeperRow
+		case _LoyaltyOther
+			currow = _LoyaltyOtherRow
+		case _LoyaltyAgenda
+			currow = _LoyaltyAgendaRow
+		case _LoyaltyFlaw
+			currow = _LoyaltyFlawRow
+	end select
+	
+	do until LoyaltySheet.getCellByPosition(curcol, currow).string = &quot;&quot;
+		currow = currow + 1
+	loop
+	LoyaltySheet.getCellByPosition(curcol, currow).string = loyaltycard
+	LoyaltySheet.getCellByPosition(curcol, currow).CellBackColor = _white
+	if blockID = _LoyaltyFlaw then
+		LoyaltySheet.getCellByPosition(curcol, currow).CharColor = _blue2
+	else
+		LoyaltySheet.getCellByPosition(curcol, currow).CharColor = LoyaltyCardColor(loyaltycard)
+	end if
+	if InStr(loyaltycard, &quot;You Are a Cylon&quot;) &gt; 0 or IsCylonLeader(playerID) then
+		SetLoyaltyCylon playerID
+	elseif InStr(loyaltycard, &quot;Mutineer&quot;) &gt; 0 and not IsRevealed(playerID) then
+		MsgBox GetPlayerName(playerID) &amp; &quot; is the Mutineer!&quot;
+		if GetMutineer() = 0 then
+			MsgBox GetPlayerName(playerID) &amp; &quot; receives another Loyalty Card as the Mutineer.&quot;
+			LoyaltyToPlayer playerID, GetFromLoyaltyDeck(_DeckLoyalty), _LoyaltyOther
+		end if
+		MakeMutineer playerID
+	elseif InStr(loyaltycard, &quot;Sympa&quot;) &gt; 0 and not IsRevealed(playerID) then
+		MakeSympathetic playerID
+	end if
+	
+	PopulateGiveLoyaltyFrom
+	UpdateLoyaltyCount
+end sub	&apos;LoyaltyToPlayer
+
+
+sub ShuffleLoyaltyDeck (whichdeck as integer)
+	dim tmpval, sortOrder() as double
+	dim i,j,cardcnt, currow as integer
+	dim tmpcard, loyaltycard() as string
+	GetLoyalty
+	
+	cardcnt=0
+	tmpcard = GetFromLoyaltyDeck(whichdeck)
+	do until tmpcard = &quot;&quot;
+		cardcnt = cardcnt + 1
+		redim preserve loyaltycard(cardcnt) as string
+		loyaltycard(cardcnt) = tmpcard
+		tmpcard = GetFromLoyaltyDeck(whichdeck)
+	loop
+	
+	redim sortOrder(cardcnt)
+	
+	for i = 1 to cardcnt
+		sortOrder(i) = rnd()
+	next i
+
+	for i = 1 to cardcnt -1
+		for j = i + 1 to cardcnt
+			if SortOrder(i) &gt; sortOrder(j) then
+				tmpval = sortOrder(i)
+				tmpcard = loyaltycard(i)
+					
+				SortOrder(i) = sortOrder(j)
+				loyaltycard(i) = loyaltycard(j)
+					
+				sortorder(j) = tmpval
+				loyaltycard(j) = tmpcard
+			end if
+		next j
+	next i
+
+	for i= 1 to cardcnt
+		AddToLoyaltyDeck whichdeck, loyaltycard(i)
+	next i
+end sub	&apos;ShuffleLoyaltyDeck
+
+
+sub DealSleeperCards
+	&apos; just need to deal the sleeper cards based on the current player (who gets the first card) 
+	&apos;   and set the loyalty of anyone who became a Cylon (including symp?)
+	dim curID, i, rtncd as integer
+	dim sympID as integer
+	dim curcard, tmpmsg as string
+	
+	GetLoyalty	
+
+	sympID = 0
+	curID = GetCurrentPlayer()
+	for i = 1 to PlayerCnt()
+		if Not IsCylonLeader(curID) then
+			if not VariantManualLoyalty then
+				curcard = GetFromLoyaltyDeck(_DeckLoyalty)
+				LoyaltyToPlayer curID, curcard, _LoyaltySleeper
+			end if
+		
+			if GetPlayerName(curID) = &quot;Boomer&quot; then
+				if not VariantManualLoyalty then
+					curcard = GetFromLoyaltyDeck(_DeckLoyalty)
+					LoyaltyToPlayer curID, curcard, _LoyaltySleeper
+				end if
+	
+				&apos; if Boomer is not a revealed Cylon, she should be sent to the brig
+				if Not IsRevealed(curID) then
+					SetPlayerLoc curID, &quot;Brig&quot;
+					MsgBox &quot;Boomer has been sent to the brig&quot;
+					LogThis &quot;Boomer moved to the brig&quot;
+				end if
+			end if
+		end if
+		curID = CurID + 1
+		if curID &gt; PlayerCnt() then
+			curID = 1
+		end if
+	next i
+
+&apos; Manage the Sympahtizer now	
+	if sympID &gt; 0 then
+		MakeSympathetic sympID
+	end if
+	
+	tmpmsg = &quot;&quot;
+	for i = 1 to PlayerCnt()
+		if IsRevealed(i) and not IsCylonLeader(i) then
+			if tmpmsg = &quot;&quot; then
+				tmpmsg = GetPlayerName(i)
+			else
+				tmpmsg = tmpmsg &amp; &quot; and &quot; &amp; GetPlayerName(i)
+			end if
+		end if
+	next i
+	if tmpmsg &lt;&gt; &quot;&quot; then
+		MsgBox &quot;Don&apos;t forget to hand off extra Loyalty cards from &quot; &amp; tmpmsg
+	end if
+end sub
+
+sub MakeSympathetic (playerID as integer)
+	if OptionIsSympatheticCylon() then	&apos;Pegasus: we have a Sympathetic Cylon
+		MsgBox GetPlayerName(playerID) &amp; &quot; is a Sympathetic Cylon.&quot;
+		&apos;&quot;Reveal&quot; the Cylon and mark as a sympathizer
+		MakeCylon playerID, FALSE
+		&apos; Deal an Agenda to the Sympathetic Cylon
+		LoyaltyToPlayer playerID, Deal_Agenda(), _LoyaltyAgenda
+		
+		DiscardLoyalty playerID, &quot;You Are a Sympathetic Cylon&quot;
+	else	&apos;Base game: we have a Sympathizer (could be human or cylon)
+		&apos; if we have a Sympathizer who is not a revealed Cylon and everything is blue then the Symp Reveals and goes to the Rez ship
+		if ResourcesAreBlue() and not IsRevealed(playerID) then
+			MsgBox GetPlayerName(playerID) &amp; &quot; is the Cylon Sympathizer.  All resources are Blue, so &quot; &amp; GetPlayerName(playerID) &amp; &quot; reveals as a Cylon.&quot; 
+			
+			SetLoyaltySympathetic playerID
+			MakeCylon playerID, FALSE
+		
+		elseif IsRevealed (playerID) then
+			MsgBox GetPlayerName(playerID) &amp; &quot; got the Sympathizer card.  As a revealed Cylon, &quot; &amp; GetPlayerName(playerID) &amp; &quot; gets to give it to someone else.  You need to manage that by hand.&quot;
+			
+		else
+			&apos; we have a symp who is not revealed and at least one resource is red, so throw the fool into the brig
+			MsgBox GetPlayerName(playerID) &amp; &quot; is the Sympathizer and is being sent to the brig.&quot;
+			SetPlayerLoc playerID, &quot;Brig&quot;
+		end if
+		DiscardLoyalty playerID, &quot;You Are a Sympathizer&quot;
+	end if		
+end sub	&apos;MakeSympathetic
+
+sub MakeMutineer (playerID as integer)
+	dim zarekID as integer
+	SetMutineer(playerID)
+	if GetTitle(_TitlePresident) = playerID then
+		UpdateTitle GetNextTitle(_TitlePresident, playerID), _TitlePresident
+		MsgBox GetPlayerName(GetTitle(_TitlePresident)) &amp; &quot; is now the President.&quot;
+		LogThis GetPlayerName(GetTitle(_TitlePresident)) &amp; &quot; is now the President.&quot;
+	end if
+	if GetTitle(_TitleAdmiral) = playerID then
+		UpdateTitle GetNextTitle(_TitleAdmiral, playerID), _TitleAdmiral
+		MsgBox GetPlayerName(GetTitle(_TitleAdmiral)) &amp; &quot; is now the Admiral.&quot;
+		LogThis GetPlayerName(GetTitle(_TitleAdmiral)) &amp; &quot; is now the Admiral.&quot;
+	end if
+	if UseCylonFleet and GetTitle(_TitleCAG) = playerID then
+		UpdateTitle GetNextTitle(_TitleCAG, playerID), _TitleCAG
+		MsgBox GetPlayerName(GetTitle(_TitleCAG)) &amp; &quot; is now the CAG.&quot;
+		LogThis GetPlayerName(GetTitle(_TitleCAG)) &amp; &quot; is now the CAG.&quot;
+	end if
+	
+	for zarekID = 1 to PlayerCnt()
+		if GetPlayerName(zarekID) = &quot;Tom&quot; then
+			MsgBox GetPlayerName(playerID) &amp; &quot; draws two Mutiny cards, have Zarek bury one.&quot;
+			DrawMutiny(playerID, false)
+			DrawMutiny(playerID, false)
+			exit sub
+		end if
+	next zarekID
+	MsgBox GetPlayerName(playerID) &amp; &quot; draws a Mutiny Card.&quot;
+	DrawMutiny(playerID)
+end sub
+
+sub GiveLoyaltyCard
+	dim fromStr, toStr, curcard, tmplst() as string
+	dim fromID, toID, currow, rtn as integer
+	dim mutineer as boolean
+	GetLoyalty
+	
+	fromID = SelectedLoyaltyPlayerID()
+	if fromID = 0 then
+		MsgBox &quot;Please select a player to give the card(s).&quot;,0,&quot;Give Loyalty Cards&quot;
+		exit sub
+	end if
+	fromStr	= GetPlayerName(fromID)
+
+	tmplst = LoyaltyForm.getByName(&quot;lstLoyaltyTo&quot;).SelectedItems()
+	if ubound(tmplst) = -1 then
+		MsgBox &quot;Please select a player to receive the card(s).&quot;,0,&quot;Give Loyalty Cards&quot;
+		exit sub
+	end if
+	toStr		= LoyaltyForm.getByName(&quot;lstLoyaltyTo&quot;).StringItemList(val(tmplst(0))	
+	toID		= GetPlayerID(toStr)
+	mutineer	= false
+		
+	if IsMutineer(fromID) then
+		if msgBox (fromStr &amp; &quot; makes &quot; &amp; toStr &amp; &quot; the Mutineer?&quot;, 4, &quot;Give Loyalty Cards&quot;) = 6 then
+			mutineer = true
+		end if
+	end if
+	if not mutineer then
+		if MsgBox (fromStr &amp; &quot; gives all unplayed Loyalty cards to &quot; &amp; toStr &amp; &quot;?&quot;,4,&quot;Give Loyalty Cards&quot;) &lt;&gt; 6 then
+			exit sub
+		elseif GetTotalDistance &gt; 6 then
+			if MsgBox (&quot;Distance is greater than 6, pass Loyalty cards anyway?&quot;,4,&quot;Give Loyalty Cards&quot;) &lt;&gt; 6 then
+				exit sub
+			end if
+		end if
+	end if
+
+	&apos;any card that has a white background is in the player&apos;s hand...move it.
+	currow = _LoyaltyStartRow
+	do until currow &gt; _LoyaltyStartRow + _MaxLoyaltyInHand
+		if LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(fromID), currow).string &lt;&gt; &quot;&quot; AND _
+			LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(fromID), currow).CellBackColor = _white AND _
+			((not mutineer) xor LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(fromID), currow).string = &quot;You are a Mutineer&quot;) _
+		then
+			curcard = LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(fromID), currow).string
+			LoyaltyToPlayer toID, curcard, _LoyaltyOther
+			LogThis fromStr &amp; &quot; gives Loyalty card &apos;&quot; &amp; curcard &amp; &quot;&apos; to &quot; &amp; toStr
+			&apos;If we just handed off a Cylon card, change the player&apos;s loyalty
+			if InStr(curcard,&quot;Symp&quot;) &gt; 0 then
+				MakeSympathetic toID
+			end if
+			LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(fromID), currow).string = &quot;&quot;
+			LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(fromID), currow).CellBackColor = _bluegrey
+		end if
+		currow = currow + 1
+	loop
+	PopulateGiveLoyaltyFrom	
+	UpdateLoyaltyCount
+end sub	&apos;GiveLoyaltyCard
+
+sub DealLoyaltyCard
+	dim toStr, curcard as string
+	dim toID, currow as integer
+	GetLoyalty
+	
+	toID = SelectedLoyaltyPlayerID()
+	if toID = 0 then
+		MsgBox &quot;Please select a player to receive the card.&quot;,0,&quot;Deal Loyalty Card&quot;
+		exit sub
+	end if
+	toStr=GetPlayerName(toID)
+
+	if MsgBox (&quot;Deal a new Loyalty Card to &quot; &amp; toStr &amp; &quot;?&quot;,4,&quot;Deal Loyalty Card&quot;) &lt;&gt; 6 then
+		exit sub
+	end if
+
+	LoyaltyToPlayer GetPlayerID(toStr), GetFromLoyaltyDeck(_DeckLoyalty), _LoyaltyOther
+	
+	PopulateGiveLoyaltyFrom	
+	UpdateLoyaltyCount
+end sub	&apos;DealLoyaltyCard
+
+sub btnRevealFlaw
+	RevealFlaw()
+end sub
+
+sub RevealFlaw (optional playerid as variant, optional force as variant)
+	GetLoyalty
+	GetSF
+	dim rtn as integer
+	
+	if IsMissing(playerID) then
+		playerID = SelectedLoyaltyPlayerID()
+		if playerID = 0 then
+			MsgBox &quot;Please select a player to Reveal their Flaw.&quot;,0,&quot;Reveal Flaw&quot;
+			exit sub
+		end if
+	end if
+	
+	LogThis GetPlayerName(playerID) &amp; &quot; Reveals &quot; &amp; LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyFlawRow).string &amp; &quot;.&quot;
+	if (not IsMissing(force)) and force then 
+		MsgBox GetPlayerName(playerID) &amp; &quot; is forced to Reveal &quot; &amp; LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyFlawRow).string &amp; &quot;.&quot;
+		rtn	= 7
+	elseif GetTotalDistance() &lt; 6 then 
+		MsgBox GetPlayerName(playerID) &amp; &quot; Reveals &quot; &amp; LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyFlawRow).string &amp; &quot;.&quot;
+		rtn	= 7
+	else
+		rtn = MsgBox(&quot;Does &quot; &amp; GetPlayerName(playerID) &amp; &quot; Reveal &quot; &amp; LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyFlawRow).string &amp; &quot; willingly?&quot;, 3, &quot;Reveal Flaw&quot;)
+	end if
+	
+	if rtn = 6 then
+		DiscardFlaw(playerID)
+	elseif rtn = 7 then
+		SkillSheet.getCellByPosition(GetSkillSetCol(_SkillSetHand, playerID), _SkillFlawRow).CellBackColor = _red
+		LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyFlawRow).CharColor = _red
+	end if
+	
+	PopulateGiveLoyaltyFrom
+end sub
+
+function FlawRevealed (playerID as integer) as boolean
+	FlawRevealed = (LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyFlawRow).CharColor = _red)
+end function
+
+sub DiscardFlaw (playerID as integer)
+	GetLoyalty
+	GetSF
+	
+	MsgBox GetPlayerName(playerID) &amp; &quot; discards &quot; &amp; LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyFlawRow).string &amp; &quot;.&quot;
+	LogThis GetPlayerName(playerID) &amp; &quot; discards &quot; &amp; LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyFlawRow).string &amp; &quot;.&quot;
+	SkillSheet.getCellByPosition(GetSkillSetCol(_SkillSetHand, playerID), _SkillFlawRow).CellBackColor = _white
+	LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyFlawRow).string = &quot;&quot;
+	LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyFlawRow).CharColor = _white
+	
+	PopulateGiveLoyaltyFrom
+end sub
+
+sub PopulateGiveLoyaltyFrom
+	dim playerID, currow, cntr as integer
+	dim playerlst(1) as string
+	dim addme as boolean
+	GetLoyalty
+	
+	cntr	= 1
+	for playerID = 1 to PlayerCnt()
+		&apos; Cylon Leaders never have Loyalty or Flaws
+		if IsCylonLeader(playerID) then
+			addme	= GameTypeIsDaybreak()				
+		elseif VariantManualLoyalty() then
+			&apos; Everyone but a Cylon Leader is added (I suppose once the deck is empty that&apos;s not true)
+			addme = true
+		else
+			&apos; Add anyone who has a flaw or any remaining Loyalty Cards.
+			if VariantFlaws() then
+				addme = LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyFlawRow).string &lt;&gt; &quot;&quot; and not FlawRevealed(playerID)
+			end if
+			
+			&apos; see if this player has any cards that can be given away...
+			currow = _LoyaltyStartRow
+			do until currow &gt; _LoyaltyStartRow + _MaxLoyaltyInHand
+				if LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), currow).string &lt;&gt; &quot;&quot; AND _
+					LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), currow).CellBackColor = _white _
+				then
+					addme = true
+					exit do
+				end if	
+				currow	= currow + 1
+			loop
+		end if
+		
+		&apos; If we should add them, do so.
+		if addme then
+			redim preserve playerlst(cntr) as string
+			playerlst(cntr) = GetPlayerName(playerID)
+			cntr=cntr+1
+		end if
+	next playerID
+&apos;	end if
+	
+	LoyaltyForm.getByName(&quot;lstLoyaltyFrom&quot;).StringItemList=playerlst()
+	UpdateLoyaltyOptions
+end sub	&apos;PopulateGiveLoyaltyFrom
+
+
+sub PopulatePersonalGoals 
+	dim currow, pgcnt as integer
+	dim tmplst() as string
+	dim goalstr as string
+	dim playerID as integer
+	
+	playerID	= SelectedLoyaltyPlayerID()
+
+	currow = _LoyaltyStartRow
+	pgcnt = 0
+	do until currow &gt; _LoyaltyStartRow + _MaxLoyaltyInHand
+		goalstr	= LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), currow).string
+		if (Instr(goalstr, &quot;Goal&quot;) &gt; 0 OR InStr(goalstr, &quot;Chase&quot;) &gt; 0 OR InStr(goalStr, &quot;Ally&quot;) &gt; 0 OR InStr(goalStr, &quot;Justified&quot;) OR InStr(goalStr, &quot;Force&quot;)) AND _
+			LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), currow).CellBackColor = _white _
+		then
+			pgcnt = pgcnt + 1
+			redim preserve tmplst(pgcnt) as string
+			tmplst(pgcnt) = LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), currow).string
+		end if
+		currow = currow + 1
+	loop
+
+	LoyaltyForm.getByName(&quot;lstPersonalGoal&quot;).StringItemList	= tmplst()
+end sub &apos;PopulatePersonalGoals
+
+function SelectedLoyaltyPlayerID () as integer
+	dim tmplst() as string
+	GetLoyalty
+	
+	tmplst = LoyaltyForm.getByName(&quot;lstLoyaltyFrom&quot;).SelectedItems()
+	if ubound(tmplst) = -1 then
+		SelectedLoyaltyPlayerID = 0
+	else
+		SelectedLoyaltyPlayerID = GetPlayerID(LoyaltyForm.getByName(&quot;lstLoyaltyFrom&quot;).StringItemList(val(tmplst(0)))	
+	end if
+	
+end function
+
+sub UpdateLoyaltyOptions
+	dim pglst as variant
+	dim playerID as integer
+	GetLoyalty
+	
+	PopulatePersonalGoals
+	PopulateGiveLoyaltyTo
+
+	LoyaltyForm.getByName(&quot;btnPersonalGoal&quot;).enabled=FALSE
+	LoyaltyForm.getByName(&quot;btnGiveLoyalty&quot;).enabled=FALSE
+end sub
+
+sub EnableGiveLoyalty
+	GetLoyalty
+	LoyaltyForm.getByName(&quot;btnGiveLoyalty&quot;).enabled	= TRUE
+end sub
+
+sub EnablePersonalGoal
+	dim goalstr as string
+	dim tmplst() as string
+	dim tmp as integer
+	GetLoyalty
+	
+	tmplst	= LoyaltyForm.getByName(&quot;lstPersonalGoal&quot;).SelectedItems()
+	goalstr = LoyaltyForm.getByName(&quot;lstPersonalGoal&quot;).StringItemList(val(tmplst(0)))
+	if goalStr = &quot;&quot; then
+		&apos; Blank top line
+		LoyaltyForm.getByName(&quot;btnPersonalGoal&quot;).enabled	= FALSE
+		exit sub
+	elseif InStr(goalStr, &quot;Goal&quot;) &gt; 0 then
+		&apos; Personal Goal
+		LoyaltyForm.getByName(&quot;btnPersonalGoal&quot;).label	= &quot;Reveal Personal Goal&quot;
+	else
+		&apos; Motive
+		LoyaltyForm.getByName(&quot;btnPersonalGoal&quot;).label	= &quot;Reveal Motive&quot;
+	end if
+	LoyaltyForm.getByName(&quot;btnPersonalGoal&quot;).enabled	= TRUE
+end sub
+	
+sub PopulateGiveLoyaltyTo
+	dim playerID, currow, cntr as integer
+	dim playerlst(1) as string
+	
+	cntr	= 1
+	for playerID = 1 to PlayerCnt()
+		if not IsRevealed(playerID) and playerID &lt;&gt; SelectedLoyaltyPlayerID then
+			redim preserve playerlst(cntr) as string
+			playerlst(cntr) = GetPlayerName(playerID)
+			cntr=cntr+1
+		end if
+	next playerID
+	
+	LoyaltyForm.getByName(&quot;lstLoyaltyTo&quot;).StringItemList	= playerlst()
+end sub	&apos;PopulateGiveLoyaltyTo
+
+sub RevealPersonalGoal
+	dim playerID as integer
+	dim goalstr as string
+	dim tmplst() as string
+	GetLoyalty
+	
+	playerID = SelectedLoyaltyPlayerID()
+	tmplst = LoyaltyForm.getByName(&quot;lstPersonalGoal&quot;).SelectedItems()
+	goalstr = LoyaltyForm.getByName(&quot;lstPersonalGoal&quot;).StringItemList(val(tmplst(0)))	
+	
+	DiscardLoyalty playerID, goalstr
+	if GetTotalDistance() &lt; 7 and not IsCylonLeader(playerID) then
+		AddToLoyaltyDeck _DeckLoyalty, GetFromLoyaltyDeck(_DeckNotACylon)
+		ShuffleLoyaltyDeck _DeckLoyalty
+		LoyaltyToPlayer playerID, GetFromLoyaltyDeck(_DeckLoyalty), _LoyaltyOther
+	end if
+	PopulateGiveLoyaltyFrom
+end sub
+
+</script:module>

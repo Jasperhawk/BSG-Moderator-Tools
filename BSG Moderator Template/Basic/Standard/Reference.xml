@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Reference" script:language="StarBasic">dim RefSheet as object
+dim Ref2Sheet as object
+
+const _RefPlayerNameCol = 0
+const _RefPlayerCardsCol = _RefPlayerNameCol	&apos; SkillIDs start at 1 now.
+const _RefPlayerGameCol = _RefPlayerNameCol + 10
+const _RefPlayerPresCol = _RefPlayerNameCol + 11
+const _RefPlayerAdmCol = _RefPlayerNameCol + 12
+const _RefPlayerCAGCol = _RefPlayerNameCol + 13
+const _RefPlayerLocCol = _RefPlayerNameCol + 9
+const _RefPlayerRow = 48
+const _RefMaxCharCnt = 38
+
+const _RefSkillNameCol = 0
+const _RefSkillCardNameCol = _RefSkillNameCol + 2
+const _RefSkillCardGameCol = _RefSkillNameCol + 10
+const _RefSkillCardDistCol = _RefSkillNameCol + 11
+const _RefSkillCardRow = 113
+
+const _RefLoyaltyGameCol	= 0
+const _RefLoyaltyNameCol	= 1
+const _RefAgendaRow			= 194
+const _RefMotiveRow			= 208
+const _RefCylonRow			= 229
+const _RefPersonalGoalRow	= 244
+const _RefFinalFiveRow		= 253
+
+const _RefFlawNameCol		= 0
+const _RefFlawGameCol		= 1
+const _RefFlawRow			= 260
+
+global SkillCards(6,6) as string
+
+global const _TitlePresident = 0
+global const _TitleAdmiral = 1
+global const _TitleCAG = 2
+
+sub GetRef
+	if RefSheet &lt;&gt; NULL then
+		exit sub
+	end if 
+	
+	RefSheet= ThisComponent.Sheets.getByName(&quot;Reference&quot;)
+end sub
+
+sub GetRef2
+	if Ref2Sheet &lt;&gt; NULL then
+		exit sub
+	end if 
+	
+	Ref2Sheet= ThisComponent.Sheets.getByName(&quot;Reference2&quot;)
+end sub
+
+function RefPlayerRow (playername as string) as integer
+	dim currow as integer
+	GetRef
+	
+	currow = _RefPlayerRow
+	do until RefSheet.getCellByPosition(_RefPlayerNameCol, currow).string = playername or currow &gt; _RefPlayerRow + _RefMaxCharCnt
+		currow = currow+1
+	loop
+	
+	if currow &gt; _RefPlayerRow + _RefMaxCharCnt then 
+		RefPlayerRow = -1
+	else
+		RefPlayerRow = currow
+	end if
+end function	&apos;RefPlayerRow
+
+function RefTitleRank (playername as string, title as integer) as integer
+	GetRef
+	
+	if RefPlayerRow(playername) &lt; 0 then
+		RefTitleRank = 999
+	else
+		RefTitleRank = RefSheet.GetCellByPosition(_RefPlayerPresCol + title, RefPlayerRow(playername)).String
+	end if
+end function
+
+function RefStartLocation (playername) as string
+	GetRef
+	
+	RefStartLocation = RefSheet.GetCellByPosition(_RefPlayerLocCol, RefPlayerRow(playername)).String
+end function
+
+function GetFullCharacterSet as variant
+	dim currow, charcnt as integer
+	dim charset(_RefMaxCharCnt) as string
+	GetRef
+
+	currow = _RefPlayerRow
+	charcnt = 0
+	for currow = _RefPlayerRow to _RefPlayerRow + _RefMaxCharCnt
+		if RefSheet.getCellByPosition(_RefPlayerGameCol, currow).string = &quot;B&quot; OR _
+			(RefSheet.getCellByPosition(_RefPlayerGameCol, currow).string = &quot;P&quot; AND GameTypeIsPegasus()) OR _
+			(RefSheet.getCellByPosition(_RefPlayerGameCol, currow).string = &quot;E&quot; AND GameTypeIsExodus()) OR _
+			(RefSheet.getCellByPosition(_RefPlayerGameCol, currow).string = &quot;D&quot; AND GameTypeIsDaybreak()) OR _
+			(RefSheet.getCellByPosition(_RefPlayerGameCol, currow).string = &quot;R&quot; AND GameTypeIsRevelations()) _
+		then		
+			charset(charcnt) = RefSheet.getCellByPosition(_RefPlayerNameCol, currow).string 
+			charcnt = charcnt + 1
+		end if
+	next currow
+
+	GetFullCharacterSet = charset()
+end function 	&apos;GetFullCharacterSet
+
+function GetFullSkillCardSet (skilltype as string) as variant
+	dim currow, cardvalue, cardcnt, distcnt, i as integer
+	dim cardset(41), skillcat, gametype, cardtxt as string
+	GetRef
+	
+	cardsetcnt = 0
+	currow = _RefSkillCardRow
+	do until RefSheet.GetCellByPosition(_RefSkillNameCol, currow).string = skilltype
+		currow = currow + 1
+	loop
+	
+	skillcat = skilltype
+	&apos;so now currow is where this skill type starts
+	do until skillcat &lt;&gt; skilltype and skillcat &lt;&gt; &quot;&quot;
+		gametype = RefSheet.GetCellByPosition(_RefSkillCardGameCol, currow).string 
+		if gametype = &quot;B&quot; or (gametype = &quot;P&quot; and GameTypeIsPegasus()) or (gametype = &quot;E&quot; and GameTypeIsExodus()) or (gametype = &quot;D&quot; and GameTypeIsDaybreak()) or (gametype = &quot;R&quot; and GameTypeIsRevelations()) then
+			for cardvalue = 0 to 6
+				&apos; How many copies of which values?
+				cardcnt = RefSheet.GetCellByPosition(_RefSkillCardDistCol + cardvalue, currow).value
+
+				&apos; Special conditions
+				if skilltype = &quot;Treachery&quot; and gametype = &quot;P&quot; and GameTypeIsDaybreak() then &apos; Don&apos;t use Pegasus Treachery
+					cardcnt = 0
+				elseif GameTypeIsRevelations() then
+					if RefSheet.GetCellByPosition(_RefSkillCardNameCol, currow).string = &quot;Broadcast Location&quot; and cardvalue = 1 then
+						cardcnt = 6	&apos; Remove two BL for Revelations
+					elseif (not GameTypeIsExodus() and (RefSheet.GetCellByPosition(_RefSkillCardNameCol, currow).string = &quot;Price of Failure&quot; OR _
+								RefSheet.GetCellByPosition(_RefSkillCardNameCol, currow).string = &quot;The Plan&quot;)) then
+						cardcnt = 0 &apos; Only use these cards if Exodus is in play
+					end if
+				end if
+				
+				&apos; Add the cards to the deck.
+				if cardcnt &gt; 0 then
+					for i = 1 to cardcnt
+						cardsetcnt = cardsetcnt + 1
+						cardset(cardsetcnt) = cardvalue &amp; &quot; - &quot; &amp; RefSheet.GetCellByPosition(_RefSkillCardNameCol, currow).string 
+					next i
+				end if
+			next cardvalue
+		end if
+		
+		currow = currow + 1
+		skillcat = RefSheet.GetCellByPosition(_RefSkillNameCol, currow).string
+	loop
+	cardset(0) = cardsetcnt
+	GetFullSkillCardSet = cardset()
+end function
+
+
+function GetPlyrDraw (playerID as integer) as variant
+	dim carddraw(7) as variant
+	dim currow, skillID as integer
+	GetRef
+	
+	currow = RefPlayerRow (GetPlayerName(playerID))
+	
+&apos;+== what about an infiltration sympathetic cylon...check that.
+	for skillID = _SkilIDMin to _SkillIDMax
+		if IsInfiltrating(playerID) and IsCylonLeader(playerID) and _
+			RefSheet.GetCellByPosition(_RefPlayerCardsCol + skillID, currow).value &gt; 0 _
+		then
+			carddraw(skillID) = RefSheet.GetCellByPosition(_RefPlayerCardsCol + skillID, currow).value + 0.1
+		else
+			carddraw(skillID) = RefSheet.GetCellByPosition(_RefPlayerCardsCol + skillID, currow).value
+		end if
+	next skillID
+	GetPlyrDraw = carddraw()
+end function
+
+function SkillIDFromText (cardtext as string) as integer
+	dim currow, skillID as integer
+	GetRef
+	
+	skillID = 0
+	currow = _RefSkillCardRow
+	do while RefSheet.getCellByPosition(_RefSkillCardNameCol, currow).string &lt;&gt; &quot;&quot;
+		if RefSheet.getCellByPosition(_RefSkillNameCol, currow).string &lt;&gt; &quot;&quot; then
+			skillID = SkillID + 1
+		end if
+		if Instr(cardtext, RefSheet.getCellByPosition(_RefSkillCardNameCol, currow).string ) &gt; 0 then
+			SkillIDFromText = skillID
+			exit do
+		end if
+		currow = currow + 1
+	loop
+end function	&apos;SkillIDFromText
+
+
+</script:module>
