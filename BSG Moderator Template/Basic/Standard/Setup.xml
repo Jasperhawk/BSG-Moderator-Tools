@@ -654,7 +654,7 @@ sub SetInitTrack (taskID as integer, completed as boolean)
 	dim tasklist as variant
 	GetSetup
 		
-	tasklist=Array(,&quot;Initialize&quot;,&quot;Game State&quot;,&quot;Loyalty Cards&quot;,&quot;Ships&quot;,&quot;Skill Cards &amp; Destiny&quot;,&quot;Crisis Cards&quot;,&quot;Super Crisis Cards&quot;,&quot;Quorum Cards&quot;,&quot;Destination Cards&quot;,&quot;Game Log&quot;)
+	tasklist=Array(,&quot;Initialize&quot;,&quot;Ships&quot;,&quot;Game State&quot;,&quot;Loyalty Cards&quot;,&quot;Skill Cards &amp; Destiny&quot;,&quot;Crisis Cards&quot;,&quot;Super Crisis Cards&quot;,&quot;Quorum Cards&quot;,&quot;Destination Cards&quot;,&quot;Game Log&quot;)
 	
 	if completed then
 		SetupSheet.getCellByPosition(_InitTrackCol, _InitTrackRow + TaskID).string		= &quot;&quot;
@@ -707,6 +707,13 @@ sub Initialize_Game
 		end if
 	next playerID
 
+	&apos; sweep all the ships from the board, repair all ships
+	&apos; shuffle the civilians and the basestar damage tokens
+	&apos; launch the ships for the initial setup
+	&apos; Has to happen before Game State, because Apollo.
+	Initialize_Ships
+	SetInitTrack 2, TRUE
+
 	&apos; set initial President, Admiral, and starting location (default Apollo to Sector 6?)
 	&apos; reset all resource counters, including Nukes
 	&apos; reset Jump Track to the start
@@ -714,19 +721,13 @@ sub Initialize_Game
 	&apos; reset the turn to 1.1
 	Initialize_GameState
 	Initialize_IonianNebula
-	SetInitTrack 2, TRUE
+	SetInitTrack 3, TRUE
 	
 	
 	&apos; Create the appropriate size loyalty deck
 	&apos; Shuffle Loyalty and deal the first round of cards, set the initial loyalty on GameState
 	Initialize_Mutiny	
 	Initialize_Loyalty
-	SetInitTrack 3, TRUE
-
-	&apos; sweep all the ships from the board, repair all ships
-	&apos; shuffle the civilians and the basestar damage tokens
-	&apos; launch the ships for the initial setup
-	Initialize_Ships
 	SetInitTrack 4, TRUE
 	
 	&apos; set default hand description for each player 

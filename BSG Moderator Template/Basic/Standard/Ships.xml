@@ -49,7 +49,7 @@ global const _ShipStatusCylonFleet6	= 16
 global const _ShipStatusActivate	= 17
 
 const _ScarCol = 14
-const _ScarRow = 16
+const _ScarRow = 17
 
 sub GetShipSheet
 	if ShipSheet &lt;&gt; NULL then
@@ -177,6 +177,7 @@ function ShipCnt (shiptype as integer) as integer
 	if UseCylonFleet() then
 		tmp(_ShipViper)		= 6
 		tmp(_ShipMarkVII)	= 4
+		tmp(_ShipRaider)	= 20
 	end if
 	if GameTypeIsDaybreak() then
 		tmp(_ShipAssaultRaptor)	= 4

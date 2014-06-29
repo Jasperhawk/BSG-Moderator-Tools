@@ -9,7 +9,7 @@ const _LoyaltyStartCol = 1
 const _LoyaltySleeperCol = 3
 const _LoyaltySleeperDataCol = 6
 
-const _LoyaltyRow = 2
+global const _LoyaltyRow = 2
 
 const _LoyaltyRefRow = 230
 const _GoalsRefOffset = 1
@@ -25,12 +25,12 @@ const _LoyaltyGameRefCol = 0
 const _LoyaltyTextRefCol = 1
 
 &apos; new values
-const _LoyaltyAgendaRow = 2
+global const _LoyaltyAgendaRow = 2
 const _LoyaltyFlawRow = _LoyaltyAgendaRow
 const _LoyaltyStartRow = _LoyaltyAgendaRow + 1
 const _LoyaltySleeperRow = _LoyaltyAgendaRow + 3
 const _LoyaltyOtherRow = _LoyaltyAgendaRow + 5
-const _MaxLoyaltyInHand = 10
+global const _MaxLoyaltyInHand = 10
 
 const _LoyaltyCol = 0
 
@@ -194,6 +194,11 @@ sub UpdateLoyaltyCount ()
 	next playerID	
 end sub &apos;UpdateLoyaltyCount
 
+function GetLoyaltyCount(playerID as integer) as integer
+	GetLoyalty
+	
+	GetLoyaltyCount	= LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(playerID), _LoyaltyCntRow).value
+end function
 
 &apos;+== should this stuff come from a reference tab?
 sub BuildLoyaltyDecks 

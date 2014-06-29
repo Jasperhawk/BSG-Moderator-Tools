@@ -55,8 +55,9 @@ const _CrisisTypeCAG = 4
 const _CrisisTypeAttack = 5
 const _CrisisTypeNone = -1	&apos; used for resetting buttons
 
-const _SuperCol = 0
-const _SuperRow = _ColonyRow + _ColonyCnt + 4
+global const _SuperCol 		= 0
+global const _SuperRow 		= 239	&apos; Can&apos;t be calculated because it&apos;s global
+global const _SuperNameCol	= 1
 const _SuperBaseCnt = 5
 const _SuperPegasusCnt = 5
 const _SuperExodusCnt = 3 

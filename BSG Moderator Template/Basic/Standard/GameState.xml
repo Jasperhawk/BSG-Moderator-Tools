@@ -399,6 +399,12 @@ function IsCylon (playerID as integer) as boolean
 	IsCylon = (GameSheet.GetCellByPosition(_PlayerLoyaltyCol,_PlayerStartRow + playerID).String &lt;&gt; &quot;H&quot;)
 end function
 
+function GetSuperCnt (playerID as integer) as integer
+	GetGS
+	
+	GetSuperCnt	= GameSheet.getCellByPosition(_PlayerSuperCol, _PlayerStartRow + playerID).value
+end function
+
 function IsCylonLeaderByName (playername as string) as boolean
 	IsCylonLeaderByName = (playername = &quot;Cavil&quot; or playername = &quot;Leoben&quot; or playername = &quot;D&apos;Anna&quot; or playername = &quot;Simon&quot; or playername = &quot;Doral&quot; or playername = &quot;Six&quot; or playername = &quot;Athena&quot;)
 end function
@@ -984,12 +990,17 @@ sub MakeCylon (playerID as integer, asCylon as boolean)
 			SetViperPilot 0, ViperID, _ShipViper
 			SetShipStatus _ShipViper, ViperID, 0
 			LogThis &quot;Viper &quot; &amp; ViperID &amp; &quot; returns to the Reserves&quot;
-		else
+		elseif viperID &lt; 20 then
 			viperID = viperID - 10
 			SetViperPilot 0, ViperID, _ShipMarkVII
 			SetShipStatus _ShipMarkVII, ViperID, 0
-			LogThis &quot;Viper Mark VII&quot; &amp; ViperID &amp; &quot; returns to the Reserves&quot;
-		end if
+			LogThis &quot;Viper Mark VII &quot; &amp; ViperID &amp; &quot; returns to the Reserves&quot;
+		else
+			viperID = viperID - 20
+			SetViperPilot 0, ViperID, _ShipAssaultRaptor
+			SetShipStatus _ShipAssaultRaptor, ViperID, 0
+			LogThis &quot;Assault Raptor &quot; &amp; ViperID &amp; &quot; returns to the Reserves&quot;
+		end if		
 		UpdateShips
 	end if
 	
@@ -1867,6 +1878,7 @@ sub Initialize_GameState
 		SetOPG playerID, 1
 		SetSCCount playerID, 0
 		SetInfiltrate playerID, FALSE
+		SetRevealed playerID, TRUE	&apos; Yes it&apos;s wonky, the toggle is actually meant as &quot;clear&quot;
 		GameSheet.GetCellByPosition(_PlayerLocCol, _PlayerStartRow + playerID).string = &quot;&quot;
 		if playerID &gt; PlayerCnt() then
 			SetLoyaltyBlank playerID
@@ -2199,7 +2211,6 @@ sub GenerateBoardImage
 	SaveCSV
 	shell (gimpexe, 0, gimpparm)
 end sub
-
 
 sub LandPlayers
 	dim playerID as integer	

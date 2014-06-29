@@ -91,16 +91,15 @@ sub DrawMutinyButton
 	UpdateMutinyCardList	
 end sub
 
-sub UpdateMutinyCardList
-	dim playerID, cardID, numcards as integer
+function GetMutinyHand (playerID as integer) as variant
+	dim cardID, numcards as integer
 	dim cardlst() as string
 	dim playername as string
 	GetMutinySheet
 	
-	playerID = GetSelected(_ListMutinyPlayers)
 	if playerID &lt; 1 then
-		MutinyForm.getByName(&quot;lstMutinyCards&quot;).StringItemList	= cardlst()
-		exit sub
+		GetMutinyHand	= cardlst()
+		exit function
 	end if
 	
 	playername	= GetPlayerName(playerID)
@@ -112,8 +111,14 @@ sub UpdateMutinyCardList
 			cardlst(numcards)	= MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string
 		end if
 	next cardID
+	GetMutinyHand	= cardlst()
+end function
+
+sub UpdateMutinyCardList
+	dim playerID as integer
+	GetMutinySheet
 	
-	MutinyForm.getByName(&quot;lstMutinyCards&quot;).StringItemList	= cardlst()
+	MutinyForm.getByName(&quot;lstMutinyCards&quot;).StringItemList	= GetMutinyHand(GetSelected(_ListMutinyPlayers))
 	MutinyForm.getByName(&quot;btnPlayMutiny&quot;).enabled			= false
 	MutinyForm.getByName(&quot;btnDiscardMutiny&quot;).enabled		= false
 	MutinyForm.getByName(&quot;btnBuryMutiny&quot;).enabled			= false
@@ -129,7 +134,7 @@ sub SelectedMutinyCardChanged
 	MutinyForm.getByName(&quot;btnBuryMutiny&quot;).enabled			= (cardID &gt; 0)
 end sub
 
-function GetMutinyHandCout(playerID as integer) as integer
+function GetMutinyHandCount(playerID as integer) as integer
 	GetMutinySheet
 	GetMutinyHandCount	= MutinySheet.getCellByPosition(_MutinyHandCountCol, _MutinyHandCountRow + playerID).value
 end function
