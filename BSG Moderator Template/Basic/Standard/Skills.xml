@@ -1,0 +1,2046 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Skills" script:language="StarBasic">option explicit
+
+&apos;dim i,j as integer
+dim SkillName(8) as string
+dim SkillColorTag(7) as string
+dim SFFlag as boolean
+
+global const _SkillFlawRow = 27
+
+const _SkillCardRow = 57
+const _MaxSkillCardsInHand = 20
+const _MaxSkillCardsInDestiny = 24	&apos; 21 is the basic max with Complex Destiny and Revelations, 3 more in case of discarded Treachery.
+
+const _SkillDiscardRow = 100
+const _SkillStatusLocRow = 28
+const _SkillPlayerNameRow =29
+const _CardDrawRow = 30
+const _PlayerHandRow = 32
+
+const _DestinyCol = 6
+const _DestinyRow = 2
+global const _DestinyPlayerID = 8
+
+const _SkillCheckCol = 7
+const _SkillCheckRow = 2
+
+const _SkillCntBase = 21
+const _SkillCntPegasus = 5
+const _SkillCntExodus = 4
+const _SkillCntDaybreak	= 5
+const _SkillCntRevelations = 5
+const _MaxSkillCnt = _SkillCntBase + _SkillCntPegasus + _SkillCntExodus + _SkillCntDaybreak + _SkillCntRevelations
+
+const _SkillCardCntCol = 2
+const _SkillCardCntRow = 17
+
+const _HandCntCol = 0
+const _HandCntRow = 17
+
+const _SkillCheckHeaderRow 		= 1
+const _SkillCheckResearchCol 	= 12
+const _SkillCheckTreacheryCol	= 13
+const _SkillCheckValueCol 		= 15
+
+const _SkillCheckFlagsRow 			= 24
+const _SkillCheckCommitteeCol	 	= 8
+const _SkillCheckOrderCol			= 9
+const _SkillCheckInspirationalCol 	= 9
+const _SkillCheckChanceCol			= 10
+const _SkillCheckGutsCol 			= 10
+const _SkillCheckFixCol				= 12
+const _SkillCheckRecklessCol 		= 13
+
+const _SkillCheckTriggeredRow 			= 25
+const _SkillCheckTriggerConsequenceCol	= 14
+const _SkillCheckTriggerRecklessCol		= 11
+
+const _SkillColorTagRow = 143
+
+global const _SkillSetHand = 0
+const _SkillSetDeck = 1
+const _SkillSetDiscard = 2
+const _SkillSetDestiny = 3
+
+const _PlayerDrawnRow		= 147
+const _SkillCheckNeedsRow 	= 154
+const _DieRollNeedsRow		= _SkillCheckNeedsRow + 1
+
+global const _SkillIDPolitics		= 1
+global const _SkillIDMin			= _SkillIDPolitics
+global const _SkillIDLeadership		= 2
+global const _SkillIDTactics		= 3
+global const _SkillIDPiloting		= 4
+global const _SkillIDEngineering	= 5
+global const _SkillIDBaseMax		= _SkillIDEngineering
+global const _SkillIDTreachery 		= 6
+global const _SkillIDFaith 			= 7
+global const _SkillIDMax			= _SkillIDFaith
+const _SkillIDDestiny 		= 8
+
+dim SkillSheet, SkillForm As Object
+ 
+sub GetSF
+	if SFFlag then
+		exit sub
+	end if
+	
+	SFFlag = true	
+	SkillSheet= ThisComponent.Sheets.getByName(&quot;Skill Cards&quot;)
+	SkillForm = SkillSheet.DrawPage.Forms.GetByName(&quot;DealCards&quot;)
+	SkillName= Array(&quot;&quot;,&quot;Politics&quot;,&quot;Leadership&quot;,&quot;Tactics&quot;,&quot;Piloting&quot;,&quot;Engineering&quot;,&quot;Treachery&quot;,&quot;Faith&quot;,&quot;Destiny&quot;)
+	Randomize
+end sub	&apos;GetSF
+
+
+function SkillDeckSize as integer
+	dim decksize as integer
+	
+	decksize = _SkillCntBase
+	if GameTypeIsPegasus() then
+		decksize = decksize + _SkillCntPegasus
+	end if
+	if GameTypeIsExodus() then
+		decksize = decksize + _SkillCntExodus
+	end if
+	if GameTypeIsDaybreak() then
+		decksize = decksize + _SkillCntDaybreak
+	end if
+	if GameTypeIsRevelations() then
+		decksize = decksize + _SkillCntRevelations
+	end if
+	SkillDeckSize = decksize	
+end function	&apos;SkillDeckSize
+
+
+function GetSkillSetCol (whichset as integer, setID as integer)
+
+	select case whichset
+		case _SkillSetHand
+			GetSkillSetCol = GetPlayerCol(setID)
+			
+		case _SkillSetDeck, _SkillSetDiscard
+			GetSkillSetCol = GetSkillCol(setID)
+		
+		case _SkillSetDestiny
+			GetSkillSetCol = _DestinyCol
+	end select
+	
+end function	&apos;GetSkillSetCol
+
+function GetSkillSetRow (whichset as integer, setID as integer)
+	
+	select case whichset
+		case _SkillSetHand
+			GetSkillSetRow = _PlayerHandRow
+		
+		case _SkillSetDeck
+			GetSkillSetRow = _SkillCardRow
+			
+		case _SkillSetDiscard 
+			GetSkillSetRow = _SkillDiscardRow
+			
+		case _SkillSetDestiny 
+			GetSkillSetRow = _DestinyRow
+	end select
+end function	&apos;GetSkillSetRow
+			
+function MaxCardCnt (whichset as integer)
+
+	if whichset = _SkillSetHand then
+		MaxCardCnt	= _MaxSkillCardsInHand
+	elseif whichset = _SkillSetDestiny then
+		MaxCardCnt	= _MaxSkillCardsInDestiny
+	else	&apos;_SkillSetDeck, _SkillSetDiscard
+		MaxCardCnt = _MaxSkillCnt
+	end if
+end function	&apos;MaxCardCnt
+
+
+&apos;This is called from Initialize_SkillCards after all the skill cards have been put in the decks.
+&apos; based on the game type/expansion, it will
+&apos; 	-make sure all the correct cards are in based on the gametype/expansion
+&apos;		-simply delete ALL skill cards and then repopulate
+&apos; 	-mask areas that are not needed
+&apos;	-hide rows that are unnecessary to make the tab cleaner
+
+sub Configure_SkillCards
+	dim skillid, maxcards, i, playerID as integer
+	dim curcol, currow as integer
+	dim cardset as variant
+	GetSF
+
+	&apos;First clear all the skill cards
+	DiscardSkillCheckCards
+
+	&apos; Clear Player hands.
+	for playerid = 1 to 7
+		do while GetSkillCardFrom(_SkillSetHand,playerID) &lt;&gt; &quot;&quot;
+		loop
+		
+		&apos; Clear drawn cards stats.
+		for skillID = _SkillIDMin to _SkillIDMax
+			Skillsheet.getCellByPosition(GetPlayerCol(playerid), _PlayerDrawnRow + skillID).string = &quot;&quot;
+		next skillID
+		SkillSheet.getCellByPosition(GetSkillSetCol(_SkillSetHand, playerID), _SkillFlawRow).CellBackColor = _white
+	next playerid
+	
+	&apos; Clear decks and discards.
+	for skillID = _SkillIDMin to _SkillIDMax
+		do while GetSkillCardFrom(_SkillSetDiscard, skillID) &lt;&gt; &quot;&quot;
+		loop
+		do while GetSkillCardFrom (_SkillSetDeck, skillID) &lt;&gt; &quot;&quot;
+		loop
+	next skillID
+	
+	&apos; Clear Destiny
+	do while GetSkillCardFrom(_SkillSetDestiny,0) &lt;&gt; &quot;&quot;
+	loop
+
+	&apos; now repopulate from reference
+	maxcards = 0
+	for skillID = _SkillIDMin to _SkillIDMax
+		curcol	= GetSkillCol(skillID)
+		
+		cardset = GetFullSkillCardSet (SkillName(SkillID))
+		if cardset(0) &gt; maxcards then
+			maxcards = cardset(0)
+		end if
+		
+		for currow = _SkillCardRow to _SkillCardRow + cardset(0) - 1
+			AddSkillCardTo _SkillSetDeck, SkillColorL(skillID) &amp; cardset(currow - _SkillCardRow + 1) &amp; SkillColorR(skillID)
+		next currow
+	next skillID
+
+	&apos; If we&apos;re not using Treachery, blank out the deck
+	curcol= GetSkillCol(_SkillIDTreachery)
+	for currow = _SkillCardRow to _SkillCardRow + _MaxSkillCnt - 1
+		if GameTypeIsPegasus() or GameTypeIsDaybreak() then
+			SkillSheet.getCellByPosition(curcol,currow).CellBackColor = _white
+			SkillSheet.getCellByPosition(curcol,currow+(_SkillDiscardRow -_SkillCardRow )).CellBackColor = _ltgrey
+		else
+			SkillSheet.getCellByPosition(curcol,currow).CellBackColor = _grey
+			SkillSheet.getCellByPosition(curcol,currow+(_SkillDiscardRow -_SkillCardRow )).CellBackColor = _grey
+		end if
+	next currow
+
+	&apos; If we&apos;re not using Faith, blank out the deck
+	curcol= GetSkillCol(_SkillIDFaith)
+	for currow = _SkillCardRow to _SkillCardRow + _MaxSkillCnt - 1
+		if GameTypeIsRevelations() then
+			SkillSheet.getCellByPosition(curcol,currow).CellBackColor = _white
+			SkillSheet.getCellByPosition(curcol,currow+(_SkillDiscardRow -_SkillCardRow )).CellBackColor = _ltgrey
+		else
+			SkillSheet.getCellByPosition(curcol,currow).CellBackColor = _grey
+			SkillSheet.getCellByPosition(curcol,currow+(_SkillDiscardRow -_SkillCardRow )).CellBackColor = _grey
+		end if
+	next currow
+	
+	&apos; Hide any rows we don&apos;t need
+	for currow = 1 to _MaxSkillCnt 
+		if currow &lt;= maxcards then
+			SkillSheet.Rows(_SkillCardRow + currow).IsVisible = TRUE
+			SkillSheet.Rows(_SkillDiscardRow + currow).IsVisible = TRUE
+		else
+			SkillSheet.Rows(_SkillCardRow + currow).IsVisible = FALSE
+			SkillSheet.Rows(_SkillDiscardRow + currow).IsVisible = FALSE
+		end if
+	next currow
+	
+	&apos; Blank out the card count rows for the missing decks, too.
+	for i = 0 to 2
+		if GameTypeIsPegasus() or GameTypeIsDaybreak() then
+			SkillSheet.getCellByPosition(_SkillCardCntCol + i,_SkillCardCntRow + _SkillIDTreachery).CellBackColor = _white
+		else
+			SkillSheet.getCellByPosition(_SkillCardCntCol + i,_SkillCardCntRow + _SkillIDTreachery).CellBackColor = _grey
+		end if
+		if GameTypeIsRevelations() then
+			SkillSheet.getCellByPosition(_SkillCardCntCol + i,_SkillCardCntRow + _SkillIDFaith).CellBackColor = _white
+		else
+			SkillSheet.getCellByPosition(_SkillCardCntCol + i,_SkillCardCntRow + _SkillIDFaith).CellBackColor = _grey
+		end if		
+	next i
+end sub	&apos;Configure_SkillCards
+
+function SkillColorR (skillID as integer) as string
+	if ucase(Left(SkillColorL(skillID),6)) = &quot;[COLOR&quot; then
+		SkillColorR=&quot;[/color]&quot;
+	else
+		SkillColorR=&quot;}&quot; &amp; left(SkillColorL(skillID),1)
+	end if
+end function
+
+function SkillColorL (skillID as integer) as string
+	dim i as integer
+	if SkillColorTag(_SkillIDMin) = &quot;&quot; then
+		&apos; fill the array
+		for i = _SkillIDMin to _SkillIDMax
+			SkillColorTag(i) = Skillsheet.getCellByPosition(GetSkillCol(i), _SkillColorTagRow).string
+		next i
+	end if
+	SkillColorL = SkillColorTag(skillID)
+end function
+
+
+function SkillStrFromText (cardtext as string) as integer
+	SkillStrFromText= val(mid(cardtext, len(SkillColorL(SkillIDFromText(cardtext)))+1,1))
+end function
+
+function SkillCardFromText (cardtext as string) as string
+	SkillCardFromText= mid(stripcolor(cardtext),5)
+end function
+
+function GetPlayerCol (playerID as integer) as integer
+	if playerID &lt;&gt; _DestinyPlayerID then
+		GetPlayerCol = playerID - 1
+	else
+		GetPlayerCol = _DestinyCol
+	end if
+end function
+
+function GetSkillCol (skillID as integer) as integer
+	GetSkillCol = skillID - 1
+end function
+
+function StripColor (skillstr as string) as string
+	dim offsetL, offsetR as integer
+	offsetL = instr(skillstr,&quot;]&quot;)
+	offsetR = 8
+	if offsetL = 0 then
+		offsetL = instr(skillstr,&quot;{&quot;)
+		offsetR = 2
+	end if
+	StripColor = mid(skillstr,offsetL+1, len(skillstr) - offsetL - offsetR)
+end function
+
+function SkillColorDisp (skillID as integer) as variant
+	SkillColorDisp =  Skillsheet.getCellByPosition(GetSkillCol(skillID), _SkillColorTagRow).charcolor
+end function
+
+sub ReformatSkillCard (srccol, srcrow)
+	dim skillID as integer
+	dim oldstr, newstr as string
+
+	oldstr=SkillSheet.getCellByPosition(srccol, srcrow).string
+	skillID=SkillIDFromText(oldstr)
+	SkillSheet.getCellByPosition(srccol, srcrow).string = SkillColorL(skillID) &amp; StripColor(oldstr) &amp; SkillColorR(skillID)
+	SkillSheet.getCellByPosition(srccol, srcrow).charcolor = SkillColorDisp(skillID) 
+end sub
+
+sub ResetSkillCardColors
+	dim skillID, cardno, playerID, rtncd as integer
+	
+	rtncd=MsgBox(&quot;Reset the color tags and display colors for the skill cards?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	GetSF
+	
+	&apos; hands first
+	for playerID = 1 to PlayerCnt()
+		cardno=0
+		do until SkillSheet.getCellByPosition(GetPlayerCol(playerID),_PlayerHandRow + cardno).string = &quot;&quot;
+			ReformatSkillCard GetPlayerCol(playerID), _PlayerHandRow + cardno
+			cardno=cardno+1
+		loop
+	next playerID
+
+	for skillID = _SkillIDMin to _SkillIDMax
+		&apos; skill deck		
+		for cardno = _SkillCardRow to _SkillCardRow + _MaxSkillCnt - 1
+			if SkillSheet.getCellByPosition(GetSkillCol(skillID),cardno).string &lt;&gt; &quot;&quot; then
+				ReformatSkillCard GetSkillCol(skillID), cardno
+			end if
+		next cardno
+				
+		&apos; discard pile		
+		for cardno = _SkillDiscardRow to _SkillDiscardRow + _MaxSkillCnt - 1
+			if SkillSheet.getCellByPosition(GetSkillCol(skillID),cardno).string &lt;&gt; &quot;&quot; then
+				ReformatSkillCard GetSkillCol(skillID), cardno
+			end if
+		next cardno
+
+		&apos;reset the colors of the skill card column headers
+		SkillSheet.getCellByPosition(GetSkillCol(skillID),_SkillCardRow - 1).charcolor = Skillsheet.getCellByPosition(GetSkillCol(skillID), _SkillColorTagRow).charcolor
+		SkillSheet.getCellByPosition(GetSkillCol(skillID),_SkillDiscardRow - 1).charcolor = Skillsheet.getCellByPosition(GetSkillCol(skillID), _SkillColorTagRow).charcolor
+	next skillID
+	
+	&apos; destiny 		
+	for cardno = _DestinyRow to _DestinyRow + _MaxSkillCardsInDestiny
+		if SkillSheet.getCellByPosition(_DestinyCol, cardno).string &lt;&gt; &quot;&quot; then
+			ReformatSkillCard _DestinyCol, cardno
+		end if
+	next cardno
+		
+	&apos; skill check
+	cardno = 0
+	do until SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckRow + cardno).string = &quot;&quot;
+		ReformatSkillCard _SkillCheckCol, _SkillCheckRow + cardno
+		cardno=cardno+1
+	loop	
+
+	&apos;reset the colors of the skill card count section
+	for skillID = _SkillIDMin to _SkillIDMax
+		SkillSheet.getCellByPosition(_SkillCardCntCol, _SkillCardCntRow + SkillID).charcolor = Skillsheet.getCellByPosition(GetSkillCol(skillID), _SkillColorTagRow).charcolor
+		SkillSheet.getCellByPosition(_SkillCardCntCol + 1, _SkillCardCntRow + SkillID).charcolor = Skillsheet.getCellByPosition(GetSkillCol(skillID), _SkillColorTagRow).charcolor
+		SkillSheet.getCellByPosition(_SkillCardCntCol + 2, _SkillCardCntRow + SkillID).charcolor = Skillsheet.getCellByPosition(GetSkillCol(skillID), _SkillColorTagRow).charcolor
+	next skillID
+
+end sub
+
+function SkillCardCnt (skillID as integer) as integer
+	GetSF
+	SkillCardCnt = SkillSheet.getCellByPosition(_SkillCardCntCol + 1, _SkillCardCntRow + SkillID).value
+end function
+
+function HandCardCnt (playerID as integer) as integer
+	GetSF
+	if playerID = _DestinyPlayerID then
+		HandCardCnt = Skillsheet.getCellByPosition(_HandCntCol + 3, _HandCntRow + 8).value
+	else
+		HandCardCnt = Skillsheet.getCellByPosition(_HandCntCol + 1, _HandCntRow + playerID).value
+	end if
+end function
+
+&apos;CardInHand returns the text of the &apos;cardNo&apos; card in &apos;playerID&apos;s hand
+function CardInHand (playerID as integer, cardNo as integer, optional stripped) as string
+	dim handrow as integer
+	
+	if cardNo = 0 or HandCardCnt(playerID) = 0 then
+		CardInHand = &quot;&quot;
+		exit function
+	end if
+	if playerID = _DestinyPlayerID then
+		handrow = _DestinyRow
+	else
+		handrow = _PlayerHandRow
+	end if
+	if IsMissing(stripped) then
+		CardInHand =SkillSheet.getCellByPosition(GetPlayerCol(playerID), handrow + cardNo - 1).string
+	else
+		CardInHand =StripColor(SkillSheet.getCellByPosition(GetPlayerCol(playerID), handrow + cardNo - 1).string)
+	end if
+	
+end function
+
+
+
+function IsSkillCheckClear() as boolean
+	GetSF
+	IsSkillCheckClear = (SkillForm.getByName(&quot;btnSkillCheckClear&quot;).enabled = FALSE)
+end function
+
+sub Populate_Skills 
+	dim Ctl_Cards as object
+	dim selectlist() as string
+	dim skilllst(7) as string
+	dim prevsel, srccol,i as integer
+	
+	GetSF
+	Ctl_Cards = SkillForm.getByName(&quot;lstSkillDecks&quot;)
+
+	selectlist=Ctl_Cards.SelectedItems()
+	
+	for i = _SkillIDMin to _SkillIDBaseMax
+		skilllst(i)	= skillname(i) &amp; &quot; (&quot; &amp; SkillCardCnt(i) &amp; &quot;)&quot;
+	next i
+	if GameTypeIsPegasus() or GameTypeIsDaybreak() then
+		skilllst(_SkillIDTreachery)	= skillname(_SkillIDTreachery) &amp; &quot; (&quot; &amp; SkillCardCnt(_SkillIDTreachery) &amp; &quot;)&quot;
+	end if
+	if GameTypeIsRevelations() then
+		skilllst(_SkillIDFaith)	= skillname(_SkillIDFaith) &amp; &quot; (&quot; &amp; SkillCardCnt(_SkillIDFaith) &amp; &quot;)&quot;
+	end if
+
+	Ctl_Cards.StringItemList	= skilllst()
+	Ctl_cards.SelectedItems		= selectlist
+end sub		&apos;Populate_Skills
+
+
+Sub DealCard
+	dim srccol,srcrow,destcol,destrow as integer
+	dim srcskill, destplayer as integer
+	dim cardtxt as string
+
+	GetSF
+	srcskill	= GetSelected(_ListSkillDecks)
+	if srcskill = -1 then
+		MsgBox &quot;Please select a skill deck.&quot;
+		exit sub
+	end if
+
+	destplayer = GetSelected(_ListSkillPlayers)
+	if destplayer &lt; 1 then
+		MsgBox &quot;Please select a player.&quot;
+		exit sub
+	end if
+	
+	
+	SkillForm.getByName(&quot;btnDeal&quot;).enabled = FALSE
+	cardtxt = GetSkillCardFrom( _SkillSetDeck, srcskill)
+
+	if IsPlayerDestiny(destplayer) then
+		&apos;we&apos;re manipulating destiny, so the rules change a bit. +==
+		AddSkillCardTo _SkillSetDestiny, cardtxt
+	else
+		AddSkillCardTo _SkillSetHand, cardtxt, destplayer
+		Skillsheet.getCellByPosition(GetPlayerCol(destPlayer), _PlayerDrawnRow + srcskill).string = &quot;X&quot;
+	end if
+
+	LogThis GetPlayerName(Destplayer) &amp; &quot; receives &quot; &amp; cardtxt
+
+	if SkillCardCnt(srcskill) = 0 then
+		Msgbox &quot;Time to reshuffle the &quot; &amp; skillname(srcskill) &amp; &quot; deck!&quot;
+		PrepSkillDeck srcskill
+		ShuffleASkillDeck srcskill
+	else
+		CompressSkillCards _SkillSetDeck, srcskill
+	end if
+	
+	Populate_Skills
+	Populate_Handlist
+	SkillForm.getByName(&quot;btnDeal&quot;).enabled = TRUE
+End Sub		&apos;DealCard
+
+
+function MaxSkillCardsInDestiny as integer
+	dim maxskill as integer
+	GetSF
+		
+	if GameTypeIsRevelations() then
+		maxSkill	= _SkillIDFaith	&apos; Includes Treachery and Faith
+	elseif GameTypeIsPegasus() or GameTypeIsDaybreak() then
+		maxSkill	= _SkillIDTreachery	&apos; Includes Treachery
+	else
+		maxSkill	= _SkillIDBaseMax
+	end if
+
+	if VariantComplexDestiny() then 
+		MaxSkillCardsInDestiny = maxskill * 3
+	else
+		MaxSkillCardsInDestiny = maxskill * 2
+	end if
+	
+end function
+
+sub DealDestiny
+	dim skillID, maxskill, maxdestsize, i as integer
+	dim cardtxt as string
+
+	GetSF
+	
+	if GameTypeIsRevelations() then
+		maxSkill	= _SkillIDFaith	&apos; Includes Treachery and Faith
+	elseif GameTypeIsPegasus() or GameTypeIsDaybreak() then
+		maxSkill	= _SkillIDTreachery	&apos; Includes Treachery
+	else
+		maxSkill	= _SkillIDBaseMax
+	end if
+
+	do while SkillCardCnt(_SkillIDDestiny) &lt; MaxSkillCardsInDestiny()
+		for skillID = _SkillIDMin to maxskill
+			AddSkillCardTo _SkillSetDestiny, GetSkillCardFrom(_SkillSetDeck, skillID)
+			if SkillCardCnt(skillID) = 0 then
+				MsgBox SkillName(skillID) &amp; &quot; deck is empty: Shuffling&quot;
+				PrepSkillDeck skillID
+				ShuffleASkillDeck skillID
+			end if
+			CompressSkillCards _SkillSetDeck, skillID
+		next skillID
+	loop
+	CompressSkillCards _SkillSetDestiny, 0
+	ShuffleASkillDeck _SkillIDDestiny
+end sub		&apos;DealDestiny
+
+
+
+&apos;PrepSkillDeck moves everything from the discard back into the skill deck so that it can be reshuffled in
+sub PrepSkillDeck (skillID as integer)
+	dim curcol, srcrow, currow as integer
+	dim cardtxt as string
+	GetSF
+	
+	cardtxt = GetSkillCardFrom(_SkillSetDiscard, skillID)
+	do until cardtxt = &quot;&quot;
+		AddSkillCardTo _SkillSetDeck, cardtxt
+		cardtxt = GetSkillCardFrom(_SkillSetDiscard, skillID)
+	loop
+end sub	&apos;PrepSkillDeck
+
+
+&apos;UndealSkill takes a skill card from a players hand, puts it back into the skill deck, and reshuffles.
+sub UndealSkill
+	dim player, skillID, srccol, srcrow, destcol, destrow, cardno, rtncd as integer
+	dim cardtext as string
+
+	GetSF
+	player = GetSelected(_ListSkillPlayers)
+	if player = -1 then
+		MsgBox &quot;Please select a player.&quot;,0,&quot;Undeal a Card&quot;
+		exit sub
+	end if
+
+	cardNo= GetSelected(_ListSkillCards)
+	if cardNo = -1 then
+		MsgBox &quot;Please select a card to undeal.&quot;,0,&quot;Undeal a Card&quot;
+		exit sub
+	end if
+
+	cardtext=CardInHand(player, cardNo)
+	rtncd=MsgBox(&quot;Do you want to take the card &apos;&quot; &amp; cardtext &amp; &quot;&apos; back from &quot; &amp; GetPlayerName(player) &amp; &quot;&apos;s hand and put it into the skill deck and reshuffle?&quot;,4,&quot;Undeal a Card&quot;)
+	
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	AddSkillCardTo _SkillSetDeck, GetSkillCardFrom(_SkillSetHand, player, cardNo)
+	
+	CompressSkillCards _SkillSetHand, player
+	ShuffleASkillDeck SkillIDFromText(cardtext)
+	Populate_Handlist
+	LogThis cardtext &amp; &quot; UNDEALT from the hand of &quot; &amp; GetPlayerName(player)
+end sub &apos;UndealSkill
+
+
+sub ShuffleSkill
+	dim rtncd, SkillID, curcol, currow, destoffset as integer
+	dim tmplst() as string
+
+	GetSF
+	tmplst = SkillForm.getByName(&quot;lstSkillDecks&quot;).SelectedItems()
+	if ubound(tmplst) = -1 then
+		MsgBox &quot;Please select a skill deck to shuffle.&quot;
+		exit sub
+	end if
+
+	SkillID	= val(tmplst(0))
+
+	rtncd	= MsgBox(&quot;Reshuffle the &quot; &amp; skillname(SkillID) &amp; &quot; Deck?&quot;,4)
+	
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	CompressSkillCards _SkillSetDeck, SkillID
+	ShuffleASkillDeck SkillID
+end sub		&apos;ShuffleSkill
+
+function IsPlayerDestiny (playerID as integer) as BOOLEAN
+	IsPlayerDestiny = (SkillForm.getByName(&quot;lstPlayers&quot;).StringItemList(playerID) = &quot;*** DESTINY ***&quot;)
+end function
+
+sub Populate_HandList
+	dim tmplst() as string
+	dim handlist(22) as string
+	dim player, cardno as integer
+
+	GetSF
+	player = GetSelected(_ListSkillPlayers)
+	if player = -1 then
+		exit sub
+	end if
+
+	if IsPlayerDestiny(player) then
+		player = _DestinyPlayerID
+	end if
+	
+	EnableCardButtons FALSE
+
+	SkillForm.getByName(&quot;lstPlyrHand&quot;).StringItemList=g_emptylst()
+	if HandCardCnt (player) = 0 then
+		Exit sub
+	end if
+
+	for cardno = 1 to HandCardCnt(player)
+		handlist(cardno) = CardInHand(player, cardNo, TRUE)
+	next cardno
+	SkillForm.getByName(&quot;lstPlyrHand&quot;).StringItemList	= handlist()
+	PopulateGiveCardPlayers player
+end sub		&apos;Populate_Handlist
+
+
+sub EnableCardButtons(enableflag as boolean)
+	GetSF
+	SkillForm.getByName(&quot;btnDiscardCard&quot;).enabled = enableflag
+	SkillForm.getByName(&quot;btnPlayCard&quot;).enabled = enableflag
+	SkillForm.getByName(&quot;btnGiveCard&quot;).enabled = enableflag
+end sub
+
+sub CardSelected
+	if IsPlayerDestiny(GetSelected(_ListSkillPlayers)) then
+		EnableCardButtons FALSE
+		GetSF
+		SkillForm.getByName(&quot;btnDiscardCard&quot;).enabled = TRUE
+	else
+		EnableCardButtons TRUE
+	end if
+end sub
+
+sub DiscardFromHand 
+	dim player, srccol, srcrow, cardno, rtncd as integer
+	dim cardtext, tmplst() as string
+
+	GetSF
+	player = GetSelected(_ListSkillPlayers)
+	if player = -1 then
+		MsgBox &quot;Please select a player.&quot;
+		exit sub
+	end if
+
+	if IsPlayerDestiny(player) then
+		player = _DestinyPlayerID
+	end if
+	
+	if GetPlayerName(player) &lt;&gt; &quot;Apollo&quot; or IsRevealed(player) then
+		cardNo	= GetSelected(_ListSkillCards)
+		if cardNo = -1 then
+			MsgBox &quot;Please select a card to discard.&quot;
+			exit sub
+		end if
+	else
+		rtncd = MsgBox (&quot;Should this discard for Apollo be random? (Headstrong)&quot;,4)
+		if rtncd = 6 then
+			cardno= Int(RND()* HandCardCnt(player))+1
+			Msgbox &quot;Apollo will discard: &quot; &amp; CardInHand(player,cardno,TRUE)
+		else
+			cardNo= GetSelected(_ListSkillCards)
+			if cardNo = -1 then
+				MsgBox &quot;Please select a card to discard.&quot;
+				exit sub
+			end if
+		end if
+	end if
+
+	if player = _DestinyPlayerID then
+		cardtext = SkillForm.getByName(&quot;lstPlyrHand&quot;).StringItemList(cardNo)
+		DiscardFromDestiny cardtext
+		
+	&apos; Treacherous Destiny
+	elseif VariantTreacherousDestiny() and (IsInfiltrating(player) or not IsRevealed(player)) and (SkillIDFromText(CardInHand(player,cardNo)) = _SkillIDTreachery) then
+		&apos; Log
+		MsgBox CardInHand(player, cardno) &amp; &quot; has been sent to Destiny.&quot;
+		LogThis GetPlayerName(player) &amp; &quot; DISCARDED &quot; &amp; CardInHand(player, cardno) &amp; &quot; to Destiny.&quot;
+		
+		&apos;Place the card into Destiny, then shuffle Destiny
+		AddSkillCardTo _SkillSetDestiny, GetSkillCardFrom(_SkillSetHand, player, cardNo)
+		CompressSkillCards _SkillSetDestiny, 0
+		ShuffleASkillDeck _SkillIDDestiny
+		
+		&apos;Clean up the player&apos;s hand
+		CompressSkillCards _SkillSetHand, player
+		Populate_Handlist
+	else
+		RemoveFromHand player, cardno, FALSE
+	end if
+end sub		&apos;DiscardFromHand
+
+sub SetSkillFlag (flag as string, optional state as boolean)
+	dim whichcol, whichrow as integer
+	dim whichtxt as string
+
+	whichrow	= _SkillCheckFlagsRow
+	select case flag
+		case &quot;Committee&quot;
+			whichcol	= _SkillCheckCommitteeCol
+			whichtxt	= &quot;IC&quot;
+		
+		case &quot;Reckless&quot;
+			whichcol	= _SkillCheckRecklessCol
+			whichtxt	= &quot;Rkls&quot;
+			
+		case &quot;Inspirational&quot;
+			whichcol	= _SkillCheckInspirationalCol
+			whichrow	= whichrow + 1
+			whichtxt	= &quot;Insp&quot;
+			
+		case &quot;Guts&quot;
+			whichcol	= _SkillCheckGutsCol
+			whichrow	= whichrow + 1
+			whichtxt	= &quot;Guts&quot;
+			
+		case &quot;Order&quot;
+			whichcol	= _SkillCheckOrderCol
+			whichtxt	= &quot;Order&quot;
+			
+		case &quot;Chance&quot;
+			whichcol	= _SkillCheckChanceCol
+			whichtxt	= &quot;Chance&quot;
+	
+	end select
+	if IsMissing(state) then
+		state = TRUE
+	end if
+	
+	if NOT state then
+		whichtxt = &quot;&quot;
+	end if
+	
+	SkillSheet.getCellByPosition(whichcol, whichrow).string	= whichtxt
+end sub
+			
+sub SetSkillTrigger (flag as string, optional state as boolean)
+	dim whichcol as integer
+	dim bgclr as variant
+
+	if flag = &quot;RECKLESS&quot; then
+		whichcol = _SkillCheckTriggerRecklessCol
+	else
+		whichcol = _SkillCheckTriggerConsequenceCol
+	end if
+
+	if IsMissing(state) then
+		state = TRUE
+	end if
+
+	if state then	
+		bgclr = _red
+	else
+		flag = &quot;&quot;
+		bgclr = _bluegrey
+	end if
+
+	SkillSheet.getCellByPosition(whichcol,_SkillCheckTriggeredRow).string = flag
+	SkillSheet.getCellByPosition(whichcol,_SkillCheckTriggeredRow).CellBackColor = bgclr
+end sub
+
+
+sub PlayFromHand 
+	dim player, srccol, srcrow, cardno as integer
+	dim tmplst() as string
+
+	GetSF
+	
+	player = GetSelected(_ListSkillPlayers)
+	if player = -1 then
+		MsgBox &quot;Please select a player.&quot;
+		exit sub
+	end if
+
+	cardNo = GetSelected(_ListSkillCards)
+	if cardNo = -1 then
+		MsgBox &quot;Please select a card to play.&quot;
+		exit sub
+	end if
+
+
+	&apos;lets do some special checks here for specific cards...
+&apos;+== revisit these, right now we&apos;re playing them always, do we need to add the IsSkillCheckClear() back in?
+	select case SkillCardFromText(CardInHand(player,cardNo))
+		case &quot;Investigative Committee&quot;
+			SetSkillFlag &quot;Committee&quot;
+
+		case &quot;Scientific Research&quot; 
+			&apos;if we&apos;re playing a scientific research during a skill check, set the appropriate flag
+			SkillSheet.getCellByPosition(_SkillCheckResearchCol,_SkillCheckHeaderRow).string	= &quot;X&quot;
+
+		case &quot;At Any Cost&quot;
+			&apos;if we&apos;re playing a at any cost during a skill check, set the appropriate flag
+			SkillSheet.getCellByPosition(_SkillCheckTreacheryCol,_SkillCheckHeaderRow).string	= &quot;X&quot;
+			SetSkillFlag &quot;Reckless&quot;
+	
+		case &quot;Jury Rigged&quot;
+			&apos;if we&apos;re playing a jury rigged during a skill check, reduce difficulty by 4
+			SkillSheet.getCellByPosition(_SkillCheckValueCol,_SkillCheckHeaderRow).value	= SkillSheet.getCellByPosition(_SkillCheckValueCol,_SkillCheckHeaderRow).value-4
+			SetSkillFlag &quot;Reckless&quot;
+
+		case &quot;Guts and Initiative&quot;
+			&apos;if we&apos;re playing a guts and initiative during a skill check, skip destiny
+			SkillForm.getByName(&quot;btnSkillCheckFromDestiny&quot;).enabled = FALSE
+			SkillForm.getByName(&quot;btnSkillCheckFromPlayer&quot;).enabled = TRUE
+			SkillForm.getByName(&quot;btnSkillCheckClear&quot;).enabled = TRUE
+			SetSkillFlag &quot;Reckless&quot;
+			SetSkillFlag &quot;Guts&quot;
+
+		case &quot;Support the People&quot;
+			SetSkillFlag &quot;Reckless&quot;
+
+		case &quot;God&apos;s Plan&quot;	
+			&apos;if we&apos;re playing &quot;God&apos;s Plan&quot; Treachery card, swap it with the top of destiny.
+			GodsPlan player, cardNo
+			exit sub	&apos;GodsPlan removes the card for us
+			
+		case &quot;Build Nuke&quot;
+			if Not AddNuke() then
+				exit sub
+			end if
+			
+		case &quot;Restore Order&quot;
+			SetSkillFlag &quot;Order&quot;
+			
+		case &quot;A Second Chance&quot;
+			SetSkillFlag &quot;Chance&quot;		
+		
+	end select
+			
+	RemoveFromHand player, cardno, TRUE
+end sub		&apos;PlayFromHand
+
+&apos;this is split out so that it can be called without the confirmations
+sub RemoveFromHand (playerID as integer, cardNo as integer, AsPlay as boolean)
+	dim cardtxt as string
+	if AsPlay then
+		LogThis GetPlayerName(playerID) &amp; &quot; PLAYED &quot; &amp; CardInHand(playerID,cardno)
+	else
+		LogThis GetPlayerName(playerID) &amp; &quot; DISCARDED &quot; &amp; CardInHand(playerID,cardno)
+	end if
+
+	AddSkillCardTo _SkillSetDiscard, GetSkillCardFrom (_SkillSetHand, playerID, cardNo)
+	CompressSkillCards _SkillSetHand, playerID
+	
+	Populate_Handlist
+end sub	&apos;RemoveFromHand
+
+
+sub DiscardFromDestiny (cardtxt as string)
+	dim cardno, srccol, srcrow, maxcnt, skillID as integer
+
+	srccol	= GetSkillSetCol (_SkillSetDestiny, 0)
+	srcrow	= GetSkillSetRow (_SkillSetDestiny)
+	
+	maxcnt = MaxCardCnt(_SkillSetDestiny)
+	skillID = SkillIDFromText(cardtxt)
+	cardtxt = SkillColorL(skillID) &amp; cardtxt &amp; SkillColorR(skillID)
+	
+	for cardno = 0 to maxcnt
+		if SkillSheet.getCellByPosition(srccol,srcrow + cardno).string = cardtxt then
+			SkillSheet.getCellByPosition(srccol,srcrow + cardno).string = &quot;&quot;
+			exit for
+		end if
+	next cardno
+
+	AddSkillCardTo _SkillSetDiscard, cardtxt
+	CompressSkillcards _SkillSetDestiny, 0
+	Populate_Handlist
+end sub &apos;DiscardFromDestiny
+
+
+sub StartSkillCheck(crisisname as string, crisisskills() as variant, difficulty as integer, location as boolean, partial as integer, consequence as boolean)
+	dim skillid as integer
+	GetSF
+
+	&apos; Set the name
+	SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckHeaderRow).string	= crisisname
+	
+	&apos; Set the positive skills
+	for skillid = _SkillIDPolitics to _SkillIDEngineering
+		SkillSheet.getCellByPosition(_SkillCheckCol + skillid, _SkillCheckHeaderRow).string	= crisisskills(skillid)
+	next skillid
+	
+	&apos; Special cases for Treachery
+	if crisisname = &quot;Airlock&quot; or crisisname = &quot;Resistance HQ&quot; then
+		SkillSheet.getCellByPosition(_SkillCheckCol + _SkillIDTreachery, _SkillCheckHeaderRow).string	= &quot;X&quot;
+	else
+		SkillSheet.getCellByPosition(_SkillCheckCol + _SkillIDTreachery, _SkillCheckHeaderRow).string	= &quot;&quot;		
+	end if
+	
+	&apos; Set the Difficulty
+	SkillSheet.getCellByPosition(_SkillCheckValueCol,_SkillCheckHeaderRow).value	= difficulty
+	
+	&apos; Check the Partial
+	if partial = 0 then
+		SkillSheet.getCellByPosition(_SkillCheckValueCol + 1, _SkillCheckHeaderRow).string	= &quot;&quot;
+	else
+		SkillSheet.getCellByPosition(_SkillCheckValueCol + 1, _SkillCheckHeaderRow).value	= partial
+	end if
+	
+	&apos; Consequence
+	if consequence then
+		SkillSheet.getCellByPosition(_SkillCheckValueCol + 2, _SkillCheckHeaderRow).string	= &quot;X&quot;
+	else
+		SkillSheet.getCellByPosition(_SkillCheckValueCol + 2, _SkillCheckHeaderRow).string	= &quot;&quot;
+	end if
+	
+	if GetPlayerName(GetCurrentPlayer()) = &quot;Adama&quot; and (Not IsRevealed(GetCurrentPlayer())) and not location then
+		SetSkillFlag &quot;Inspirational&quot;
+		MsgBox &quot;Adama is an Inspirational Leader!&quot;
+	end if
+end sub
+
+
+sub ClearSkillCheck
+	&apos; this will discard all cards in the crisis
+	dim rtncd as integer
+	rtncd	= MsgBox(&quot;Discard all cards from the Skill Check?&quot;,4)
+	
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	DiscardSkillCheckCards
+end sub
+
+
+sub DiscardSkillCheckCards	
+	dim srcrow, srccol, cardno as integer
+	dim i as integer
+	
+	GetSF
+
+	&apos;split out from ClearSkillCheck so it could be called by Initialize...
+	for cardno = 0 to 19
+		if SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckrow + cardno).string = &quot;&quot; then
+			exit for
+		end if
+	
+		srccol	= _SkillCheckCol
+		srcrow	= _SkillCheckRow + cardno 
+
+		AddSkillCardTo _SkillSetDiscard, SkillSheet.getCellByPosition(srccol, srcrow).string
+		SkillSheet.getCellByPosition(srccol, srcrow).string = &quot;&quot;
+		
+		for i = _SkillIDMin to _SkillIDMax
+			SkillSheet.getCellByPosition(_SkillCheckCol + i,_SkillCheckrow + cardno).string	= &quot;&quot;
+		next i	
+	next cardno
+	
+	for i = 0 to 9
+		SkillSheet.getCellByPosition(_SkillCheckCol + i, _SkillCheckRow - 1).string	= &quot;&quot;
+	next i
+
+	SkillForm.getByName(&quot;btnSkillCheckFromDestiny&quot;).enabled = TRUE
+	SkillForm.getByName(&quot;btnSkillCheckFromPlayer&quot;).enabled = FALSE
+	SkillForm.getByName(&quot;btnSkillCheckClear&quot;).enabled = FALSE
+	SkillForm.getByName(&quot;btnLaunchSkillCheck&quot;).enabled = TRUE
+	SetSkillFlag &quot;Reckless&quot;, FALSE
+	SetSkillFlag &quot;Guts&quot;, FALSE
+	SetSkillFlag &quot;Committee&quot;, FALSE
+	SetSkillFlag &quot;Inspirational&quot;, FALSE
+	SetSkillFlag &quot;Order&quot;, FALSE
+	SetSkillFlag &quot;Chance&quot;, FALSE
+	SetSkillTrigger &quot;RECKLESS&quot;, FALSE
+	SetSkillTrigger &quot;CONSEQUENCE&quot;, FALSE
+
+end sub		&apos;DiscardSkillCheckCards
+
+
+sub SortSkillCheckCards
+	dim card1no, card2no, i, tmpi as integer
+	dim card1, card2, tmp as string
+	dim tmpclr as variant
+	dim swap as boolean
+	GetSF
+	
+	for card1no = 0 to 19
+		for card2no = card1no + 1 to 20
+			card1 = SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckrow + card1no).string
+			card2 = SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckrow + card2no).string
+			if card2 = &quot;&quot; then
+				exit for
+			end if
+			swap = FALSE		
+			if SkillIDFromText(card1) &gt; SkillIDFromText(card2) then
+				swap = TRUE
+			elseif SkillIDFromText(card1) = SkillIDFromText(card2) then
+				if SkillStrFromText(card1) &gt; SkillStrFromText(card2) then
+					swap = TRUE
+				elseif SkillStrFromText(card1) = SkillStrFromText(card2) and SkillCardFromText(card1) &gt; SkillCardFromText(card2) then
+						swap = TRUE
+				end if
+			end if
+	
+			if swap then
+				tmp = SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckrow + card1no).string
+				tmpclr = SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckrow + card1no).charcolor
+
+				SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckrow + card1no).string = SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckrow + card2no).string
+				SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckrow + card1no).charcolor = SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckrow + card2no).charcolor
+
+				SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckrow + card2no).string = tmp
+				SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckrow + card2no).charcolor = tmpclr
+			
+				for i = _SkillIDMin to _SkillIDMax
+					tmpi = SkillSheet.getCellByPosition(_SkillCheckCol+i,_SkillCheckrow + card1no).value
+					tmpclr = SkillSheet.getCellByPosition(_SkillCheckCol+i,_SkillCheckrow + card1no).charcolor
+
+					SkillSheet.getCellByPosition(_SkillCheckCol+i,_SkillCheckrow + card1no).value = SkillSheet.getCellByPosition(_SkillCheckCol+i,_SkillCheckrow + card2no).value
+					SkillSheet.getCellByPosition(_SkillCheckCol+i,_SkillCheckrow + card1no).charcolor = SkillSheet.getCellByPosition(_SkillCheckCol+i,_SkillCheckrow + card2no).charcolor
+
+					SkillSheet.getCellByPosition(_SkillCheckCol+i,_SkillCheckrow + card2no).value = tmpi
+					SkillSheet.getCellByPosition(_SkillCheckCol+i,_SkillCheckrow + card2no).charcolor = tmpclr
+				next i
+			end if
+		next card2no
+	next card1no
+
+end sub	&apos;SortSkillCheckCards
+
+sub CheckAutoSort
+	GetSF
+
+	if SkillForm.getByName(&quot;chkAutoSort&quot;).state = 1 then
+		SkillForm.getByName(&quot;btnAutoSort&quot;).enabled = FALSE
+	else
+		SkillForm.getByName(&quot;btnAutoSort&quot;).enabled = TRUE
+	end if
+	
+end sub
+
+
+&apos; Resort all the hands, and should be called at the end of each turn
+sub SortHands
+	GetSF	
+	dim playerID, srccol, cardcnt, i,j, tmpval as integer
+	dim sortlst(20) as integer
+	dim stringlst(20), tmpstring as string
+	dim colorlst(20), tmpcolor as variant
+	
+	for playerID = 1 to PlayerCnt()
+		cardcnt	= HandCardCnt(playerID)
+		if cardcnt &gt; 0 then
+			srccol	= GetPlayerCol(playerID)
+			
+			for i = 1 to cardcnt
+				sortlst(i)		= (SkillIDFromText(SkillSheet.GetCellByPosition(srccol, _PlayerHandRow + i - 1).string) * 10) + SkillStrFromText(SkillSheet.GetCellByPosition(srccol, _PlayerHandRow + i - 1).string)	
+				stringlst(i)	= SkillSheet.GetCellByPosition(srccol, _PlayerHandRow + i  -1).string	
+				colorlst(i)		= SkillSheet.GetCellByPosition(srccol, _PlayerHandRow + i - 1).CharColor
+			next i
+	
+			for i = 1 to cardcnt - 1
+				for j = i + 1 to cardcnt
+					if sortlst(i) &gt; sortlst(j) then
+						tmpval			= sortlst(i)
+						tmpstring		= stringlst(i)
+						tmpcolor		= colorlst(i)
+		
+						sortlst(i)		= sortlst(j)
+						stringlst(i)	= stringlst(j)
+						colorlst(i)		= colorlst(j)
+		
+						sortlst(j)		= tmpval
+						stringlst(j)	= tmpstring
+						colorlst(j)		= tmpcolor
+					end if
+				next j
+			next i
+
+			for i = 1 to cardcnt
+				SkillSheet.GetCellByPosition(srccol,_PlayerHandRow + i - 1).string		= stringlst(i)
+				SkillSheet.GetCellByPosition(srccol,_PlayerHandRow + i - 1).CharColor	= colorlst(i)
+			next i
+		end if
+	next playerID
+
+	Populate_Handlist
+end sub	&apos;SortHands
+
+sub ShuffleDestiny
+	dim rtncd as integer
+	
+	rtncd	= MsgBox(&quot;Reshuffle the Destiny Deck?&quot;, 4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+
+	ShuffleASkillDeck _SkillIDDestiny
+end sub
+
+&apos; ShuffleASkillDeck should be called *after* the deck has been populated with cards and compressed.
+&apos; skill = 8 means we shuffle the Destiny deck.
+sub ShuffleASkillDeck (skill as integer)
+	dim srccol, startrow, maxrow, i, j as integer
+	dim tmpval as double
+	dim tmpstring, stringlst() as string
+	dim tmpcolor, colorlst() as variant
+	dim rndlst() as double
+	
+	if skill = _SkillIDDestiny then &apos;Destiny
+		srccol		= _DestinyCol
+		startrow	= _DestinyRow - 1
+	else
+		srccol		= GetSkillCol(skill)
+		startrow	= _SkillCardRow - 1
+	end if
+	maxrow	= SkillCardCnt(skill)
+	
+	redim rndlst(maxrow)
+	redim colorlst(maxrow)
+	redim stringlst(maxrow)
+	
+	for i = 1 to maxrow
+		rndlst(i)		= rnd()
+		stringlst(i)	= SkillSheet.GetCellByPosition(srccol,startrow + i).string	
+		colorlst(i)		= SkillSheet.GetCellByPosition(srccol,startrow + i).CharColor
+	next i
+	
+	for i = 1 to maxrow - 1
+		for j = i + 1 to maxrow
+			if rndlst(i) &gt; rndlst(j) then
+				tmpval			= rndlst(i)
+				tmpstring		= stringlst(i)
+				tmpcolor		= colorlst(i)
+
+				rndlst(i)		= rndlst(j)
+				stringlst(i)	= stringlst(j)
+				colorlst(i)		= colorlst(j)
+
+				rndlst(j)		= tmpval
+				stringlst(j)	= tmpstring
+				colorlst(j)		= tmpcolor
+			end if
+		next j
+	next i
+
+	for i = 1 to maxrow
+		SkillSheet.GetCellByPosition(srccol,startrow + i).string	= stringlst(i)
+		SkillSheet.GetCellByPosition(srccol,startrow + i).CharColor	= colorlst(i)
+	next i
+	
+	LogThis SkillName(Skill) &amp; &quot; deck shuffled.&quot;
+	Populate_Skills
+end sub	&apos;ShuffleASkillDeck
+
+
+sub FromHandToCrisis
+	dim player, srccol, srcrow,cardno as integer
+	dim cardtxt as string
+
+	GetSF
+	player	= GetSelected(_ListSkillPlayers)
+	if player = -1 then
+		MsgBox &quot;Please select a player.&quot;,0,&quot;Hand into Crisis&quot;
+		exit sub
+	end if
+
+	cardNo	= GetSelected(_ListSkillCards)
+	if cardNo = -1 then
+		MsgBox &quot;Please select a card to play.&quot;, 0, &quot;Hand into Crisis&quot;
+		exit sub
+	end if
+
+	cardtxt	= GetSkillCardFrom(_SkillSetHand, player, cardNo)	
+	
+	CompressSkillCards _SkillSetHand, player
+	PlayCardIntoCrisis cardtxt
+	Logthis GetPlayerName(player) &amp; &quot; played &quot; &amp; cardtxt &amp; &quot; into crisis.&quot;
+	
+	if SkillForm.getByName(&quot;chkAutoSort&quot;).state = 1 then
+		SortSkillCheckCards
+	end if
+	Populate_handlist
+end sub 	&apos;FromHandToCrisis
+
+
+sub ProcessZeroSkillCard (cardtxt as string)
+
+	&apos; +== process the 0-value skill cards from Exodus 
+	select case SkillCardFromText(cardtxt)
+		case &quot;Red Tape&quot;
+		
+		case &quot;Iron Will&quot;
+		
+		case &quot;Trust Instincts&quot;
+			&apos;probably should do this explicitly, but for now just
+			SkillForm.getByName(&quot;btnSkillCheckFromDestiny&quot;).enabled = TRUE
+
+		case &quot;Protect the Fleet&quot;
+		
+		case &quot;Establish Network&quot;
+		
+	end select
+	
+	if SkillSheet.getCellByPosition(_SkillCheckValueCol + 2,_SkillCheckHeaderRow).string = &quot;X&quot; then
+		&apos;Trigger any Consequence
+		SetSkillTrigger &quot;CONSEQUENCE&quot;
+		MsgBox &quot;Consequence Triggered.&quot;, 0, &quot;ProcessZeroSkilCard&quot;
+	end if
+
+end sub &apos;ProcessZeroSkillCard
+
+sub FromDestinyToCrisis
+	&apos; play the top two cards in the destiny deck.
+	dim cardtxt as string
+	dim destminsize as integer
+	
+	GetSF
+	
+	cardtxt = GetSkillCardFrom(_SkillSetDestiny, 0)
+	PlayCardIntoCrisis cardtxt
+	LogThis &quot;Destiny played &quot; &amp; cardtxt &amp; &quot; into skill check.&quot;
+
+	cardtxt = GetSkillCardFrom(_SkillSetDestiny, 0)
+	PlayCardIntoCrisis cardtxt
+	LogThis &quot;Destiny played &quot; &amp; cardtxt &amp; &quot; into skill check.&quot;
+
+	if SkillForm.getByName(&quot;chkAutoSort&quot;).state = 1 then
+		SortSkillCheckCards
+	end if
+	
+	if VariantComplexDestiny() then
+		destminsize = 5
+	else
+		destminsize = 0
+	end if
+	
+	if SkillCardCnt(_SkillIDDestiny) = destminsize or SkillCardCnt(_SkillIDDestiny) = destminsize + 1 then
+		MsgBox &quot;Rebuilding Destiny deck.&quot;, 0, &quot;Destiny into Crisis&quot;
+		DealDestiny
+	end if
+	
+	SkillForm.getByName(&quot;btnSkillCheckFromPlayer&quot;).enabled = TRUE
+	SkillForm.getByName(&quot;btnSkillCheckClear&quot;).enabled = TRUE
+	SkillForm.getByName(&quot;btnLaunchSkillCheck&quot;).enabled = FALSE
+end sub		&apos;FromDestinyToCrisis
+
+
+sub PlayCardIntoCrisis (cardtext as string)
+	dim destcol, destrow, skillmod, skillID, skillStr as integer
+	dim card as string
+	dim valuecolor as variant
+	GetSF
+
+	skillID		= SkillIDFromText(cardtext)
+	skillStr	= SkillStrFromText(cardtext)
+	skillmod	= 1
+	valuecolor	= _black
+	
+	destrow		= _SkillCheckRow
+	do 
+		if SkillSheet.getCellByPosition(_SkillCheckCol,destrow).string	= &quot;&quot; then
+			SkillSheet.getCellByPosition(_SkillCheckCol,destrow).string		= cardtext
+			SkillSheet.getCellByPosition(_SkillCheckCol,destrow).charColor	= SkillColorDisp(SkillIDFromText(cardtext))
+			if SkillSheet.getCellByPosition(_SkillCheckCol + skillID, _SkillCheckRow - 1).string = &quot;&quot; then
+				skillmod	= -1
+				valuecolor	= _red			
+			end if
+			if SkillSheet.getCellByPosition(_SkillCheckInspirationalCol, _SkillCheckFlagsRow + 1).string &lt;&gt; &quot;&quot; and skillStr = 1 then
+				&apos;Inspirational Leader
+				skillmod	= 1
+				valuecolor	= _green
+			end if
+			SkillSheet.GetCellByPosition(_SkillCheckCol + skillID,destrow).value		= skillStr * skillmod
+			SkillSheet.GetCellByPosition(_SkillCheckCol + skillID,destrow).CharColor	= valuecolor
+			exit do
+		end if
+		destrow	= destrow + 1
+	loop 
+
+	card = SkillCardFromText(cardtext)
+	if card = &quot;Broadcast Location&quot; or card = &quot;By Your Command&quot; or card = &quot;Special Destiny&quot; then
+		if SkillSheet.getCellByPosition(_SkillCheckRecklessCol,_SkillCheckFlagsRow).string &lt;&gt; &quot;&quot; then
+		&apos;Trigger any Reckless Skill Check icons
+			SetSkillTrigger &quot;RECKLESS&quot;
+			MsgBox &quot;Reckless check: &quot; &amp; card &amp; &quot; Triggered.&quot;,0,&quot;Card into Crisis&quot;
+		end if
+	end if
+		
+	if SkillStrFromText(cardtext) = 0 then
+		ProcessZeroSkillCard cardtext
+	end if
+end sub		&apos;PlayCardIntoCrisis
+
+sub Initialize_SkillCards
+	dim playerid, cardno, srcrow, skillid, flagid as integer
+	dim cardtxt as string
+
+	EnableCommandAuthority FALSE
+	EnableCryptic FALSE
+
+	for playerid = 1 to 7
+		SetDrawCards(playerid)
+		if GetPlayerName(playerID) = &quot;Adama&quot; then
+			EnableCommandAuthority TRUE
+		elseif GetPlayerName(playerID) = &quot;Leoben&quot; then
+			EnableCryptic TRUE
+		end if
+	next playerid
+
+	Configure_SkillCards	&apos; all the cards are in the decks, now clean them out and put the right cards back in.
+
+	for skillid = _SkillIDMin to _SkillIDMax
+		ShuffleASkillDeck skillID
+	next skillid
+
+	DealDestiny
+	Popluate_SkillCheckList
+end sub	&apos;Initialize_SkillCards
+
+function GetPlyrDrawDisplay (playerID as integer) as string
+	dim cards as variant
+	dim skillabbr as variant
+	dim skillid as integer
+	dim drawstr as string
+	dim optstr as string
+	
+	optstr		= &quot;&quot;
+	skillabbr	= Array(&quot;&quot;,&quot;Po&quot;,&quot;L&quot;,&quot;T&quot;,&quot;Pi&quot;,&quot;E&quot;,&quot;Tr&quot;,&quot;F&quot;)
+	cards 		= GetPlyrDraw (playerID)
+	for skillid = _SkillIDMin to _SkillIDMax
+		if int(cards(skillid)) &gt; 0 then
+			if drawstr &lt;&gt; &quot;&quot; then
+				drawstr = drawstr &amp; &quot; / &quot;
+			end if
+			drawstr = drawstr &amp; &quot; &quot; &amp; int(cards(skillid)) &amp; &quot; &quot; &amp; skillabbr(skillid)
+		end if
+		
+		if int(cards(skillid)) &lt;&gt; cards(skillid) then
+			if optstr &lt;&gt; &quot;&quot; then
+				optstr = optstr &amp; &quot; - &quot;
+			end if
+			optstr = optstr &amp; (cards(skillid) - int(cards(skillid))) * 10 &amp; &quot; &quot; &amp; skillabbr(skillid)
+		end if
+	next skillid
+	
+	if optstr &lt;&gt; &quot;&quot; then
+		drawstr = drawstr &amp; &quot; / &quot; &amp; optstr
+	end if
+	
+	GetPlyrDrawDisplay	= drawstr
+end function	&apos;GetPlyrDrawDisplay
+
+sub SetDrawCards (playerid as integer)
+	GetSF
+	
+	if playerid &gt; PlayerCnt() then 
+		SkillSheet.getCellByPosition(GetPlayerCol(playerid),_CardDrawRow).string = &quot;&quot;
+	else
+		if IsRevealed(playerid) and not IsInfiltrating(playerID) and not IsCylonLeader(playerID) then
+			SkillSheet.getCellByPosition(GetPlayerCol(playerid),_CardDrawRow).string = &quot;*** 2 CARDS ***&quot;
+		else
+			SkillSheet.getCellByPosition(GetPlayerCol(playerid),_CardDrawRow).string = GetPlyrDrawDisplay(playerid)
+		end if
+	end if
+
+	if IsSick(playerID) then
+		SkillSheet.getCellByPosition(GetPlayerCol(playerid),_SkillStatusLocRow).CellBackColor	= _green
+		SkillSheet.getCellByPosition(GetPlayerCol(playerid),_SkillStatusLocRow).string			= GetPlayerLoc(playerID)
+	else
+		SkillSheet.getCellByPosition(GetPlayerCol(playerid),_SkillStatusLocRow).CellBackColor	= _white
+		SkillSheet.getCellByPosition(GetPlayerCol(playerid),_SkillStatusLocRow).string			= &quot;&quot;
+	end if
+end sub	&apos;SetDrawCards
+
+&apos; this shows when a player is in an area that would impact the number of cards drawn - sickbay/Med Center
+sub UpdateSkillLocStatus
+
+end sub &apos;UpdateSkillLocStatus
+
+sub Skills_SetCurrentPlayer 
+	dim curplayer as integer
+	GetSF
+	
+	for curplayer = 1 to PlayerCnt()
+		if curplayer = GetCurrentPlayer() then
+			SkillSheet.getCellByPosition(GetPlayercol(curplayer),_SkillPlayerNameRow).CellBackColor		= _red
+			SkillSheet.getCellByPosition(GetPlayercol(curplayer),_SkillPlayerNameRow + 2).CellBackColor	= _red
+		else
+			SkillSheet.getCellByPosition(GetPlayercol(curplayer),_SkillPlayerNameRow).CellBackColor		= _blue8
+			SkillSheet.getCellByPosition(GetPlayercol(curplayer),_SkillPlayerNameRow + 2).CellBackColor	= _blue8
+		end if
+	next curplayer
+	
+	SkillForm.getByName(&quot;btnGlimpse&quot;).enabled = (GetPlayerName(GetCurrentPlayer()) = &quot;Leoben&quot;)
+end sub	&apos;Skills_SetCurrentPlayer
+
+
+sub VerifySkillCards
+	dim cardlst (_MaxSkillCnt * _SkillIDMax), masterlst (_MaxSkillCnt * _SkillIDMax), errorstr, tmpstr as string
+	dim cardcnt, cardno, playerID, skillID, i, mastercnt, errorcnt, firstfull, newfull as integer
+	dim found as boolean
+	dim tmplst as variant
+
+	GetSF	
+	MsgBox &quot;Verifying Skill Card Distribution. &quot; &amp; chr(13) &amp; &quot;This is only needed if you&apos;ve been messing with the cards manually.&quot; &amp; chr(13)
+
+	&apos; put all the cards that are on the sheet into cardlst, 
+	&apos; fill masterlst from the reference page 
+	&apos; compare
+	
+	cardcnt = 0
+	mastercnt = 0
+	errorcnt = 0
+	&apos; hands first
+	for playerID = 1 to PlayerCnt()
+		cardno = 1
+		tmpstr = CardInHand(playerID,cardNo,TRUE)
+		do until tmpstr = &quot;&quot;
+			cardlst(cardcnt) = tmpstr
+			cardcnt = cardcnt + 1
+			cardno = cardno + 1
+			tmpstr = CardInHand(playerID,cardNo,TRUE)
+		loop
+	next playerID
+
+	for skillID = _SkillIDMin to _SkillIDMax
+		if 	(skillID &lt;= _SkillIDBaseMax) or _
+			(skillID = _SkillIDTreachery and (GameTypeIsPegasus() or GameTypeIsDaybreak())) or _
+			(skillID = _SkillIDFaith and GameTypeIsRevelations()) then
+
+			&apos; skill deck		
+			for cardno = _SkillCardRow to _SkillCardRow + SkillDeckSize() - 1
+				if SkillSheet.getCellByPosition(GetSkillCol(skillID), cardno).string &lt;&gt; &quot;&quot; then
+					cardlst(cardcnt) = stripcolor(SkillSheet.getCellByPosition(GetSkillCol(skillID), cardno).string)
+					cardcnt = cardcnt + 1
+				end if
+			next cardno
+					
+			&apos; discard pile		
+			for cardno = _SkillDiscardRow to _SkillDiscardRow + SkillDeckSize() - 1
+				if SkillSheet.getCellByPosition(GetSkillCol(skillID), cardno).string &lt;&gt; &quot;&quot; then
+					cardlst(cardcnt) = stripcolor(SkillSheet.getCellByPosition(GetSkillCol(skillID), cardno).string)
+					cardcnt = cardcnt + 1
+				end if
+			next cardno
+			
+			&apos;get master list for this skill
+			tmplst = GetFullSkillCardSet (SkillName(skillID))
+			for i = 1 to tmplst(0)
+				masterlst(mastercnt)	= tmplst(i)
+				mastercnt				= mastercnt + 1
+			next i				
+		end if
+	next skillID
+
+	&apos; destiny 		
+	for cardno = _DestinyRow to _DestinyRow + _MaxSkillCardsInDestiny
+		if SkillSheet.getCellByPosition(_DestinyCol, cardno).string &lt;&gt; &quot;&quot; then
+			cardlst(cardcnt) = stripcolor(SkillSheet.getCellByPosition(_DestinyCol,cardno).string)
+			cardcnt = cardcnt + 1
+		end if
+	next cardno
+		
+	&apos; skill check
+	cardno = 0
+	do until SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckRow + cardno).string = &quot;&quot;
+		cardlst(cardcnt) = stripcolor(SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckRow + cardno).string)
+		cardcnt = cardcnt + 1
+		cardno	= cardno + 1
+	loop
+
+	MsgBox &quot;CardCnt: &quot; &amp; Cardcnt &amp; chr(13) &amp; &quot;MasterCnt: &quot; &amp; mastercnt
+
+	firstfull = 0
+	for cardno = 0 to ubound(cardlst)
+		if cardlst(cardno) &lt;&gt; &quot;&quot; then
+			found 	= FALSE
+			newfull	= -1
+			for i = firstfull to ubound(masterlst)
+				if cardlst(cardno) = masterlst(i) then
+					cardlst(cardno)= &quot;&quot;
+					masterlst(i) = &quot;&quot;
+					found = TRUE
+					exit for
+				elseif masterlst(i) &lt;&gt; &quot;&quot; and newfull = -1 then
+					newfull = i
+				end if
+			next i
+			if not found then
+				errorstr = errorstr &amp; cardlst(cardno) &amp; &quot;; &quot;
+				errorcnt = errorcnt + 1
+			end if
+		end if
+		if newfull &gt; 0 then
+			firstfull	= newfull
+		end if
+	next cardno
+	if errorcnt = 0 then
+		MsgBox &quot;Verification Complete, no errors&quot;
+	else
+		tmpstr = &quot;&quot;
+		for i = 0 to ubound(masterlst)
+			if masterlst(i) &lt;&gt; &quot;&quot; then
+				tmpstr = tmpstr &amp; masterlst(i) &amp; &quot;; &quot;
+			end if
+		next i
+		MsgBox &quot;Verification Complete with ERRORS. &quot; &amp; chr(13) &amp; &quot;Extra cards:&quot; &amp; chr(13) &amp; errorstr &amp; chr(13) &amp; chr(13) &amp; &quot;Missing cards:&quot; &amp; chr(13) &amp; tmpstr
+	end if
+end sub 	&apos;VerifySkillCards
+
+
+sub CommandAuthority
+	&apos; this will invoke Adama&apos;s once per game abiltiy.
+	&apos; it will take all the cards from the skill check and put them in Adama&apos;s hand
+	
+	dim cardno, playerID, destcol, destrow, rtncd as integer
+	dim i as integer
+	
+	GetSF
+
+	playerID = GetPlayerID (&quot;Adama&quot;)
+	if playerID &lt; 1 then	
+		MsgBox &quot;No Adama Found!!!&quot;
+		EnableCommandAuthority FALSE
+		exit sub
+	end if
+	
+	rtncd = MsgBox (&quot;Invoke COMMAND AUTHORITY?&quot;, 4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	LogThis &quot;Adama invokes COMMAND AUTHORITY&quot;
+	&apos;now move cards from the skill check into the hand
+	cardno = 0
+	do until SkillSheet.getCellByPosition(_SkillCheckCol, _SkillCheckrow + cardno).string	= &quot;&quot; 
+		AddSkillCardTo _SkillSetHand, SkillSheet.getCellByPosition(_SkillCheckCol, _SkillCheckrow + cardno).string, playerID
+		LogThis &quot;Adama receives &quot; &amp; SkillSheet.getCellByPosition(_SkillCheckCol, _SkillCheckrow + cardno).string
+		
+		for i = 0 to _SkillIDMax	&apos; 0 because we&apos;re clearing the card field as well as the value array
+			SkillSheet.getCellByPosition(_SkillCheckCol + i, _SkillCheckrow + cardno).string	= &quot;&quot;
+		next i	
+		cardno	= cardno + 1
+	loop
+	
+	for i = _SkillIDMin to _SkillIDMax
+		Skillsheet.getCellByPosition(GetPlayerCol(playerID), _PlayerDrawnRow + i).string = &quot;X&quot;
+	next i
+	
+	SetOPG playerID, 0
+	EnableCommandAuthority FALSE
+	Populate_Skills
+	DiscardSkillCheckCards
+end sub		&apos;CommandAuthority
+
+sub EnableCommandAuthority (onFlag as boolean)
+	GetSF
+	SkillForm.getByName(&quot;btnCommandAuthority&quot;).enabled = onFlag
+end sub
+
+sub CrypticMessage
+	&apos; this will invoke Leoben&apos;s once per game abiltiy.
+	&apos; it will trade his hand with another player&apos;s
+	
+	dim LeobenID, playerID, Leocol, currow, plyrcol, rtncd, leocnt as integer
+	dim cardtxt as string
+	dim tmpcard(20) as string
+	dim tmpcolor(20) as variant
+	dim i as integer
+	
+	GetSF
+
+	LeobenID = GetPlayerID (&quot;Leoben&quot;)
+	if LeobenID &lt; 1 then	
+		MsgBox &quot;No Leoben Found!!!&quot;,0,&quot;Cryptic Message&quot;
+		EnableCryptic FALSE
+		exit sub
+	end if
+
+	playerID = GetSelected(_ListSkillPlayers)
+	if playerID &lt; 1 or playerID = LeobenID then
+		MsgBox &quot;Please select a player to trade hands with Leoben.&quot;,0,&quot;Cryptic Message&quot;
+		exit sub
+	end if
+
+	rtncd = MsgBox (&quot;Invoking Cryptic Message will cause Leoben to trade hands with &quot; &amp; GetPlayerName(playerID) &amp; &quot;. Do you want to continue?&quot;, 4, &quot;Cryptic Message&quot;)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+
+	&apos;first lets save Loeben&apos;s cards
+	leocnt = 0
+	cardtxt = GetSkillCardFrom(_SkillSetHand, LeobenID)
+	do while cardtxt &lt;&gt; &quot;&quot;
+		leocnt			= leocnt + 1
+		tmpcard(leocnt)	= cardtxt
+		SkillSheet.getCellByPosition(leocol, currow).string = &quot;&quot;
+		cardtxt = GetSkillCardFrom(_SkillSetHand, LeobenID)
+	loop
+
+	&apos;now copy the other player&apos;s cards into leoben&apos;s hand
+	cardtxt = GetSkillCardFrom(_SkillSetHand, playerID)
+	do while cardtxt &lt;&gt; &quot;&quot;
+		AddSkillCardTo _SkillSetHand, cardtxt, LeobenID
+		cardtxt = GetSkillCardFrom(_SkillSetHand, playerID)
+	loop
+	
+	&apos;finally, give leoben&apos;s hand to the other player
+	if leocnt &gt; 0 then
+		for i = 1 to leocnt
+			AddSkillCardTo _SkillSetHand, tmpcard(i), playerID
+		next i
+	end if
+
+	for i = _SkillIDMin to _SkillIDMax
+		Skillsheet.getCellByPosition(GetPlayerCol(playerID), _PlayerDrawnRow + i).string = &quot;X&quot;
+		Skillsheet.getCellByPosition(GetPlayerCol(LeobenID), _PlayerDrawnRow + i).string = &quot;X&quot;
+	next i
+	
+	SetOPG LeobenID, 0
+	EnableCryptic FALSE
+	Populate_Handlist
+	
+	logthis &quot;Cryptic Message: Loeben swapped hands with &quot; &amp; GetPlayerName(playerID)	
+end sub	&apos;Cryptic Message
+
+sub EnableCryptic (onFlag as boolean)
+	GetSF
+	SkillForm.getByName(&quot;btnCryptic&quot;).enabled = onFlag
+end sub
+
+sub Popluate_SkillCheckList
+	dim checklist(5) as string
+	dim sel(1) as integer
+	GetSF
+		
+	checklist(0)=&quot;Administration&quot;
+	checklist(1)=&quot;Admiral&apos;s Quarters&quot;
+	checklist(2)=&quot;Brig&quot;
+
+	if GameTypeIsPegasus() then
+		checklist(3) = &quot;Airlock&quot;
+		if ObjectiveIsNewCaprica() then
+			checklist(4) = &quot;Resistance HQ&quot;
+			checklist(5) = &quot;Detention&quot;
+		end if
+	end if
+	
+	SkillForm.getByName(&quot;lstSkillCheck&quot;).StringItemList() = g_emptylst()
+	SkillForm.getByName(&quot;lstSkillCheck&quot;).StringItemList() = checklist()
+	sel(0)	= 0
+	SkillForm.getByName(&quot;lstSkillCheck&quot;).SelectedItems() = sel()
+end sub	&apos;Populate_SkillCheckList
+
+
+sub LaunchSkillCheck
+	GetSF
+	dim skillsincheck(5), checkname as string
+	dim playerid, difficulty, partial, rtncd as integer
+	dim filpflag, hatredflag, insubordinateflag, brigflag, intolerantflag as boolean
+
+	checkname	= SkillForm.getByName(&quot;lstSkillCheck&quot;).StringItemList(SkillForm.getByName(&quot;lstSkillCheck&quot;).SelectedItems(0))
+	partial		= 0
+	&apos;skillsincheck(8) = &quot;&quot;	&apos; Force the Partial field to be blank, not 0. Overwrite if needed (Intolerant, anything else?)
+	
+	filpflag			= FALSE
+	hatredflag			= FALSE
+	insubordinateflag	= FALSE
+	brigflag			= FALSE
+	
+	for playerid = 1 to PlayerCnt()
+		if not IsRevealed (playerID) and GetPlayerName(playerid) = &quot;Zarek&quot; then
+			filpflag=TRUE
+		end if
+		if not IsRevealed (playerID) and GetPlayerName(playerid) = &quot;Tigh&quot; then
+			hatredflag=TRUE
+		end if
+		if not IsRevealed (playerID) and GetPlayerName(playerid) = &quot;Starbuck&quot; then
+			insubordinateflag=TRUE
+		end if
+		if not IsRevealed (playerID) and GetPlayerName(playerid) = &quot;Cain&quot; then
+			intolerantflag=TRUE
+		end if
+		if GetPlayerLoc(playerID) = &quot;Brig&quot; then
+			brigflag=TRUE
+		end if		
+	next playerid
+		
+	select case checkname
+		case &quot;Administration&quot;
+			skillsincheck(_SkillIDPolitics)		= &quot;X&quot;
+			skillsincheck(_SkillIDLeadership)	= &quot;X&quot;
+			difficulty	= 5
+			if filpflag then
+				rtncd = MsgBox(&quot;Will Zarek use &apos;Friends in Low Places&apos;?&quot;,4,&quot;Friends in Low Places&quot;)
+				if rtncd = 6 then
+					rtncd = MsgBox(&quot;Will Zarek make the check EASIER?&quot;,4,&quot;Friends in Low Places&quot;)
+					if rtncd = 6 then
+						difficulty	= difficulty - 2
+					else
+						difficulty	= difficulty + 2
+					end if
+				end if
+			end if
+						
+		case &quot;Admiral&apos;s Quarters&quot;
+			skillsincheck(_SkillIDLeadership)	= &quot;X&quot;
+			skillsincheck(_SkillIDTactics)		= &quot;X&quot;
+			difficulty	= 7
+			if hatredflag then
+				rtncd = MsgBox(&quot;Will Tigh use &apos;Cylon Hatred&apos;?&quot;, 4, &quot;Cylon Hatred&quot;)
+				if rtncd = 6 then
+					difficulty = difficulty - 3
+				end if
+			end if
+			if insubordinateflag then
+				rtncd = MsgBox(&quot;Is Starbuck the target?&quot;, 4, &quot;Insubordinate&quot;)
+				if rtncd = 6 then
+					difficulty = difficulty - 3
+				end if
+			end if
+			if intolerantflag then
+				partial = 10
+			end if
+		
+		case &quot;Brig&quot;
+			skillsincheck(_SkillIDPolitics)	= &quot;X&quot;
+			skillsincheck(_SkillIDTactics)	= &quot;X&quot;
+			difficulty	= 7
+			if filpflag then
+				rtncd = MsgBox(&quot;Will Zarek use &apos;Friends in Low Places&apos;?&quot;,4,&quot;Friends in Low Places&quot;)
+				if rtncd = 6 then
+					rtncd = MsgBox(&quot;Will Zarek make the check EASIER?&quot;,4,&quot;Friends in Low Places&quot;)
+					if rtncd = 6 then
+						difficulty = difficulty - 2
+					else
+						difficulty = difficulty + 2
+					end if
+				end if
+			end if
+			
+		case &quot;Airlock&quot;
+			skillsincheck(_SkillIDPolitics)	= &quot;X&quot;
+			skillsincheck(_SkillIDTactics)	= &quot;X&quot;
+			difficulty	= 12
+			if brigflag then
+				rtncd = MsgBox(&quot;Is the target in the Brig?&quot;,4,&quot;Airlock&quot;)
+				if rtncd = 6 then
+					difficulty = difficulty - 4
+				end if
+			end if
+			
+		case &quot;Resistance HQ&quot;
+			skillsincheck(_SkillIDLeadership)	= &quot;X&quot;
+			skillsincheck(_SkillIDTactics)		= &quot;X&quot;
+			difficulty	= 7
+			
+		case &quot;Detention&quot;
+			skillsincheck(_SkillIDPolitics)	= &quot;X&quot;
+			skillsincheck(_SkilIDTactics)	= &quot;X&quot;
+			difficulty	= 9
+			if filpflag then
+				rtncd = MsgBox(&quot;Will Zarek use &apos;Friends in Low Places&apos;?&quot;,4,&quot;Friends in Low Places&quot;)
+				if rtncd = 6 then
+					rtncd = MsgBox(&quot;Will Zarek make the check EASIER?&quot;,4,&quot;Friends in Low Places&quot;)
+					if rtncd = 6 then
+						difficulty = difficulty - 2
+					else
+						difficulty = difficulty + 2
+					end if
+				end if
+			end if
+			
+		case else
+			exit sub
+	end select
+	
+	StartSkillCheck(checkname, skillsincheck(), difficulty, TRUE, partial, FALSE)
+
+end sub	&apos;LaunchSkillCheck
+
+&apos; Called to transfer a card from one player to another. 
+&apos; This could happen via:
+&apos;  - Human Fleet (base): Cylon steals a card from a Human
+&apos;  - Politically Adroit: Ellen gives a card to another player
+&apos;  - Intimate: Six steals a random card from a another player.
+&apos;  - Glimpse the Face of God: Leoben trades 1-2 cards with the top of Destiny
+&apos;		in this case, first hit the &quot;Glimpse&quot; button which will put the top 2 of Destiny into Leoben&apos;s hand
+&apos;		then &quot;give&quot; two cards back to destiny.
+sub GiveCard
+	dim srcid, destid, cardno, skillID, rtncd  as integer
+	dim srccol, srcrow, destcol, destrow as integer
+	dim destplayer, cardtext as string
+	dim tmplst() as string
+
+	GetSF
+	
+	srcid = GetSelected(_ListSkillPlayers)
+	if srcid = -1 then
+		MsgBox &quot;Please select a player.&quot;,0,&quot;Give Card&quot;
+		exit sub
+	end if
+
+	cardNo = GetSelected(_ListSkillCards)
+	if cardNo = -1 then
+		MsgBox &quot;Please select a card to give.&quot;,0,&quot;Give Card&quot;
+		exit sub
+	end if
+
+	tmplst = SkillForm.getByName(&quot;lstDestPlayer&quot;).SelectedItems()
+	if ubound(tmplst) &lt; 0 then
+		MsgBox &quot;Please select a player to receive the card.&quot;,0,&quot;Give Card&quot;
+		exit sub
+	end if
+	
+	destplayer = SkillForm.getByName(&quot;lstDestPlayer&quot;).StringItemList(val(tmplst(0)))
+	
+	cardtext	= CardInHand(srcID, cardNo, TRUE)
+	rtncd	= MsgBox(&quot;Transfer &apos;&quot; &amp; cardtext &amp; &quot;&apos; from &quot; &amp; GetPlayerName(srcid) &amp; &quot; to &quot; &amp; destplayer &amp; &quot;?&quot; ,4,&quot;Give Card&quot;)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	destid	= GetPlayerID(destplayer)		&apos;destid=0 means we&apos;re give to Destiny
+
+	if destID = 0 then 
+		AddSkillCardTo _SkillSetDestiny, GetSkillCardFrom(_SkillSetHand, srcID, cardNo)
+	else
+		AddSkillCardTo _SkillSetHand, GetSkillCardFrom(_SkillSetHand, srcID, cardNo), destID
+		for skillID = _SkillIDMin to _SkillIDMax
+			Skillsheet.getCellByPosition(GetPlayerCol(destID), _PlayerDrawnRow + skillID).string = &quot;X&quot;
+		next skillID
+	end if
+	
+	LogThis destplayer &amp; &quot; receives &quot; &amp; cardtext &amp; &quot; from &quot; &amp; GetPlayerName(srcID)
+	
+	CompressSkillCards _SkillSetHand, srcID
+	Populate_Handlist
+end sub	&apos;GiveCard
+
+
+sub PopulateGiveCardPlayers (fromplayer as integer)
+	dim playerlst(8) as string
+	dim i, cntr as integer
+	
+	cntr	= 1
+	for i = 1 to PlayerCnt()
+		if i &lt;&gt; fromplayer then
+			playerlst(cntr)	= GetPlayerName(i)
+			cntr	= cntr + 1
+		end if
+	next i
+	if GetPlayerName(fromplayer) = &quot;Leoben&quot; and GetCurrentPlayer() =  fromplayer and SkillForm.getByName(&quot;btnGlimpse&quot;).enabled =FALSE then
+		&apos; in other words...if it&apos;s Leoben&apos;s turn, and we&apos;ve hit the &quot;glimpse&quot; button, and we&apos;ve selected Leoben, then we can 
+		&apos;		give the card to Destiny
+		playerlst(cntr + 1) = &quot;Destiny&quot;
+		cntr	= cntr + 1
+	end if
+	SkillForm.getByName(&quot;lstDestPlayer&quot;).StringItemList	= playerlst()
+end sub
+
+
+sub GlimpseTheFaceofGod
+	&apos;This will take the top two cards from Destiny and put them into Leoben&apos;s hand.
+	&apos;We then need to move cards from Leoben&apos;s hand back into destiny.
+	dim leobenID, i, rtncd as integer
+	dim cardtxt as string
+	
+	GetSF
+
+	rtncd = MsgBox(&quot;Glimpsing the Face of God will put the top two Destiny cards into Leoben&apos;s hand.  You will need to then &apos;give&apos; two cards back to Destiny.  Do you want to Proceed?&quot;, 4, &quot;Glimpse the Face of God&quot;)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if	
+
+	LogThis &quot;Leoben Glimpses the Face of God!&quot;
+	
+	LeobenID	= GetCurrentPlayer() &apos; this is only avaiable if Leoben is the current player
+
+	for i = 1 to 2
+		cardtxt = GetSkillCardFrom(_SkillSetDestiny, 0)
+		AddSkillCardTo _SkillSetHand, cardtxt, LeobenID
+		LogThis &quot;Leoben receives &quot; &amp; cardtxt &amp; &quot; from Destiny&quot;
+	next i
+
+	for i = _SkillIDMin to _SkillIDMax
+		Skillsheet.getCellByPosition(GetPlayerCol(LeobenID), _PlayerDrawnRow + i).string = &quot;X&quot;
+	next i
+
+&apos;	NOTE: DO NOT compress the destiny deck...we want the two card given to be on top...	
+
+	SkillForm.getByName(&quot;btnGlimpse&quot;).enabled = FALSE
+	PopulateGiveCardPlayers LeobenID
+end sub	&apos;GlimpseTheFaceOfGod
+
+
+sub GodsPlan (playerID as integer, cardNo as integer)
+	dim cardtxt as string
+	
+	&apos;Take the card from the player and swap it with the top of destiny
+	cardtxt = GetSkillCardFrom(_SkillSetHand, playerID, cardNo)
+	AddSkillCardTo _SkillSetHand, GetSkillCardFrom(_SkillSetDestiny, 0), playerID
+	AddSkillCardTo _SkillSetDestiny, cardtxt
+	
+	SortHands
+end sub	&apos;God&apos;s Plan
+
+
+
+&apos;whichset tells us if we&apos;re getting from a hand, deck, discard, or destiny
+&apos; need to investigate if we should support skill checks the same way, but they behave a little differently.
+&apos; setID is the player for _SkillSetHand
+sub AddSkillCardTo (whichset as integer, cardtxt as string, optional setID as integer)
+	dim destcol, destrow, skillID as integer
+
+	skillID = SkillIDFromText(cardtxt)
+	if IsMissing(setID) then
+		setID = skillID
+	end if
+				
+	destcol	= GetSkillSetCol(whichset, setID)
+	destrow	= GetSkillSetRow(whichset)
+	
+	do 
+		if SkillSheet.getCellByPosition(destcol,destrow).string = &quot;&quot; then
+			&apos;found the first empty cell
+			SkillSheet.getCellByPosition(destcol,destrow).string	= cardtxt
+			SkillSheet.getCellByPosition(destcol,destrow).charColor	= SkillColorDisp(skillID)
+			exit do
+		end if
+		destrow	= destrow + 1	
+	loop
+
+end sub	&apos;AddSkillCardTo
+
+
+&apos;whichset tells us if we&apos;re getting from a hand, deck, discard, or destiny
+&apos; setID is the player for hand or skill for deck and discard; ignored for destiny
+&apos; cardno is only used for hands, otherwise we&apos;ll always be taking the top card.
+&apos;
+&apos;Note: this will NOT compress the deck...that&apos;s a separate call so that if we&apos;re pulling multiple cards we don&apos;t waste too much effort
+
+function GetSkillCardFrom (whichset as integer, optional setID as integer, optional cardno as integer) as string
+	dim srccol, srcrow, maxcnt as integer
+
+	srccol	= GetSkillSetCol(whichset, setID)
+	srcrow	= GetSkillSetRow(whichset)
+	
+	if IsMissing(cardno) then
+		maxcnt = MaxCardCnt(whichset)
+		&apos;take from the top of the deck
+		GetSkillCardFrom = &quot;&quot;
+		for cardno = 0 to maxcnt
+			if SkillSheet.getCellByPosition(srccol,srcrow + cardno).string &lt;&gt; &quot;&quot; then
+				GetSkillCardFrom = SkillSheet.getCellByPosition(srccol,srcrow + cardno).string 
+				SkillSheet.getCellByPosition(srccol,srcrow + cardno).string = &quot;&quot;
+				exit for
+			end if
+		next cardno
+	else
+		GetSkillCardFrom = SkillSheet.getCellByPosition(srccol,srcrow + cardno - 1).string
+		SkillSheet.getCellByPosition(srccol,srcrow + cardno - 1).string = &quot;&quot;
+	end if
+end function	&apos;GetSkillCardFrom
+
+
+
+sub CompressSkillCards (whichset as integer, setID as integer)
+	dim srccol, srcrow, firstempty, maxcnt, i as integer
+
+	srccol	= GetSkillSetCol(whichset, setID)
+	srcrow	= GetSkillSetRow(whichset)
+
+	firstempty = -1
+	maxcnt = MaxCardCnt(whichset)
+	for i = 0 to maxcnt
+		if SkillSheet.getCellByPosition(srccol,srcrow + i).string = &quot;&quot; and firstempty = -1 then
+			firstempty = srcrow + i
+		elseif SkillSheet.getCellByPosition(srccol,srcrow + i).string &lt;&gt; &quot;&quot; and firstempty &lt;&gt; -1 then
+			SkillSheet.getCellByPosition(srccol,firstempty).string = SkillSheet.getCellByPosition(srccol,srcrow + i).string
+			SkillSheet.getCellByPosition(srccol,firstempty).CharColor = SkillSheet.getCellByPosition(srccol,srcrow + i).CharColor
+			SkillSheet.getCellByPosition(srccol,srcrow + i).string = &quot;&quot; 
+			firstempty = firstempty + 1
+		end if
+	next i
+
+end sub	&apos;CompressSkillCards
+	
+	
+sub ManipulateDestiny
+	dim playerlst(1), tmplst(1) as string
+
+	GetSF
+
+	if SkillForm.getByName(&quot;btnManipulateDestiny&quot;).label = &quot;Manipulate Destiny&quot; then
+		playerlst(1)=&quot;*** DESTINY ***&quot;
+		SkillForm.getByName(&quot;lstPlayers&quot;).StringItemList=playerlst()
+			
+	&apos;	tmplst= GameForm.getByName(&quot;lstPlayers&quot;).SelectedItems()
+		tmplst(0) = 1
+		SkillForm.getByName(&quot;lstPlayers&quot;).SelectedItems=tmplst
+		Populate_Handlist
+		SkillForm.getByName(&quot;btnManipulateDestiny&quot;).label = &quot;Restore Players&quot;
+	else
+		PopulatePlayers
+		SkillForm.getByName(&quot;btnManipulateDestiny&quot;).label = &quot;Manipulate Destiny&quot;		
+	end if
+end sub
+</script:module>

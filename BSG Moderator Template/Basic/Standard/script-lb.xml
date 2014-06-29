@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE library:library PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "library.dtd">
+<library:library xmlns:library="http://openoffice.org/2000/library" library:name="Standard" library:readonly="false" library:passwordprotected="false">
+ <library:element library:name="Ships"/>
+ <library:element library:name="GameLog"/>
+ <library:element library:name="Crisis"/>
+ <library:element library:name="GameState"/>
+ <library:element library:name="BoardStatus"/>
+ <library:element library:name="Image"/>
+ <library:element library:name="Quorum"/>
+ <library:element library:name="Util"/>
+ <library:element library:name="Destination"/>
+ <library:element library:name="Skills"/>
+ <library:element library:name="Reference"/>
+ <library:element library:name="z_ToDo"/>
+ <library:element library:name="z_ChangeLog"/>
+ <library:element library:name="Loyalty"/>
+ <library:element library:name="Setup"/>
+ <library:element library:name="IonNeb"/>
+ <library:element library:name="Mutiny"/>
+</library:library>

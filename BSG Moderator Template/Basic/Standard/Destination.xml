@@ -1,0 +1,654 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Destination" script:language="StarBasic">dim DestnSheet as object
+dim DestnForm as object
+
+const _DestnGameCol = 0
+const _DestnDeckCol = _DestnGameCol + 1
+const _DestnJumpCol = _DestnGameCol + 2
+const _DestnDistanceCol = _DestnGameCol + 3
+const _DestnFuelCol = _DestnGameCol + 4
+const _DestnOtherCol = _DestnGameCol + 5
+const _DestnActionCol = _DestnGameCol + 6
+
+const _DestnRow = 7
+
+const _DestnBaseCnt = 22
+const _DestnPegasusCnt = 5
+const _DestnExodusCnt = 7 
+const _DestnDaybreakCnt = 0
+const _DestnRevelationsCnt = 5
+const _MaxDestnCnt = _DestnBaseCnt + _DestnPegasusCnt + _DestnExodusCnt + _DestnDaybreakCnt + _DestnRevelationsCnt
+
+const _DestnTotalCol = 3
+const _DestnTotalRow = 5
+
+const _DestnBuryCntCol = 4
+const _DestnBuryCntRow = 5
+
+const _DistanceTriggerSleeper = 1
+const _DistanceTriggerEndgame = 2
+const _DistanceTriggerCivilWar = 3
+const _DistanceTriggerRow		= 2
+const _DistanceTriggerCol		= 0
+
+const _SleeperDistance			= 4
+const _KobolDistance			= 8
+const _NewCapricaDistance		= 7
+const _IonianNebulaDistance		= 8
+const _EarthDistance			= 10
+const _CivilWarDistance			= 1
+const _ColonyDistance			= 7
+
+const _SpecialBaseCnt 			= 1
+const _SpecialDaybreakCnt		= 0
+const _SpecialRevelationsCnt	= 2
+const _MaxSpecialCnt			= _SpecialBaseCnt + _SpecialDaybreakCnt + _SpecialRevelationsCnt
+
+sub GetDestn
+	if DestnSheet &lt;&gt; NULL then
+		exit sub
+	end if 
+	
+	DestnSheet= ThisComponent.Sheets.getByName(&quot;Destination Cards&quot;)
+	DestnForm = DestnSheet.DrawPage.Forms.GetByName(&quot;formDestination&quot;)
+	Randomize
+end sub
+
+function GetDestnBuryCnt as integer
+	GetDestnBuryCnt = DestnSheet.GetCellByPosition(_DestnBuryCntCol,_DestnBuryCntRow).value
+end function
+
+sub SetDestnBuryCnt (reset as boolean)
+	if reset then
+		DestnSheet.GetCellByPosition(_DestnBuryCntCol,_DestnBuryCntRow).value = 0
+	else
+		DestnSheet.GetCellByPosition(_DestnBuryCntCol,_DestnBuryCntRow).value = DestnSheet.GetCellByPosition(_DestnBuryCntCol,_DestnBuryCntRow).value + 1
+	end if
+end sub
+
+function GetTotalDistance as integer
+	GetDestn
+	GetTotalDistance = DestnSheet.GetCellByPosition(_DestnTotalCol, _DestnTotalRow).value
+end function
+
+sub SetTotalDistance (newdist as integer)
+	DestnSheet.GetCellByPosition(_DestnTotalCol, _DestnTotalRow).value = newdist
+end sub
+
+
+function GetDestnCnt as integer
+	dim curcnt as integer
+	
+	curcnt = _DestnBaseCnt
+	if GameTypeIsPegasus() then
+		curcnt = curcnt + _DestnPegasusCnt
+	end if
+	
+	if GameTypeIsExodus() then
+		curcnt = curcnt + _DestnExodusCnt
+		if UseCylonFleet() then
+			curcnt = curcnt -1	&apos;Mining Asteroid is removed when using the fleet
+		end if
+	end if
+	
+	if GameTypeIsDaybreak then
+		curcnt = curcnt + _DestnDaybreakCnt
+	end if
+	
+	if GameTypeIsRevelations() then
+		curcnt = curcnt + _DestnRevelationsCnt
+	end if
+	GetDestnCnt = curcnt
+end function	&apos;GetDestnCnt
+	
+sub Initialize_Destination
+
+	&apos;move all the jumped destinations back into the deck, then reshuffle.
+	dim destid, specials as integer
+	GetDestn
+
+	SetDestnBuryCnt TRUE		&apos;reset the count so that nothing has been buried
+	
+	&apos; move all the jumped cards back into the deck
+	for destid = 1 to _MaxDestnCnt + _MaxSpecialCnt
+		if DestnSheet.GetCellByPosition(_DestnDeckCol,_DestnRow + destid).String  = &quot;&quot; then
+			DestnSheet.GetCellByPosition(_DestnDeckCol,_DestnRow + destid).String = DestnSheet.GetCellByPosition(_DestnJumpCol,_DestnRow + destid).String
+			DestnSheet.GetCellByPosition(_DestnJumpCol,_DestnRow + destid).String = &quot;&quot;
+		end if
+	next destID
+	
+	ShuffleDestination TRUE		&apos;this reorders things by gametype 
+	specials = _SpecialBaseCnt
+	if GameTypeIsDaybreak then
+		specials	= specials + _SpecialDaybreakCnt
+	end if
+	if GameTypeIsRevelations then
+		specials	= specials + _SpecialRevelationsCnt
+	end if
+	
+	&apos; now hide the rows we don&apos;t want
+	for destID = 1 to _MaxDestnCnt + _MaxSpecialCnt
+		if destID &lt;= GetDestnCnt()+ specials then
+			DestnSheet.Rows(_DestnRow + destID).IsVisible = TRUE
+		else
+			DestnSheet.Rows(_DestnRow + destID).IsVisible = FALSE
+		end if
+	next destID
+	ShuffleDestination FALSE
+		
+	SetTotalDistance 0
+	DestnSheet.GetCellByPosition(_DistanceTriggerCol + _DistanceTriggerSleeper, _DistanceTriggerRow).String	= &quot;&quot;
+	DestnSheet.GetCellByPosition(_DistanceTriggerCol + _DistanceTriggerEndgame, _DistanceTriggerRow).String	= &quot;&quot;
+	DestnSheet.GetCellByPosition(_DistanceTriggerCol + _DistanceTriggerCivilWar, _DistanceTriggerRow).String	= &quot;&quot;
+	UpdateTTTargetList
+	EnableDestButtons TRUE
+	DestnForm.getByName(&quot;btnLegendary&quot;).enabled = FALSE
+end sub		&apos;Initialize_Destination
+
+
+function GetDestnGameType (destid as integer) as string
+	GetDestnGameType = DestnSheet.getCellByPosition(_DestnGameCol, _DestnRow + destID).string
+end function
+
+
+&apos; this will reshuffle the destination deck. 
+&apos; Note: this is called directly by the &quot;reshuffle&quot; button
+sub ReshuffleDestination
+	ShuffleDestination FALSE
+end sub
+
+&apos; it assumes the deck is already correct, so it will not shuffle in any cards that have been played or
+&apos; any that have been buried.
+&apos; if asConfigure is set, we want to sort the cards by game type, not randomly
+
+sub ShuffleDestination (asConfigure as boolean)
+	dim sortOrder(_MaxDestnCnt + _MaxSpecialCnt), tmpval as double
+	dim destdata(_MaxDestnCnt + _MaxSpecialCnt, 6), tmpdata(6) as string
+	dim destid, i,j, k, destncnt, topofdeck as integer
+	dim tmp as string
+	GetDestn
+
+	if asConfigure then
+		topofdeck = _DestnRow
+		destncnt = _MaxDestnCnt + _MaxSpecialCnt
+	else
+		destnCnt = GetDestnCnt() - GetDestnBuryCnt()
+		topofdeck = _DestnRow + 1
+		do until DestnSheet.GetCellByPosition(_DestnDeckCol,topofdeck).String &lt;&gt; &quot;&quot;
+			topofdeck	= topofdeck + 1
+			destnCnt	= destnCnt - 1
+		loop
+		topofdeck	= topofdeck - 1
+	end if
+	
+	for destid = 1 to destnCnt
+		for i = 0 to 6
+			destdata(destid, i) = DestnSheet.GetCellByPosition(_DestnGameCol + i, topofdeck + destid).String
+		next i
+		if asConfigure then
+			tmp = GetDestnGameType(destid)
+			if (tmp = &quot;B&quot; OR (tmp = &quot;P&quot; and GameTypeIsPegasus()) OR (tmp = &quot;E&quot; and GameTypeIsExodus()) OR (tmp = &quot;D&quot; and GameTypeIsDaybreak) OR (tmp = &quot;R&quot; and GameTypeIsRevelations())) AND _
+				NOT (destdata(destID, 1) = &quot;Mining Asteroid&quot; and UseCylonFleet()) then 
+				sortOrder(destid) = 0
+			elseif tmp = &quot;BX&quot; or (tmp = &quot;DX&quot; and GameTypeIsDaybreak) or (tmp = &quot;RX&quot; and GameTypeIsRevelations()) then	&apos;placeholders
+				sortOrder(destid) = 0.5
+			else
+				sortOrder(destid) = 1
+			end if
+		else
+			sortOrder(destid) = rnd()
+		end if
+	next destID
+
+	&apos; now we sort
+	for i = 1 to  destnCnt - 1
+		for j = i + 1 to destnCnt
+			if sortOrder(i) &gt; sortOrder(j) then
+				tmpval = sortOrder(i)
+				for k = 0 to 6
+					tmpdata(k) = destdata(i,k)
+				next k
+				
+				sortOrder(i) = sortOrder(j)
+				for k = 0 to 6
+					destData(i,k) = destData(j,k)
+				next k
+				
+				sortOrder(j) = tmpval
+				for k = 0 to 6
+					destData(j,k) = tmpdata(k)
+				next k
+			end if
+		next j
+	next i
+	
+	for destid = 1 to destnCnt
+		for i = 0 to 6
+			DestnSheet.GetCellByPosition(_DestnGameCol + i, topofdeck + destid).String = destData(destid, i)
+		next i
+	next destID
+
+end sub 	&apos;ShuffleDestination
+
+
+
+sub JumpToDestination
+	dim destid, rtncd, destndist, prevdist, shipid, howmany, i as integer
+	dim destnstr, msgstr, tmpstr as string
+	GetDestn
+	GetGS
+	
+	if MsgBox(&quot;Did you handle any Population/Civilian Loss?&quot;, 4, &quot;FTL Control&quot;) &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	&apos;get the first available destination
+	for destid = 1 to GetDestnCnt()
+		if DestnSheet.GetCellByPosition(_DestnDeckCol,_DestnRow + destID).String  &lt;&gt; &quot;&quot; then
+			destnstr = DestnSheet.GetCellByPosition(_DestnDeckCol,_DestnRow + destID).String
+			destndist = DestnSheet.GetCellByPosition(_DestnDistanceCol,_DestnRow + destID).String
+			exit for
+		end if
+	next destID
+	rtncd = MsgBox (&quot;Select &quot; &amp; destnstr &amp; &quot; (Distance &quot; &amp; destndist &amp; &quot;) as the next jump destination?&quot;,4,&quot;Confirm Destination&quot;)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	DestnSheet.GetCellByPosition(_DestnJumpCol,_DestnRow + destID).String = DestnSheet.GetCellByPosition(_DestnDeckCol,_DestnRow + destID).String
+	DestnSheet.GetCellByPosition(_DestnDeckCol,_DestnRow + destID).String = &quot;&quot;
+	
+	prevdist = GetTotalDistance()
+	SetTotalDistance prevdist + destndist
+
+	ActivateJump FALSE
+
+	&apos; lose resources
+	for i = 1 to (val(DestnSheet.GetCellByPosition(_DestnFuelCol,_DestnRow + destID).String)*-1)
+		ReduceResource 0
+	next i
+	
+	msgstr = &quot;&quot;
+	MsgBox &quot;Fuel reduced by &quot; &amp; (val(DestnSheet.GetCellByPosition(_DestnFuelCol,_DestnRow + destID).String)*-1)
+	LogThis &quot;Fuel reduced by &quot; &amp; (val(DestnSheet.GetCellByPosition(_DestnFuelCol,_DestnRow + destID).String)*-1)
+	select case left(DestnSheet.GetCellByPosition(_DestnOtherCol,_DestnRow + destID).String,4)
+		case &quot;Food&quot;
+			&apos; only one dest for food, which increases it by one
+			IncreaseResource _ResourceFood
+			msgstr = &quot;Food increased by 1&quot;
+			
+		case &quot;Mora&quot;
+			&apos; morale destinations are +/- 1
+			if val(right(DestnSheet.GetCellByPosition(_DestnOtherCol,_DestnRow + destID).String,2)) &gt; 0 then
+				IncreaseResource _ResourceMorale
+				msgstr = &quot;Morale increased by 1&quot;
+			else
+				ReduceResource _ResourceMorale
+				msgstr= &quot;Morale reduced by 1&quot;
+			end if
+		
+		case &quot;Popu&quot;
+			&apos; population desinations are +/- 1
+			if val(right(DestnSheet.GetCellByPosition(_DestnOtherCol,_DestnRow + destID).String,2)) &gt; 0 then
+				IncreaseResource _ResourcePopulation
+				msgstr=&quot;Population increased by 1&quot;
+			else
+				ReduceResource _ResourcePopulation
+				msgstr=&quot;Population decreased by 1&quot;
+			end if
+			
+		case &quot;Civi&quot;
+			&apos;draw a civilian ship and destroy it
+			DestroyACivilian
+			
+		case &quot;Vipe&quot;
+			&apos;repair two damaged vipers
+			shipid=GetAvailableShip(_ShipViper, _ShipStatusDamaged)
+			if shipid = 0 then
+				MsgBox &quot;No Vipers to repair&quot;
+			else
+				SetShipStatus _ShipViper, shipID, _ShipStatusOffBoard
+				shipid=GetAvailableShip(_ShipViper, _ShipStatusDamaged)
+				if shipid = 0 then
+					msgstr = &quot;1 Vipers Repaired&quot;
+				else
+					SetShipStatus _ShipViper, shipID, _ShipStatusOffBoard
+					msgstr = &quot;2 Vipers Repaired&quot;	
+				end if
+			end if	
+
+		case &quot;Rapt&quot;
+			shipid=GetAvailableShip(_ShipRaptor)
+			if shipid=0 then
+				MsgBox &quot;No Raptors to destroy&quot;
+			else
+				SetShipStatus _ShipRaptor, shipID, _ShipStatusDestroyed
+				msgstr = &quot;Raptor destroyed.&quot;
+			end if							
+			
+		case &quot;Depl&quot;
+			&apos;there are 4 deploys possible other than scar, don&apos;t bother generalizing at this point
+			select case DestnSheet.GetCellByPosition(_DestnJumpCol,_DestnRow + destID).String
+				case &quot;Binary Star&quot;
+					&apos;deploy two civs...first make sure there are two available.
+					if GetAvailableShipCnt(_ShipCivilian) = 0 then
+						MsgBox &quot;No Civilians available to deploy.&quot;
+					elseif GetAvailableShipCnt(_ShipCivilian) = 1 then
+						MsgBox &quot;Only 1 Civilian available to deploy, ask current player where to put it (1 or 4).&quot;
+					else
+						shipid=GetAvailableShip(_ShipCivilian)
+						SetShipStatus _ShipCivilian, ShipID, 1
+						shipid=GetAvailableShip(_ShipCivilian)
+						SetShipStatus _ShipCivilian, ShipID, 4
+						msgstr = &quot;Civilian Ships deployed in Sectors 1 &amp; 4.&quot;
+					end if
+					
+				case &quot;Cylon Ambush&quot;
+					&apos;deploy a basestar, 3 raiders, 3 civilians
+					shipid=GetAvailableShip(_ShipBasestar)
+					if shipid = 0 then
+						MsgBox &quot;No Basestar available to deploy&quot;
+					else
+						SetShipStatus _ShipBasestar, shipID, 1
+						msgstr = &quot;Basestar deployed in Sector 1. &quot;
+					end if
+					howmany = GetAvailableShipCnt(_ShipRaider)
+					if howmany = 0 then
+						MsgBox &quot;No Raiders available to deploy&quot;
+					else
+						if howmany &lt; 3 then
+							MsgBox &quot;Only &quot; &amp; howmany &amp; &quot; Raiders available to deploy.&quot;
+						elseif howmany &gt; 3 then
+							howmany = 3
+						end if
+						for i = 1  to howmany
+							shipid = GetAvailableShip(_ShipRaider)
+							SetShipStatus _ShipRaider, shipID, 1
+						next i
+						msgstr = msgstr &amp; howmany &amp; &quot; Raiders deployed in Sector 1.&quot;
+					end if
+					howmany = GetAvailableShipCnt(_ShipCivilian)
+					if howmany = 0 then
+						MsgBox &quot;No Civilians available to deploy&quot;
+					else
+						if howmany &lt; 3 then
+							MsgBox &quot;Only &quot; &amp; howmany &amp; &quot; Civilians available to deploy.&quot;
+						elseif howmany &gt; 3 then
+							howmany = 3
+						end if
+						for i = 1  to howmany
+							shipid = GetAvailableShip(_ShipCivilian)
+							SetShipStatus _ShipCivilian, shipID, 4
+						next i
+						msgstr = msgstr &amp; howmany &amp; &quot; Civilians deployed in Sector 4.&quot;
+					end if
+				
+				case &quot;Derelict Basestar&quot;
+					shipid=GetAvailableShip(_ShipBasestar)
+					if shipid = 0 then
+						MsgBox &quot;No Basestar available to deploy&quot;
+					else
+						SetShipStatus _ShipBasestar, shipID, 1
+						msgstr = &quot;Basestar deployed in Sector 1. &quot;
+					end if
+					howmany = GetAvailableShipCnt(_ShipCivilian)
+					if howmany = 0 then
+						MsgBox &quot;No Civilians available to deploy&quot;
+					else
+						if howmany &lt; 2 then
+							MsgBox &quot;Only &quot; &amp; howmany &amp; &quot; Civilians available to deploy.&quot;
+						elseif howmany &gt; 2 then
+							howmany = 2
+						end if
+						for i = 1  to howmany
+							shipid = GetAvailableShip(_ShipCivilian)
+							SetShipStatus _ShipCivilian, shipID, 4
+						next i
+						msgstr = msgstr &amp; howmany &amp; &quot; Civilians deployed in Sector 4.&quot;
+					end if
+				
+				case &quot;Cylon Raiders&quot;
+					howmany = GetAvailableShipCnt(_ShipRaider)
+					if howmany = 0 then
+						MsgBox &quot;No Raiders available to deploy&quot;
+					else
+						if howmany &lt; 3 then
+							MsgBox &quot;Only &quot; &amp; howmany &amp; &quot; Raiders available to deploy.&quot;
+						elseif howmany &gt; 3 then
+							howmany = 3
+						end if
+						for i = 1  to howmany
+							shipid = GetAvailableShip(_ShipRaider)
+							SetShipStatus _ShipRaider, shipID, 4
+						next i
+						msgstr = msgstr &amp; howmany &amp; &quot; Raiders deployed in Sector 4.&quot;
+					end if
+				
+			end select
+	end select
+
+	if msgstr &lt;&gt; &quot;&quot; then
+		MsgBox msgstr
+		LogThis msgstr			
+	end if
+	
+	if DestnSheet.GetCellByPosition(_DestnActionCol,_DestnRow + destID).String &lt;&gt; &quot;&quot; then
+		MsgBox &quot;Special Jump Action: &quot; &amp; DestnSheet.GetCellByPosition(_DestnActionCol,_DestnRow + destID).String
+	end if
+	
+	LogThis &quot;The Fleet jumps to &quot; &amp; destnstr &amp; &quot; (Distance &quot; &amp; destndist &amp; &quot;)&quot;  &amp; &quot; - Total distance now &quot; &amp; prevdist + destndist
+	
+	HandleDistanceTriggers
+	
+	if MsgBox (&quot;Do you need to bury any Destinations?&quot;,4,&quot;Bury Destination&quot;) = 6 then
+		BuryDestination
+		if MsgBox (&quot;Do you need to bury a second Destination (Mission Specialist)?&quot;,4,&quot;Bury Destination&quot;) = 6 then
+			BuryDestination
+		end if
+	end if
+	
+end sub
+
+sub SetDistanceTrigger (trigger as integer)
+	DestnSheet.GetCellByPosition(_DistanceTriggerCol + trigger, _DistanceTriggerRow).String	= &quot;X&quot;
+end sub
+
+function CheckDistanceTrigger (trigger as integer) as boolean
+	CheckDistanceTrigger = DestnSheet.GetCellByPosition(_DistanceTriggerCol + trigger, _DistanceTriggerRow).String &lt;&gt; &quot;&quot;
+end function
+
+sub HandleDistanceTriggers (optional legendary as boolean)
+
+	if IsMissing(legendary) then
+		legendary = FALSE
+	end if
+	
+	&apos; if my destination total is &gt; 4 and it wasn&apos;t before, deal sleeper cards
+	if ((GetTotalDistance() &gt;= _SleeperDistance) and (not CheckDistanceTrigger(_DistanceTriggerSleeper))) then
+		MsgBox &quot;Entering Sleeper Agent Phase.&quot;
+		DealSleeperCards
+		SetDistanceTrigger(_DistanceTriggerSleeper)
+		LogThis &quot;Entering Sleeper Agent Phase&quot;
+	end if
+	
+	if UseCivilWar() then
+		if GetTotalDistance &gt;= _CivilWarDistance and not CheckDistanceTrigger(_DistanceTriggerCivilWar) then
+&apos;		Cylon Civil War		
+		end if
+	end if
+	
+	if ObjectiveIsKobol() then
+		if GetTotalDistance() &gt;= _KobolDistance and not CheckDistanceTrigger(_DistanceTriggerEndgame) then
+			MsgBox &quot;One more jump to Kobol!&quot;
+			EnableDestButtons FALSE	&apos; no more destination card activity
+		end if
+	elseif ObjectiveIsNewCaprica() then
+		if GetTotalDistance() &gt;= _NewCapricaDistance and not CheckDistanceTrigger(_DistanceTriggerEndgame) then
+			MsgBox &quot;Entering New Caprica Phase&quot;
+			EnableDestButtons FALSE	&apos; no more destination card activity
+			if UseCylonFleet or legendary then
+				&apos; Have to handle this because they won&apos;t get swept by the Jump when using the CFB.
+				SweepShips (_ShipCivilian, FALSE)
+				ShuffleCivilians
+			end if
+			LandPlayers
+			LandShips
+			LogThis &quot;Entering New Caprica Phase&quot;
+			SetGamePhase _PhaseOnNewCaprica
+			SetDistanceTrigger(_DistanceTriggerEndgame)
+		end if		
+	elseif ObjectiveIsIonianNebula() then
+		if GetTotalDistance() &gt;=_IonianNebulaDistance and not CheckDistanceTrigger(_DistanceTriggerEndgame) then
+			MsgBox &quot;We have reached the CROSSROADS!&quot;
+			EnableDestButtons FALSE
+			DealCrossroads
+			BattleOfIonianNebula
+			SetDistanceTrigger(_DistanceTriggerEndgame)
+		end if
+	elseif ObjectiveIsEarth then
+		if GetTotalDistance() &gt;= _EarthDistance and not CheckDistanceTrigger(_DistanceTriggerEndgame) then
+&apos;		EARTH!
+		end if
+	elseif  ObjectiveIsColony() then
+		if GetTotalDistance() &gt;= _ColonyDistance and not CheckDistanceTrigger(_DistanceTriggerEndgame) then
+		&apos; Colony
+		end if
+	end if
+end sub
+
+sub BuryDestination
+	dim destID, startrow, rtncd, destndist as integer
+	dim i as integer
+	dim destnstr, destndesc, destngame, tmpdestn(6) as string
+	GetDestn
+
+	&apos;get the first available destination	
+	for destID = 1 to GetDestnCnt()
+		if DestnSheet.GetCellByPosition(_DestnDeckCol,_DestnRow + destID).String  &lt;&gt; &quot;&quot; then
+			for i = 0 to 6
+				tmpdestn(i) = DestnSheet.GetCellByPosition(_DestnGameCol+i,_DestnRow + destID).String
+			next i
+			destnstr = DestnSheet.GetCellByPosition(_DestnDeckCol,_DestnRow + destID).String
+			startrow = destID
+			exit for
+		end if
+	next destID
+	rtncd = MsgBox (&quot;Move &quot; &amp; destnstr &amp; &quot; to the bottom of the deck?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	for destID = startrow + 1 to GetDestnCnt() + Legendary()
+		for i = 0 to 6
+			DestnSheet.GetCellByPosition(_DestnGameCol+i, _DestnRow + destID - 1).String = DestnSheet.GetCellByPosition(_DestnGameCol+i, _DestnRow + destID).String 
+		next i
+	next destID
+	for i = 0 to 6
+		DestnSheet.GetCellByPosition(_DestnGameCol+i, _DestnRow + GetDestnCnt() + Legendary()).String = tmpdestn(i)
+	next i
+	
+	SetDestnBuryCnt FALSE
+	LogThis destnstr &amp; &quot; moved to the bottom of the destination deck.&quot;
+	LogBuryCard _CardTypeDest, destnstr
+end sub
+
+function Legendary as integer
+	dim destID, startrow, rtncd, destndist as integer
+	dim destnstr, destndesc as string
+	GetDestn
+
+	&apos;Walk destinations to see if we&apos;ve added Legendary Discovery
+	Legendary	= 0
+	for destID = 1 to GetDestnCnt()
+		if DestnSheet.GetCellByPosition(_DestnJumpCol, _DestnRow + destID).String  = &quot;&quot; then
+			exit for
+		end if
+		if InStr(DestnSheet.GetCellByPosition(_DestnGameCol, _DestnRow + destID).String, &quot;X&quot;) &gt; 0 then
+			Legendary	= Legendary + 1
+		end if
+	next destID
+end function
+
+
+&apos;+== STILL NEED TO UPDATE THIS
+sub EnableSpecialDistance(crisisname as string)
+	GetDestn
+	
+	DestnForm.getByName(&quot;btnLegendary&quot;).enabled = true
+	DestnForm.getByName(&quot;btnLegendary&quot;).label	= crisisname
+end sub
+
+sub AddLegendaryDiscovery
+	dim destID, specID, startrow, rtncd, destndist, prevdist, i as integer
+	dim destnstr, destndesc, legarr(6) as string
+	GetDestn
+
+	destnstr	= DestnForm.getByName(&quot;btnLegendary&quot;).label
+	rtncd = MsgBox(&quot;Add Distance from &quot; &amp; destnstr &amp; &quot;?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	&apos; Find the Crisis near the bottom of the Destination pile
+	specID	= 0
+	for destID = 1 to _MaxSpecialCnt
+		if DestnSheet.GetCellByPosition(_DestnDeckCol, _DestnRow + GetDestnCnt + destID).String = destnstr then
+			for i = 0 to 6
+				legarr(i)	= DestnSheet.GetCellByPosition(_DestnGameCol + i, _DestnRow + GetDestnCnt + destID).String
+			next i
+			destndist	= DestnSheet.GetCellByPosition(_DestnDistanceCol, _DestnRow + GetDestnCnt + destID).string
+			specID	= destID
+			exit for
+		end if
+	next destID
+	
+	if specID = 0 then
+		MsgBox &quot;Couldn&apos;t find &quot; &amp; destnstr &amp; &quot;.&quot;
+		exit sub
+	end if
+	
+	&apos;we&apos;re going legendary...shuffle destinations down and add the legendary discovery
+	&apos;get the first available destination	
+	for destID = 1 to GetDestnCnt() 
+		if DestnSheet.GetCellByPosition(_DestnDeckCol,_DestnRow + destID).String  &lt;&gt; &quot;&quot; then
+			startrow = destID
+			exit for
+		end if
+	next destID
+	
+	&apos; Count backwards from the Special we just picked up.
+	for destID = GetDestnCnt() + specID to startrow step -1
+		for i = 0 to 6
+			DestnSheet.GetCellByPosition(_DestnGameCol + i, _DestnRow + destID).String = DestnSheet.GetCellByPosition(_DestnGameCol + i, _DestnRow + destID-1).String
+		next i
+	next destID
+	
+	&apos; Put the Special on the bottom of the resolved pile
+	for i = 0 to 6
+		DestnSheet.GetCellByPosition(_DestnGameCol+i, _DestnRow + startrow).string = legarr(i)
+	next i
+	
+	&apos; Mark it as resolved.
+	DestnSheet.GetCellByPosition(_DestnJumpCol, _DestnRow + startrow).string = DestnSheet.GetCellByPosition(_DestnDeckCol, _DestnRow + startrow).string
+	DestnSheet.GetCellByPosition(_DestnDeckCol, _DestnRow + startrow).string = &quot;&quot;
+
+	prevdist = GetTotalDistance()
+	SetTotalDistance prevdist + destndist
+	
+	LogThis destnstr &amp; &quot;! Total distance now &quot; &amp; GetTotalDistance
+	
+	HandleDistanceTriggers(TRUE)	&apos; Ships stay in space as this wasn&apos;t a Jump.
+	DestnForm.getByName(&quot;btnLegendary&quot;).enabled	= FALSE
+end sub	&apos;AddLegendaryDiscovery
+
+sub EnableDestButtons (enflag as boolean)
+	DestnForm.GetByName(&quot;btnJumpToDest&quot;).enabled = enflag
+	DestnForm.GetByName(&quot;btnBuryDest&quot;).enabled = enflag
+	DestnForm.getByName(&quot;btnLegendary&quot;).enabled = enflag
+end sub
+
+
+
+
+
+</script:module>

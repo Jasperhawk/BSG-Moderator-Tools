@@ -1,0 +1,1504 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Ships" script:language="StarBasic">REM  *****  BASIC  *****
+option explicit
+
+dim ShipSheet as object
+dim ShipForm as object
+global g_emptylst() as string
+
+const _ShipTypeCnt = 11
+const _ShipColCnt = 7
+
+dim ShipCol(_ShipTypeCnt,_ShipColCnt) as integer
+dim ShipRow(_ShipTypeCnt) as integer
+dim ShipNames(_ShipTypeCnt) as string
+
+global const _ShipViper			= 1
+global const _ShipMarkVII		= 2
+global const _ShipRaptor		= 3
+global const _ShipAssaultRaptor	= 4
+global const _ShipCivilian		= 5
+global const _ShipNONE			= 6
+global const _ShipBasestar		= 7
+global const _ShipRaider		= 8
+global const _ShipHeavy			= 9
+global const _ShipCenturion		= 10
+global const _ShipOccForces		= 11
+
+const _ShipColName			= 1
+const _ShipColOffBrd		= 2
+const _ShipColSector		= 3
+const _ShipColDamaged		= 4
+const _ShipColDestroyed		= 5
+const _ShipColSpecial		= 6
+const _ShipColCylonFleet	= 7
+
+const _BaseDamageCol	= 8
+const _BaseDamageRow	= 40
+
+global const _ShipStatusOffboard	= 0
+global const _ShipStatusSector1		= 1
+global const _ShipStatusSector6		= 6
+global const _ShipStatusDamaged		= 7
+global const _ShipStatusDestroyed	= 8
+global const _ShipStatusLocked		= 9
+global const _ShipStatusPrepped		= 10
+global const _ShipStatusCylonFleet1	= 11
+global const _ShipStatusCylonFleet6	= 16
+global const _ShipStatusActivate	= 17
+
+const _ScarCol = 14
+const _ScarRow = 16
+
+sub GetShipSheet
+	if ShipSheet &lt;&gt; NULL then
+		exit sub
+	end if 
+	
+	ShipSheet= ThisComponent.Sheets.getByName(&quot;Ships&quot;)
+	ShipForm = ShipSheet.DrawPage.Forms.GetByName(&quot;formShips&quot;)
+
+	PopulateShipLoc
+	Randomize
+end sub
+
+
+&apos; ****************************** SHIP FUNCTIONS	****************************
+
+
+&apos; each ship type has the following columns:  Name, OffBrd, Sector, Damaged, Destroyed, Pursuit, Special
+sub PopulateShipLoc
+	ShipCol(_ShipViper, _ShipColName)		= 1
+	ShipCol(_ShipViper, _ShipColOffBrd)		= ShipCol(_ShipViper, _ShipColName) + 1
+	ShipCol(_ShipViper, _ShipColSector)		= ShipCol(_ShipViper, _ShipColName) + 2
+	ShipCol(_ShipViper, _ShipColDamaged)	= ShipCol(_ShipViper, _ShipColName) + 4
+	ShipCol(_ShipViper, _ShipColDestroyed)	= ShipCol(_ShipViper, _ShipColName) + 5
+	ShipCol(_ShipViper, _ShipColSpecial)	= ShipCol(_ShipViper, _ShipColName) + 3
+	ShipCol(_ShipViper, _ShipColCylonFleet)	= 0
+	ShipRow(_ShipViper)		= 3
+	ShipNames(_ShipViper)	= &quot;Viper&quot;
+
+	ShipCol(_ShipMarkVII, _ShipColName)			= 1
+	ShipCol(_ShipMarkVII, _ShipColOffBrd)		= ShipCol(_ShipMarkVII, _ShipColName) + 1
+	ShipCol(_ShipMarkVII, _ShipColSector)		= ShipCol(_ShipMarkVII, _ShipColName) + 2
+	ShipCol(_ShipMarkVII, _ShipColDamaged)		= ShipCol(_ShipMarkVII, _ShipColName) + 4
+	ShipCol(_ShipMarkVII, _ShipColDestroyed)	= ShipCol(_ShipMarkVII, _ShipColName) + 5
+	ShipCol(_ShipMarkVII, _ShipColSpecial)		= ShipCol(_ShipMarkVII, _ShipColName) + 3
+	ShipCol(_ShipMarkVII, _ShipColCylonFleet)	= 0
+	ShipRow(_ShipMarkVII)	= 15
+	ShipNames(_ShipMarkVII)	= &quot;Viper Mark VII&quot;
+		
+	ShipCol(_ShipRaptor, _ShipColName)			= 1
+	ShipCol(_ShipRaptor, _ShipColOffBrd)		= ShipCol(_ShipRaptor, _ShipColName) + 1
+	ShipCol(_ShipRaptor, _ShipColSector)		= 0
+	ShipCol(_ShipRaptor, _ShipColDamaged)		= 0
+	ShipCol(_ShipRaptor, _ShipColDestroyed)		= ShipCol(_ShipRaptor, _ShipColName) + 2
+	ShipCol(_ShipRaptor, _ShipColSpecial)		= 0
+	ShipCol(_ShipRaptor, _ShipColCylonFleet)	= 0
+	ShipRow(_ShipRaptor)	= 40
+	ShipNames(_ShipRaptor)	= &quot;Raptor&quot;
+		
+	ShipCol(_ShipAssaultRaptor, _ShipColName)		= 1
+	ShipCol(_ShipAssaultRaptor, _ShipColOffBrd)		= ShipCol(_ShipRaptor, _ShipColName) + 1
+	ShipCol(_ShipAssaultRaptor, _ShipColSector)		= ShipCol(_ShipRaptor, _ShipColName) + 2
+	ShipCol(_ShipAssaultRaptor, _ShipColDamaged)	= 0
+	ShipCol(_ShipAssaultRaptor, _ShipColDestroyed)	= ShipCol(_ShipRaptor, _ShipColName) + 4
+	ShipCol(_ShipAssaultRaptor, _ShipColSpecial)	= ShipCol(_ShipRaptor, _ShipColName) + 3
+	ShipCol(_ShipAssaultRaptor, _ShipColCylonFleet)	= 0
+	ShipRow(_ShipAssaultRaptor)		= 49
+	ShipNames(_ShipAssaultRaptor)	= &quot;Assault Raptor&quot;
+	
+	ShipCol(_ShipCivilian, _ShipColName)		= 1
+	ShipCol(_ShipCivilian, _ShipColOffBrd)		= ShipCol(_ShipCivilian, _ShipColName) + 2
+	ShipCol(_ShipCivilian, _ShipColSector)		= ShipCol(_ShipCivilian, _ShipColName) + 3
+	ShipCol(_ShipCivilian, _ShipColDamaged)		= 0
+	ShipCol(_ShipCivilian, _ShipColDestroyed)	= ShipCol(_ShipCivilian, _ShipColName) + 4
+	ShipCol(_ShipCivilian, _ShipColSpecial)		= ShipCol(_ShipCivilian, _ShipColName) + 5
+	ShipCol(_ShipCivilian, _ShipColCylonFleet)	= 0
+	ShipRow(_ShipCivilian)		= 23
+	ShipNames(_ShipCivilian)	= &quot;Civilian&quot;
+
+	ShipCol(_ShipBasestar, _ShipColName)		= 8
+	ShipCol(_ShipBasestar, _ShipColOffBrd)		= ShipCol(_ShipBasestar, _ShipColName) + 1
+	ShipCol(_ShipBasestar, _ShipColSector)		= ShipCol(_ShipBasestar, _ShipColName) + 2
+	ShipCol(_ShipBasestar, _ShipColDamaged)		= 0
+	ShipCol(_ShipBasestar, _ShipColDestroyed)	= 0
+	ShipCol(_ShipBasestar, _ShipColSpecial)		= ShipCol(_ShipBasestar, _ShipColName) + 4
+	ShipCol(_ShipBasestar, _ShipColCylonFleet)	= ShipCol(_ShipBasestar, _ShipColName) + 3
+	ShipRow(_ShipBasestar)		= 35
+	ShipNames(_ShipBasestar)	= &quot;Basestar&quot;
+
+	ShipCol(_ShipRaider, _ShipColName)			= 8
+	ShipCol(_ShipRaider, _ShipColOffBrd)		= ShipCol(_ShipRaider, _ShipColName) + 1
+	ShipCol(_ShipRaider, _ShipColSector)		= ShipCol(_ShipRaider, _ShipColName) + 2
+	ShipCol(_ShipRaider, _ShipColDamaged)		= 0
+	ShipCol(_ShipRaider, _ShipColDestroyed)		= 0
+	ShipCol(_ShipRaider, _ShipColSpecial)		= 0
+	ShipCol(_ShipRaider, _ShipColCylonFleet)	= ShipCol(_ShipRaider, _ShipColName) + 3
+	ShipRow(_ShipRaider)	= 3
+	ShipNames(_ShipRaider)	= &quot;Raider&quot;
+	
+	ShipCol(_ShipHeavy, _ShipColName)		= 8
+	ShipCol(_ShipHeavy, _ShipColOffBrd)		= ShipCol(_ShipHeavy, _ShipColName) + 1
+	ShipCol(_ShipHeavy, _ShipColSector)		= ShipCol(_ShipHeavy, _ShipColName) + 2
+	ShipCol(_ShipHeavy, _ShipColDamaged)	= 0
+	ShipCol(_ShipHeavy, _ShipColDestroyed)	= 0
+	ShipCol(_ShipHeavy, _ShipColSpecial)	= 0
+	ShipCol(_ShipHeavy, _ShipColCylonFleet)	= ShipCol(_ShipHeavy, _ShipColName) + 3
+	ShipRow(_ShipHeavy)		= 27
+	ShipNames(_ShipHeavy)	= &quot;Heavy Raider&quot;
+
+	ShipCol(_ShipCenturion, _ShipColName)		= 13
+	ShipCol(_ShipCenturion, _ShipColOffBrd)		= ShipCol(_ShipCenturion, _ShipColName) + 1
+	ShipCol(_ShipCenturion, _ShipColSector)		= ShipCol(_ShipCenturion, _ShipColName) + 4
+	ShipCol(_ShipCenturion, _ShipColDamaged)	= 0
+	ShipCol(_ShipCenturion, _ShipColDestroyed)	= 0
+	ShipCol(_ShipCenturion, _ShipColSpecial)	= 0
+	ShipCol(_ShipCenturion, _ShipColCylonFleet)	= 0
+	ShipRow(_ShipCenturion)		= 27
+	ShipNames(_ShipCenturion)	= &quot;Centurion&quot;
+
+	ShipCol(_ShipOccForces, _ShipColName)		= 13
+	ShipCol(_ShipOccForces, _ShipColOffBrd)		= ShipCol(_ShipOccForces, _ShipColName) + 1
+	ShipCol(_ShipOccForces, _ShipColSector)		= ShipCol(_ShipOccForces, _ShipColName) + 4
+	ShipCol(_ShipOccForces, _ShipColDamaged)	= 0
+	ShipCol(_ShipOccForces, _ShipColDestroyed)	= 0
+	ShipCol(_ShipOccForces, _ShipColSpecial)	= 0
+	ShipCol(_ShipOccForces, _ShipColCylonFleet)	= 0
+	ShipRow(_ShipOccForces)		= 20
+	ShipNames(_ShipOccForces)	= &quot;Occupation Force&quot;
+end sub
+
+function ShipCnt (shiptype as integer) as integer
+	dim tmp() as integer
+	
+	tmp = Array(0, 8, 0, 4, 0, 12, 0, 2, 16, 4, 4, 4)
+	if UseCylonFleet() then
+		tmp(_ShipViper)		= 6
+		tmp(_ShipMarkVII)	= 4
+	end if
+	if GameTypeIsDaybreak() then
+		tmp(_ShipAssaultRaptor)	= 4
+	end if
+	ShipCnt = tmp(shiptype)
+end function
+
+function MoveUp (FromSector as integer)
+	MoveUp = (FromSector Mod 6) + 1
+end function
+
+function MoveDown (FromSector as integer)	&apos; we have to do this because of a bug in the Mod function
+	if FromSector = 1 then
+		MoveDown	= 6
+	else
+		MoveDown	= FromSector - 1
+	end if
+end function
+
+
+function GetShipStatus (ShipType as integer, ShipID as integer) as integer
+
+	if ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColOffBrd), ShipRow(ShipType) + ShipID).string &lt;&gt; &quot;&quot; then
+		GetShipStatus	= _ShipStatusOffboard
+			
+	elseif ShipCol(ShipType, _ShipColSector) &gt; 0 and ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColSector), ShipRow(ShipType) + ShipID).string &lt;&gt; &quot;&quot; then
+		GetShipStatus	= ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColSector), ShipRow(ShipType) + ShipID).string
+				
+	elseif ShipCol(ShipType, _ShipColDamaged) &gt; 0 and ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColDamaged), ShipRow(ShipType) + ShipID).string &lt;&gt; &quot;&quot; then 
+		GetShipStatus	= _ShipStatusDamaged
+			
+	elseif ShipCol(ShipType, _ShipColDestroyed) &gt; 0 and ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColDestroyed), ShipRow(ShipType) + ShipID).string &lt;&gt; &quot;&quot; then 
+		GetShipStatus	= _ShipStatusDestroyed
+
+	elseif ShipType = _ShipCivilian then
+		if ShipSheet.GetCellByPosition(ShipCol(ShipType,_ShipColSpecial),ShipRow(ShipType) + ShipID).string = &quot;Locked&quot; then
+			GetShipStatus	= _ShipStatusLocked
+		else
+			GetShipStatus	= _ShipStatusPrepped
+		end if
+		
+	elseif ShipType = _ShipViper or ShipType = _ShipMarkVII or ShipType = _ShipAssaultRaptor then
+		&apos; this could only happen if we have a piloted viper - we&apos;re not off board (Reserves), in a Sector, damaged, destroyed, or a Civilian, so this is for Pilots.
+		GetShipStatus	= _ShipStatusActivate
+		
+	elseif ShipCol(ShipType, _ShipColCylonFleet) &gt; 0 and ShipSheet.GetCellByPosition(ShipCol(ShipType,_ShipColCylonFleet), ShipRow(ShipType) + ShipID).string &lt;&gt; &quot;&quot; then 
+		GetShipStatus = 10 + val(ShipSheet.GetCellByPosition(ShipCol(ShipType,_ShipColCylonFleet),ShipRow(ShipType) + ShipID).string)
+		
+	end if
+	
+end function
+
+function GetShipName (ShipType as integer, ShipID as integer) as string
+	GetShipSheet
+	if (shiptype =_ShipViper or shiptype = _ShipMarkVII or shiptype = _ShipAssaultRaptor) and GetViperPilot(shipID, ShipType) &lt;&gt; &quot;&quot; then
+		GetShipName = ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColName), ShipRow(ShipType) + ShipID).string &amp; &quot; (&quot; &amp; GetViperPilot(shipID, ShipType) &amp; &quot;)&quot;
+	else
+		GetShipName = ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColName), ShipRow(ShipType) + ShipID).string 
+	end if
+end function 	&apos;GetShipName
+
+
+function GetSelectedShipType as integer
+	dim tmplst(), tmpname as string
+	dim i as integer
+	
+	GetShipSheet
+
+	GetSelectedShipType	= _ShipNONE
+	tmplst	= ShipForm.getByName(&quot;lstShipType&quot;).SelectedItems()
+	if ubound(tmplst) = -1 then
+		exit function
+	end if
+
+	tmpname = left(ShipForm.getByName(&quot;lstShipType&quot;).StringItemList(val(tmplst(0))), len(ShipForm.getByName(&quot;lstShipType&quot;).StringItemList(val(tmplst(0))))-1)
+	for i = 1 to _ShipTypeCnt
+		if tmpname = ShipNames(i) then
+			GetSelectedShipType = i
+			exit function
+		end if
+	next i
+end function	&apos;GetSelectedShipType
+
+sub UpdateShipTypeList 
+	dim shiptypes(_ShipTypeCnt) as string
+	dim typeID, typecnt as integer
+	GetShipSheet
+	&apos;update what ships are available based on the phase of the game	
+		
+	typecnt = 0
+	if IsGamePhase(_PhaseInSpace) or IsGamePhase(_PhaseGalacticaReturns) then
+		typecnt	= 1
+		shiptypes(1) = &quot;Vipers&quot;
+		if UseCylonFleet() then
+			typecnt = typecnt + 1
+			shiptypes(typecnt) = &quot;Viper Mark VIIs&quot;
+		end if
+	end if
+
+	typecnt = typecnt + 1
+	shiptypes(typecnt) = &quot;Raptors&quot;
+	if GameTypeIsDaybreak() then
+		typecnt = typecnt + 1
+		shiptypes(typecnt) = &quot;Assault Raptors&quot;
+	end if
+	typecnt = typecnt + 1
+	shiptypes(typecnt) = &quot;Civilians&quot;
+	typecnt = typecnt + 1
+	shiptypes(typecnt) = &quot;---------------&quot;
+
+	if IsGamePhase(_PhaseInSpace) or IsGamePhase(_PhaseGalacticaReturns) then
+		&apos; base game or beginning of Pegasus
+		typecnt = typecnt + 1
+		shiptypes(typecnt) = &quot;Basestars&quot;
+		typecnt = typecnt + 1
+		shiptypes(typecnt) = &quot;Raiders&quot;
+		typecnt = typecnt + 1
+		shiptypes(typecnt) = &quot;Heavy Raiders&quot;
+		typecnt = typecnt + 1
+		shiptypes(typecnt) = &quot;Centurions&quot;
+	end if
+	
+	if IsGamePhase(_PhaseOnNewCaprica) or IsGamePhase(_PhaseGalacticaReturns) then
+		typecnt = typecnt + 1
+		shiptypes(typecnt) = &quot;Occupation Forces&quot;
+	end if
+	
+	ShipForm.getByName(&quot;lstShipType&quot;).StringItemList	= g_emptylst()
+	ShipForm.getByName(&quot;lstShipType&quot;).StringItemList	= shiptypes()
+	ShipForm.getByName(&quot;lstShip&quot;).StringItemList		= g_emptylst()
+	ShipForm.getByName(&quot;lstShipAction&quot;).StringItemList	= g_emptylst()
+end sub	&apos;UpdateShipTypeList
+
+
+function GetSelectedShipIDs as variant
+	dim tmplst() as string
+	dim retlst() as integer
+	dim selidx, shipid, i, retid as integer
+	dim shipname as string
+	
+	GetShipSheet
+
+	tmplst= ShipForm.getByName(&quot;lstShip&quot;).SelectedItems()
+	if ubound(tmplst) = -1 then
+		GetSelectedShipIDs	= retlst()
+		exit function
+	end if
+	
+	redim retlst(ubound(tmplst))
+	for retid = 0 to ubound(tmplst)
+		selidx	= val(tmplst(retid))
+	
+		shipname = ShipForm.getByName(&quot;lstShip&quot;).StringItemList(selidx)
+		if instr(shipname,&quot;(&quot;) &gt; 0 then
+			shipname	= trim(Left(shipname, instr(shipname,&quot;(&quot;)-1))
+		end if
+	
+		if GetSelectedShipType() &lt;&gt; _ShipCivilian then
+			retlst(retid)	= Right(shipname, 2)
+		else
+			retlst(retid)	= 1 + ASC(Right(shipname,1)) - ASC(&quot;A&quot;)
+		end if
+	next retid
+	GetSelectedShipIDs = retlst()
+end function
+
+
+&apos;return the ID of the first offboard ship
+function GetAvailableShip (shiptype as integer, optional bystatus as integer) as integer
+	dim i, maxships as integer
+
+	GetShipSheet
+	if IsMissing(bystatus) then
+		bystatus	= 0
+	end if
+	
+	GetAvailableShip	= 0
+	maxships = ShipCnt(shiptype)
+	for i = 1 to maxships
+		if GetShipStatus(shiptype, i) = bystatus then
+			GetAvailableShip = i
+			exit for
+		end if
+	next i
+end function	&apos;GetAvailableShip
+
+
+&apos;how many of a given ship are available to be deployed?
+function GetAvailableShipCnt (shiptype as integer) as integer
+	dim i, maxships as integer
+	dim shipcount as integer
+	GetShipSheet
+
+	shipcount	= 0
+	maxships = ShipCnt(shiptype)
+	for i = 1 to maxships
+		if GetShipStatus(shiptype, i) = 0 then
+			shipcount	= shipcount + 1
+		end if
+	next i
+	GetAvailableShipCnt	= shipcount
+end function	&apos;GetAvailableShipCnt
+
+
+sub UpdateShips 
+&apos;	dim ctl_ships, ctl_shipActions as object
+	dim ships(20), statusstr as string
+	dim shiptype, shipstatus, tmpcnt, shipid as integer
+	dim typecnt(17) as integer
+
+	GetShipSheet
+
+&apos;Generally, we only want to show:
+&apos;	1 off-board/reserve ship	 (status 0)
+&apos;	all on-board ships 			  (status 1-6) [except piloted vipers]
+&apos;	1 damaged ship				(status 7)
+&apos;	1 destroyed ship*			(status 8) [except destroyed civilians]
+&apos;	1 locked ship				(status 9 - civilian only)
+&apos;	1 prepped ship				(status 10 - civilian only)
+
+&apos; just show all the ships except piloted vipers..it&apos;s too cumbersome this way
+
+	shiptype	= GetSelectedShipType()
+	if shiptype = _shipNONE then
+		ShipForm.getByName(&quot;lstShip&quot;).StringItemList	= g_emptylst()
+		ShipForm.getByName(&quot;lstShipAction&quot;).StringItemList	= g_emptylst()
+		exit sub
+	end if
+&apos;	typecnt=Array(99,99,99,99,99,99,99,1,1,1,1,99,99,99,99,99,99,0)
+&apos;	if shiptype=_ShipCivilian then
+&apos;		typecnt(8)=0
+&apos;	end if
+	tmpcnt	= 0
+	for shipid = 1 to ShipCnt(shiptype)
+		shipstatus	= GetShipStatus(shiptype, shipid)
+&apos;		if typecnt(shipstatus) &gt; 0 AND _
+		&apos;don&apos;t show piloted vipers 
+		if NOT ((shiptype = _ShipViper and GetViperPilot(shipID, _ShipViper) &lt;&gt; &quot;&quot;) OR _
+			 	 (shiptype = _ShipMarkVII and GetViperPilot(shipID, _ShipMarkVII) &lt;&gt; &quot;&quot;) OR _
+			 	 (shiptype = _ShipAssaultRaptor and GetViperPilot(shipID, _ShipAssaultRaptor) &lt;&gt; &quot;&quot;))_
+		then
+			tmpcnt	= tmpcnt + 1
+			select case shipstatus
+				case _ShipStatusSector1 to _ShipStatusSector6
+					if shiptype = _ShipOccForces then
+						if shipstatus = 1 then
+							statusstr	= &quot; (Occupation Authority)&quot;
+						elseif shipstatus = 2 then
+							statusstr	= &quot; (Breeder&apos;s Canyon)&quot;
+						else
+							statusstr	= &quot; (Shipyard)&quot;
+						end if
+					else
+						statusstr	= &quot; (Sector &quot; &amp; shipstatus &amp; &quot;)&quot;
+					end if
+					
+				case _ShipStatusDamaged
+					statusstr	= &quot; (Damaged)&quot;
+					
+				case _ShipStatusDestroyed
+					statusstr	= &quot; (Destroyed)&quot;
+					
+				case _ShipStatusLocked
+					statusstr	= &quot; (Locked)&quot;
+					
+				case _ShipStatusPrepped
+					statusstr	= &quot; (Prepped)&quot;
+					
+				case _ShipStatusCylonFleet1 to _ShipStatusCylonFleet6
+					statusstr	= &quot; (Cylon Sector &quot; &amp; shipstatus - 10 &amp; &quot;)&quot;
+					
+				case else
+					statusstr	= &quot;&quot;
+			end select
+			ships(tmpcnt)	= GetShipName(shiptype, shipid) &amp; statusstr
+			if shiptype = _ShipRaider and ShipSheet.GetCellByPosition(_ScarCol, _ScarRow).value = shipid then
+				ships(tmpcnt)	= &quot;SCAR: &quot; &amp; ships(tmpcnt) 
+			end if
+&apos;			typecnt(shipstatus) = typecnt(shipstatus)-1
+		end if
+	next shipid
+		
+	ShipForm.getByName(&quot;lstShip&quot;).StringItemList	= g_emptylst()
+	ShipForm.getByName(&quot;lstShip&quot;).StringItemList	= ships()
+
+	ShipForm.getByName(&quot;lstShipAction&quot;).StringItemList	= g_emptylst()
+	SetExecShip FALSE
+end sub		&apos;Updateships
+
+
+sub UpdateShipActions
+	dim ctl_shipActions as object
+	dim shiptype, shipid, shipstatus, actioncnt, i as integer
+	dim shipactions(13) as string
+	dim tmpstr as string
+	dim shipIDs() as integer
+
+	GetShipSheet
+	
+	ctl_shipActions	= ShipForm.getByName(&quot;lstShipAction&quot;)
+	ctl_shipActions.StringItemList	= g_emptylst()
+	SetExecShip FALSE
+
+	shiptype	= GetSelectedShipType()
+	shipIDs		= GetSelectedShipIDs()
+	shipstatus	= GetShipStatus(shiptype, shipIDs(0))
+	&apos; check to make sure all the selected ships have the same status
+	for i = 1 to ubound(shipIDs)	
+		if shipstatus &lt;&gt; GetShipStatus(shiptype, shipIDs(i)) then
+			exit sub
+		end if
+	next i
+
+	select case shipstatus
+		case _ShipStatusOffboard
+			&apos;Off Board/Reserves
+			if shiptype = _ShipViper or shiptype = _ShipMarkVII or shiptype = _ShipAssaultRaptor then
+				&apos;we can only launch in two sectors	
+				shipactions(1)	= &quot;Launch into Sector 5&quot;
+				shipactions(2)	= &quot;Launch into Sector 6&quot;
+				if shiptype = _ShipAssaultRaptor then
+					shipactions(3)	= &quot;Destroy Ship&quot;
+				else
+					shipactions(3)	= &quot;Damage Ship&quot;
+				end if
+				
+			elseif shiptype = _ShipRaptor then
+				shipactions(1)	= &quot;Destroy Ship&quot;
+			
+			elseif shiptype = _ShipCenturion then
+				shipactions(1)	= &quot;Board Galactica&quot;
+
+			elseif shiptype = _ShipOccForces then
+				shipactions(1)	= &quot;Deploy on New Caprica&quot;
+
+			else
+				for i = 1 to 6
+					shipactions(i)	= &quot;Deploy in Sector &quot; &amp; i
+				next i
+				if shiptype = _ShipCivilian then
+					shipactions(7)	= &quot;Destroy Ship&quot;
+				
+				else	&apos;cylon ship (raider, heavy, or basestar)
+					if UseCylonFleet() then
+						for i = 1 to 6
+							shipactions(6 + i)=&quot;Cylon Fleet: Sector &quot; &amp; i
+						next i
+					end if
+				end if
+
+			end if
+	
+		case _ShipStatusSector1 to _ShipStatusSector6
+			&apos;deployed in a sector.  Note: Raptor can never have this status
+			&apos; all other ships except heavy raider can move +/- 1 sector or be destroyed. 
+			&apos; Viper can be damaged or removed. 
+			&apos; heavy raider can only move in 1 direction and can Board Galactica if in sector 5 or 6
+			select case shiptype
+				case _ShipBasestar 
+					if GetBasestarDamage(shipid) &lt; 2 then
+						shipactions(1)	= &quot;Damage Ship&quot;
+						shipactions(2)	= &quot;Destroy Ship&quot; 
+					else
+						shipactions(1)	= &quot;Destroy Ship&quot;
+					end if
+
+				case _ShipHeavy
+					if shipstatus = 1 or shipstatus = 2 then
+						shipactions(1)	= &quot;Move to Sector &quot; &amp; MoveDown(shipstatus)
+					elseif shipstatus = 3 or shipstatus = 4 then
+						shipactions(1)	= &quot;Move to Sector &quot; &amp; MoveUp(shipstatus)
+					else
+						shipactions(1)	= &quot;Board Galactica&quot;
+					end if
+					shipactions(2)	= &quot;Destroy Ship&quot;
+			
+				case _ShipCenturion 
+					shipactions(1)	= &quot;Advance Centurion&quot;
+					shipactions(2)	= &quot;Destroy Centurion&quot;
+
+				case _ShipOccForces 
+					if shipstatus = 1 or shipstatus = 2 then
+						shipactions(1)	= &quot;Advance Occ Force&quot;
+					else
+						shipactions(1)	= &quot;Destroy Civilian Ship&quot;
+					end if
+					shipactions(2)	= &quot;Destroy Occ Force&quot;
+				
+				case _ShipViper, _ShipAssaultRaptor, _ShipRaider, _ShipCivilian
+					shipactions(1)	= &quot;Move to Sector &quot; &amp; MoveUp(shipstatus)
+					shipactions(2)	= &quot;Move to Sector &quot; &amp; MoveDown(shipstatus)
+					shipactions(3)	= &quot;Destroy Ship&quot; 
+					if shiptype = _ShipViper then
+						shipactions(4)	= &quot;Damage Ship&quot;
+					else &apos;Civilian or Raider
+						shipactions(4)	= &quot;&quot;
+					end if
+					shipactions(5)	= &quot;Return to Reserves&quot;
+				
+				case _ShipMarkVII
+					shipactions(1)	= &quot;Move to Sector &quot; &amp; MoveUp(MoveUp(shipstatus))
+					shipactions(2)	= &quot;Move to Sector &quot; &amp; MoveUp(shipstatus)
+					shipactions(3)	= &quot;Move to Sector &quot; &amp; MoveDown(shipstatus)
+					shipactions(4)	= &quot;Move to Sector &quot; &amp; MoveDown(MoveDown(shipstatus))
+					shipactions(5)	= &quot;Destroy Ship&quot; 
+					shipactions(6)	= &quot;Damage Ship&quot;
+					shipactions(7)	= &quot;Return to Reserves&quot;
+				
+			end select &apos;shiptype for ships in space
+			
+		case _ShipStatusDamaged, _ShipStatusDestroyed
+			shipactions(1)	= &quot;Repair Ship&quot;
+		
+		case _ShipStatusLocked
+			shipactions(1)	= &quot;Prepare Ship&quot;
+			shipactions(2)	= &quot;Destroy Ship&quot;
+			
+		case _ShipStatusPrepped
+			&apos;we can only launch in two sectors	
+			if IsGamePhase (_PhaseGalacticaReturns) then
+				shipactions(1)	= &quot;Evacuate to Sector 5&quot;
+				shipactions(2)	= &quot;Evacuate to Sector 6&quot;
+				shipactions(3)	= &quot;Destroy Ship&quot;
+			else
+				shipactions(1)	= &quot;Destroy Ship&quot;
+			end if
+		
+		case _ShipStatusCylonFleet1 to _ShipStatusCylonFleet6
+			shipactions(1)	= &quot;Jump to Main Board&quot;
+			shipactions(2)	= &quot;Return to Reserves&quot;
+
+	end select
+
+	ctl_shipActions.StringItemList	= shipactions()
+end sub		&apos;UpdateShipActions
+
+
+
+sub ShipAction
+	dim targetaction, rtncd, i as integer
+	dim shiptype, shipIDs(), shipstatus, msgoff as integer
+	dim actionstr, tmpstr, logstr as string
+	dim tmplst() as string
+	dim shipnamestr, divstr as string
+	
+	GetShipSheet
+	
+	shiptype	= GetSelectedShipType()
+	shipIDs		= GetSelectedShipIDs()
+	shipstatus	= GetShipStatus(shiptype, shipIDs(0))
+	shipnamestr	= GetShipName(shiptype, shipIDs(0))
+	
+	divstr	= &quot;, &quot;
+	if ubound(shipIDs) &gt; 0 then
+		&apos; check to make sure all the selected ships have the same status
+		for i = 1 to ubound(shipIDs)	
+			if shipstatus &lt;&gt; GetShipStatus(shiptype, shipIDs(i)) then
+				exit sub
+			end if
+			if i = ubound(shipIDs) then
+				divstr=&quot; &amp; &quot;
+			end if
+			shipnamestr = shipnamestr &amp; divstr &amp; GetShipName(shiptype, shipIDs(i))
+		next i
+	end if
+
+	tmplst	= ShipForm.getByName(&quot;lstShipAction&quot;).SelectedItems()
+	if ubound(tmplst) = -1 then
+		MsgBox &quot;Select an Action to execute.&quot;,0,&quot;Ship Action&quot;
+		exit sub
+	end if
+
+	actionstr = ShipForm.getByName(&quot;lstShipAction&quot;).StringItemList(val(tmplst(0)))
+
+	select case Left(actionStr, 6)
+		case &quot;Launch&quot;, &quot;Deploy&quot;, &quot;Move t&quot;, &quot;Evacua&quot;
+			&apos;this is a ship that is either launching into space or moving around...
+			&apos;	could be a viper, civilian, basestar, raider, or Heavy.
+			&apos;   this could also be a prepped civilian being evacuated from New Caprica
+			&apos; in any case, the end of the string tells us where to go
+			if shiptype = _ShipOccForces then
+				targetaction = _ShipStatusSector1
+				logstr = shipNameStr &amp; &quot; DEPLOYED on New Caprica&quot;
+				
+			else
+				targetaction = val(right(actionStr,1))
+				if left(actionstr, 4) = &quot;Move&quot; then 
+					tmpstr = &quot;MOVED&quot;
+					msgoff = 5
+				elseif left(actionstr, 4) = &quot;Evac&quot; then
+					tmpstr = &quot;EVACUATED&quot;
+					msgoff = 9
+				else 
+					tmpstr = ucase(left(actionStr,6)) &amp; &quot;ED&quot;
+					msgoff = 7
+				end if
+				logstr = shipNameStr &amp; &quot; &quot; &amp; tmpstr &amp; mid(actionstr,msgoff)
+			end if
+			
+		case &quot;Damage&quot;
+			targetaction	= _ShipStatusDamaged
+			if shiptype = _ShipBasestar then
+				logstr = &quot;&quot;
+			else
+				logstr	= shipnamestr &amp; &quot; DAMAGED&quot;	
+			end if
+			
+		case &quot;Destro&quot;
+			logstr	= shipnamestr &amp; &quot; DESTROYED&quot;
+			select case shiptype
+			case _ShipViper, _ShipMarkVII, _ShipRaptor, _ShipAssaultRaptor, _ShipCivilian, _ShipBasestar 
+				targetaction = _ShipStatusDestroyed
+				
+			case _ShipOccForces
+				&apos;this is an Occupation Force destroying a civilian ship
+				if InStr(actionstr, &quot;Civilian&quot;) &gt; 0 then
+					targetaction = _ShipStatusActivate
+					logstr = &quot;&quot;
+				else
+					targetaction = _ShipStatusOffBoard
+				end if
+			case else	&apos;cylon ships
+				targetaction = _ShipStatusOffBoard
+				
+			end select 	&apos;shiptype
+	
+			
+		case &quot;Board &quot;	
+			if shiptype = _ShipCenturion then
+				targetaction = _ShipStatusSector1	&apos;offboard centurion boarding galactica 
+				logstr	= shipnamestr &amp; &quot; BOARDED Galactica&quot;
+			else	&apos;must be a heavy raider 
+				targetaction	= _ShipStatusActivate
+				logstr	= shipnamestr &amp; &quot; REMOVED from Board&quot;
+			end if
+			
+		case &quot;Advanc&quot;	&apos;centurion or occupuation force advancing 
+			logstr	= shipnamestr &amp; &quot; ADVANCES (&quot; &amp; shipstatus+1 &amp; &quot;)&quot;
+			targetaction	= shipstatus + 1
+			if shiptype = _ShipCenturion and shipstatus = 4 then
+				MsgBox &quot;Galactica is destroyed by the Centurion.  Game Over!&quot;
+				logstr = &quot;Centurion destroys Galactica.  GAME OVER.&quot;
+			end if
+		
+		case &quot;Return&quot;, &quot;Repair&quot;
+			if left(actionstr, 6) = &quot;Return&quot; then
+				logstr	= shipnamestr &amp; &quot; RETURNED to the Reserves&quot;						
+			else
+				logstr	= shipnamestr &amp; &quot; REPAIRED.&quot;
+			end if
+			targetaction	= _ShipStatusOffboard
+		
+		case &quot;Prepar&quot;
+			logstr = shipnamestr &amp; &quot; PREPARED for Evacuation&quot;
+			targetaction = _ShipStatusPrepped
+
+		case &quot;Cylon &quot;
+			&apos;deploy this ship on the Cylon Fleet board
+			targetaction = val(right(actionStr,1)) + 10
+			logstr = shipnamestr &amp; &quot; DEPLOYED to the &quot; &amp; actionstr
+			
+		case &quot;Jump t&quot;
+			&apos;this is a ship in the Cylon Fleet jumping to the main board
+			logstr = shipnamestr &amp; &quot; JUMPED to Sector &quot; &amp; shipstatus - 10 &amp; &quot; on the Main Board from the Cylon Fleet&quot;
+			targetaction = shipstatus - 10
+			
+	end select
+		
+	LogThis logstr
+	for i = 0 to ubound(shipIDs)
+		SetShipStatus shiptype, shipIDs(i), targetaction
+	next i
+	&apos;special case here to check
+	if shiptype = _ShipCivilian and targetaction = 0 then
+		&apos;if a civilian is being returned to the reserves, we need to reshuffle the civilians.
+		&apos;	we can&apos;t do it inside SetShipStatus or we might get multiple reshuffles when the fleet jumps, which would be annoying.
+		ShuffleCivilians TRUE
+	end if
+	if shiptype = _ShipViper or shiptype = _ShipMarkVII or shiptype = _ShipAssaultRaptor then
+		Board_RefreshVipers
+	elseif shiptype = _ShipCivilian then
+		Board_RefreshCivilians
+	end if
+	UpdateShips
+	SetCrisisFlag FALSE, &quot;&quot;
+end sub		&apos;ShipAction
+
+
+
+sub DestroyACivilian
+	dim shipID as integer
+	
+	shipid	= GetAvailableShip(_ShipCivilian)
+	if shipid = 0 then
+		MsgBox &quot;No Civilians available to destroy, choose one from the board and destroy it.&quot;
+	else
+		SetShipStatus _ShipCivilian, shipid, _ShipStatusDestroyed
+	end if
+
+end sub
+
+
+sub SetShipStatus (shiptype, shipid, ByVal targetstatus)
+	dim centID, civID as integer
+	GetShipSheet
+	
+	if shiptype = _ShipBasestar then
+		if targetstatus=_ShipStatusDamaged then
+			&apos; Damage the basestar, then don&apos;t change any other status
+			DamageBasestar shipid
+			exit sub
+		elseif targetstatus = _ShipStatusDestroyed then
+			Board_ClearSpecial(&quot;Thirty-Three&quot;)
+			targetstatus = _ShipStatusOffBoard
+		end if
+	end if
+		
+	if targetstatus	=_ShipStatusActivate then
+		if shiptype = _ShipHeavy then
+			&apos; Centurion Boards Galactica
+			targetstatus	= _ShipStatusOffboard
+			centID	= GetAvailableShip (_ShipCenturion)
+			if centID &gt; 0 then
+				SetShipStatus (_ShipCenturion, centID, 1)
+				LogThis GetShipName(_ShipCenturion, centID) &amp; &quot; BOARDS Galactica&quot;
+			else
+				MsgBox &quot;No available Centurions&quot;
+				LogThis &quot;No Centurions available to Board Galactica&quot;
+			end if
+		elseif shiptype = _ShipOccForces then
+			&apos; Occ Force is deployed
+			targetstatus	= _ShipStatusOffboard
+			&apos; get the top locked civilian, then the top prepped one if that&apos;s not available, then destroy it.
+			civID = GetAvailableShip (_ShipCivilian, _ShipStatusLocked)
+			if civID = 0 then
+				civID = GetAvailableShip (_ShipCivilian, _ShipStatusPrepped)
+			end if
+			if civID &gt; 0 then
+				MsgBox GetShipName(_ShipCivilian, civID) &amp; &quot; Destroyed!&quot;
+				LogThis GetShipName(_ShipCivilian, civID) &amp; &quot; DESTROYED!&quot;
+				SetShipStatus (_ShipCivilian, civID, 8)
+			end if
+		end if
+	end if
+	
+	if targetstatus = _ShipStatusOffboard then 
+		ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColOffBrd), ShipRow(ShipType) + ShipID).string = &quot;X&quot;
+		if ShipCol(ShipType, _ShipColSpecial) &gt; 0 then
+			ClearSpecial(shiptype, shipid)
+		end if
+		if ShipType = _ShipRaider then
+			if ShipID = GetScarID() then
+				UnScar
+			end if
+			if ShipType = _ShipRaider and GetAvailableShipCnt(_ShipRaider) = ShipCnt(_ShipRaider) then
+				&apos; last raider is gone
+				Board_ClearSpecial(&quot;Dogfight&quot;)
+			end if
+		end if
+	else
+		ShipSheet.GetCellByPosition(ShipCol(ShipType,_ShipColOffBrd),ShipRow(ShipType) + ShipID).string = &quot;&quot;
+	end if
+	
+	if ShipCol(ShipType, _ShipColSector) &gt; 0 then
+		if targetstatus &gt;= _ShipStatusSector1 and targetstatus &lt;= _ShipStatusSector6 then
+			ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColSector), ShipRow(ShipType) + ShipID).value = targetstatus
+			if ShipType = _ShipCivilian then
+				&apos; when a civ launches from New Caprica...
+				ClearSpecial _ShipCivilian, ShipID
+			end if
+		else
+			ShipSheet.GetCellByPosition(ShipCol(ShipType,_ShipColSector),ShipRow(ShipType) + ShipID).string = &quot;&quot;
+		end if
+	end if
+	
+	if ShipCol(ShipType,_ShipColDamaged) &gt; 0 then
+		if targetstatus = _ShipStatusDamaged then
+			ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColDamaged), ShipRow(ShipType) + ShipID).string = &quot;X&quot;
+			ClearSpecial(shiptype, shipid)
+		else
+			ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColDamaged), ShipRow(ShipType) + ShipID).string = &quot;&quot;
+		end if
+	end if
+	
+	if ShipCol(ShipType,_ShipColDestroyed) &gt; 0 then
+		if targetstatus = _ShipStatusDestroyed then
+			ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColDestroyed), ShipRow(ShipType) + ShipID).string = &quot;X&quot;
+			if ShipCol(ShipType, _ShipColSpecial) &gt; 0 then
+				ClearSpecial(shiptype, shipid)
+			end if
+			if ShipType =_ShipCivilian then			
+				&apos;we&apos;ve destroyed a civilian ship, need to reduce resources accordingly.
+				CivilianDestroyed shipid
+			end if
+			if shiptype =_ShipCivilian or shiptype =_ShipBasestar then
+				Board_ClearSpecial(&quot;Thirty-Three&quot;)
+			end if
+		else
+			ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColDestroyed), ShipRow(ShipType) + ShipID).string = &quot;&quot;
+		end if
+	end if
+	
+	if targetstatus = _ShipStatusLocked then
+		ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColSpecial), ShipRow(ShipType) + ShipID).string = &quot;Locked&quot;
+		
+	elseif targetstatus= _ShipStatusPrepped then
+		ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColSpecial), ShipRow(ShipType) + ShipID).string = &quot;Prepped&quot;
+	end if
+	
+	if ShipCol(ShipType, _ShipColCylonFleet) &gt; 0 then
+		if targetstatus &gt;= _ShipStatusCylonFleet1 and targetstatus &lt;= _ShipStatusCylonFleet6 then
+			ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColCylonFleet), Shiprow(ShipType) + ShipID).value = targetstatus - 10
+		else
+			ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColCylonFleet),Shiprow(ShipType) + ShipID).string = &quot;&quot;
+		end if
+	
+	end if
+	
+	if ShipType =_ShipCivilian then
+		Board_RefreshCivilians
+	elseif ShipType =_ShipViper or ShipType = _ShipMarkVII or shiptype = _ShipAssaultRaptor then
+		Board_RefreshVipers
+	end if
+end sub	&apos;SetShipStatus
+
+sub SetViperPilot (playerid, viperid as integer, shiptype as integer)
+	GetShipSheet
+	if playerid &gt; 0 then
+		ShipSheet.GetCellByPosition(ShipCol(shiptype, _ShipColSpecial), ShipRow(shiptype) + viperID).string = GetPlayerName(playerid)
+	else
+		ShipSheet.GetCellByPosition(ShipCol(shiptype, _ShipColSpecial), ShipRow(shiptype) + viperID).string = &quot;&quot;
+	end if
+end sub
+
+function GetViperPilot (viperid as integer, shiptype as integer) as string
+	if viperid &gt; ShipCnt(shiptype) then
+		GetViperPilot	= &quot;&quot;
+		exit function
+	end if
+	if ShipSheet.GetCellByPosition(ShipCol(shiptype, _ShipColSpecial), ShipRow(shiptype) + viperID).string = &quot;&quot; then
+		GetViperPilot = &quot;&quot;
+	else
+		GetViperPilot = ShipSheet.GetCellByPosition(ShipCol(shiptype, _ShipColSpecial), ShipRow(shiptype) + viperID).string
+	end if
+end function
+
+sub DamageBasestar (baseID as integer)
+	dim dmgname as string
+	dim tmpdmg as string
+	dim i as integer
+	
+	&apos;get the first unused damage token
+	for i = 1 to 4
+		if ShipSheet.GetCellByPosition(_BaseDamageCol + 1, _BaseDamageRow + i).string = &quot;&quot; then
+			dmgname	= ShipSheet.GetCellByPosition(_BaseDamageCol, _BaseDamageRow + i).string
+			ShipSheet.GetCellByPosition(_BaseDamageCol + 1, _BaseDamageRow + i).string = baseID
+			tmpdmg	= ShipSheet.GetCellByPosition(ShipCol(_ShipBasestar, _ShipColSpecial), ShipRow(_ShipBasestar) + baseID).string
+			if tmpdmg = &quot;&quot; then
+				ShipSheet.GetCellByPosition(ShipCol(_ShipBasestar, _ShipColSpecial), ShipRow(_ShipBasestar) + baseID).string	= dmgname
+			else
+				ShipSheet.GetCellByPosition(ShipCol(_ShipBasestar, _ShipColSpecial), ShipRow(_ShipBasestar) + baseID).string	= tmpdmg &amp; &quot; | &quot; &amp; dmgname
+			end if
+			LogThis GetShipName(_ShipBasestar, baseID) &amp; &quot; DAMAGED: &quot; &amp; dmgname
+			if dmgname = &quot;Damage to Personnel&quot; then
+				MsgBox &quot;Damage to Personnel: Revealed Cylons each draw 2 Trauma.&quot;
+			elseif dmgname = &quot;Collateral Damage&quot; then
+				MsgBox &quot;Collateral Damage: Destroy 3 Raiders in the same Sector.&quot;
+			end if
+			exit for
+		end if
+	next i
+end sub		&apos;DamageBasestar
+
+sub ClearSpecial (shiptype, shipid)
+	dim tmpval as double
+	dim tmpstr, tmptar as string
+	dim pilotID, i, j as integer
+
+	&apos;we get this when a special flag may have been set and the ship is going away...
+	&apos;there are three types with special flags (civs used to have them but they got removed)
+	&apos; Viper = Pilot [send the pilot to the hangar deck]
+	&apos; Civilian = Lock/Prep [just clear the field, this should be destroyed or in a sector now]
+	&apos; Basestar = Damage [put the damage tokens back and reshuffle]
+		
+	if ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColSpecial), ShipRow(ShipType) + ShipID).string = &quot;&quot;  then
+		exit sub
+	end if
+	
+	if shiptype =_ShipViper or shiptype = _ShipMarkVII or shiptype = _ShipAssaultRaptor then
+		pilotid = GetPlayerID(ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColSpecial), ShipRow(ShipType) + ShipID).string)
+		SetPlayerViper pilotID, 0
+		SetPlayerLoc pilotID, &quot;Hangar Deck&quot;
+		LogThis GetPlayerName(pilotID) &amp; &quot; MOVED to the Hangar Deck&quot;
+	
+	elseif shiptype = _ShipBasestar then
+		&apos;find the tokens and reset them, then reshuffle
+		for i = 1 to 4
+			if ShipSheet.GetCellByPosition(_BaseDamageCol + 1,_BaseDamageRow + i).string = shipid then
+				ShipSheet.GetCellByPosition(_BaseDamageCol + 1,_BaseDamageRow + i).string = &quot;&quot;
+			end if
+		next i
+		ShuffleBasestarDamage
+	
+	end if
+
+	&apos; now clear the field	
+	ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColSpecial), ShipRow(ShipType) + ShipID).string = &quot;&quot;
+end sub	&apos;ClearSpecial
+
+
+sub CivilianDestroyed (shipid as integer)
+	dim civnum as integer
+	dim shipname as string
+	
+	civnum = val(left(ShipSheet.GetCellByPosition(ShipCol(_ShipCivilian, _ShipColName) + 1, ShipRow(_ShipCivilian) + ShipID).string, 2))
+	shipname = GetShipName(_ShipCivilian, shipid)
+
+	select case civnum
+		case 1 to 2
+			&apos; do nothing, these were decoys
+			MsgBox shipname &amp; &quot; destroyed: Decoy - no resources lost!&quot;
+		case 3 to 8
+			ReduceResource 3	&apos;population
+			MsgBox shipname &amp; &quot; destroyed: Population reduced by 1!&quot;
+		case 9 to 10
+			ReduceResource 3	&apos;population
+			ReduceResource 3	&apos;population
+			MsgBox shipname &amp; &quot; destroyed: Population reduced by 2!&quot;
+		case 11
+			ReduceResource 0	&apos;fuel
+			ReduceResource 3	&apos;population
+			MsgBox shipname &amp; &quot; destroyed: Population and Fuel reduced by 1!&quot;
+		case 12
+			ReduceResource 2	&apos;morale
+			ReduceResource 3	&apos;population
+			MsgBox shipname &amp; &quot; destroyed: Population and Morale reduced by 1!&quot;
+	end select
+	ClearSpecial _shipCivilian, shipid
+end sub
+
+
+
+sub ShuffleBasestarDamage
+	dim tmpval, sortval(6) as double
+	dim tmpstr, tmptar as string
+	dim i, j as integer
+
+	GetShipSheet
+
+	for i = 1 to 6
+		if ShipSheet.GetCellByPosition(_BaseDamageCol + 1,_BaseDamageRow + i).string &lt;&gt; &quot;&quot; OR _
+			 (NOT ObjectiveIsIonianNebula() AND _
+			 	(ShipSheet.GetCellByPosition(_BaseDamageCol,_BaseDamageRow + i).string = &quot;Collateral Damage&quot; or _
+			 	 ShipSheet.GetCellByPosition(_BaseDamageCol,_BaseDamageRow + i).string = &quot;Damage to Personnel&quot;) )  then
+			sortval(i)= 2
+		else
+			sortval(i)= rnd()
+		end if
+	next i
+
+	for i = 1 to 5
+		for j = i + 1 to 6
+			if sortval(i) &gt; sortval(j) then
+				tmpval	= sortval(i)
+				tmpstr	= ShipSheet.GetCellByPosition(_BaseDamageCol, _BaseDamageRow + i).string
+				tmptar	= ShipSheet.GetCellByPosition(_BaseDamageCol + 1, _BaseDamageRow + i).string
+				
+				sortval(i)	= sortval(j)
+				ShipSheet.GetCellByPosition(_BaseDamageCol, _BaseDamageRow + i).string		= ShipSheet.GetCellByPosition(_BaseDamageCol, _BaseDamageRow + j).string
+				ShipSheet.GetCellByPosition(_BaseDamageCol + 1, _BaseDamageRow + i).string	= ShipSheet.GetCellByPosition(_BaseDamageCol + 1, _BaseDamageRow + j).string
+
+				sortval(j)	= tmpval
+				ShipSheet.GetCellByPosition(_BaseDamageCol, _BaseDamageRow + j).string		= tmpstr
+				ShipSheet.GetCellByPosition(_BaseDamageCol + 1, _BaseDamageRow + j).string	= tmptar
+			end if
+		next j
+	next i
+end sub	&apos;ShuffleBasestarDamage
+
+function GetBasestarDamage (shipid as integer)
+	dim dmgcnt, i as integer
+	
+	dmgcnt	= 0
+	for i = 1 to 6
+		if ShipSheet.GetCellByPosition(_BaseDamageCol + 1, _BaseDamageRow + i).string = shipid then
+			dmgcnt	= dmgcnt + 1
+		end if
+	next i
+	GetBasestarDamage	= dmgcnt
+end function
+
+function GetCivilianBySector (sectorID as integer, lastID as integer) as integer
+	&apos;get the next civilian ship in the sector and return it&apos;s ID, return 0 if there are none.
+	dim i as integer
+	GetShipSheet
+	
+	GetCivilianBySector	= 0
+	if lastID &lt; ShipCnt(_ShipCivilian) then
+		for i = lastID + 1 to ShipCnt(_ShipCivilian)
+			if GetShipStatus(_ShipCivilian,i) = sectorID then
+				GetCivilianBySector = i
+				exit for
+			end if
+		next i
+	end if
+	
+end function	&apos;GetCivilianBySector
+
+
+function GetVipersBySector(sectorID as integer, shiptype as integer) as integer
+	dim viperstr as string
+	dim viperid, foundflag, vipercnt as integer
+
+	GetShipSheet
+
+	vipercnt = 0
+	for viperid = 1 to ShipCnt(shiptype)
+		if ShipSheet.GetCellByPosition(ShipCol(shiptype, _ShipColSector), ShipRow(shiptype) + viperid).string = sectorID then
+			vipercnt	= vipercnt + 1
+		end if
+	next viperid
+
+	GetVipersBySector = vipercnt	
+end function	&apos;GetVipersBySector
+
+
+function SweepShips (shipType as integer, sweepAll as boolean) as integer
+	&apos;removes all of the given shipType from the board, generally used on jumping...
+	dim shipid, sweepcnt as integer
+	GetShipSheet
+	
+	sweepcnt = 0
+	for shipid = 1 to ShipCnt(shipType)
+		if (GetShipStatus(shiptype, shipid) &gt; 0 and GetShipStatus(shiptype,shipid) &lt; 7) OR sweepAll OR _
+			(shipType =_ShipViper and GetViperPilot(shipID,_ShipViper) &lt;&gt; &quot;&quot;) OR _
+			(shipType = _ShipMarkVII and GetViperPilot(shipID, _ShipMarkVII) &lt;&gt; &quot;&quot;) OR _
+			(shipType = _ShipAssaultRaptor and GetViperPilot(shipID, _ShipAssaultRaptor) &lt;&gt; &quot;&quot;) _
+		then
+			SetShipStatus shiptype, shipid, 0
+			sweepcnt = sweepcnt + 1
+		end if
+	next shipid
+	
+	if sweepcnt &gt; 0 then
+		LogThis sweepcnt &amp; &quot; &quot; &amp; ShipNames(shipType) &amp; iif(sweepcnt &gt; 1, &quot;s&quot;, &quot;&quot;) &amp; &quot; removed from the board&quot;
+	end if
+	SweepShips = sweepcnt
+end function	&apos;SweepShips
+
+
+sub CylonsAttack
+	AttackTheFleet TRUE
+end sub
+
+sub AttackTheFleet (withconfirm as boolean)
+	dim rtncd as integer
+	
+	GetShipSheet
+	if withconfirm then	
+		rtncd = MsgBox(&quot;Attacking the fleet will send all Cylon ships with the Cylon Fleet to the Main Board.  Do you want to continue?&quot;, 4, &quot;Jump the Fleet&quot;)
+		
+		if rtncd &lt;&gt; 6 then
+			MsgBox &quot;Attack aborted.&quot;, 0, &quot;Attack the Fleet&quot;
+			exit sub
+		end if
+	end if
+	
+	LogThis &quot;Attacking the fleet...&quot;
+	
+	JumpShips TRUE
+	
+	SetPursuitTrack 0
+&apos;+==?	Board_ClearSpecial &quot;Jump&quot;
+
+	ShipForm.getByName(&quot;lstShip&quot;).StringItemList		= g_emptylst()
+	ShipForm.getByName(&quot;lstShipAction&quot;).StringItemList	= g_emptylst()
+	SetExecShip FALSE
+
+end sub	&apos;AttackTheFleet
+
+sub JumpShips (attack as boolean) 
+	dim idMod, shipID, shiptype, jumpCnt, logstr, shipstatus as integer
+	&apos;moves all cylon ships of a type between the Cylon Fleet and Main boards
+	if attack then 
+		idMOD = -10
+		logstr = &quot; attacked the Main Board from the Cylon Fleet&quot;
+	else
+		idMOD = 10
+		logstr = &quot; moved to the Cylon Fleet from the Main Board&quot;
+	end if
+
+	for shiptype = _ShipBasestar to _ShipHeavy
+		jumpCnt = 0
+		for shipID = 1 to ShipCnt(shiptype)
+			shipstatus = GetShipStatus(shiptype, shipID)
+			if (attack and shipstatus &gt;= _ShipStatusCylonFleet1) OR _
+				(shipstatus &gt;= _ShipStatusSector1 and shipstatus &lt;= _ShipStatusSector6 and NOT Attack) _
+			then
+				SetShipStatus shiptype, shipid, GetShipStatus(shiptype,shipID) + idMOD
+				jumpCnt = jumpCnt + 1
+			end if		
+		next shipID
+		if jumpCnt &gt; 0 then
+			LogThis jumpCnt &amp; &quot; &quot; &amp; ShipNames(shipType) &amp; iif(jumpCnt&gt;1,&quot;s&quot;,&quot;&quot;) &amp; logstr
+		end if
+	next shiptype
+
+end sub	&apos;JumpShips
+
+
+sub JumpTheFleet
+	ActivateJump TRUE
+end sub
+
+Sub ActivateJump (withconfirm as boolean)
+	&apos;sweeps all ships from the board
+	dim rtncd, sweepcnt as integer
+	
+	GetShipSheet
+
+	if withconfirm then	
+		if UseCylonFleet() then
+			rtncd = MsgBox(&quot;Jump the fleet will remove all vipers and sent all cylon ships back to the Cylon Fleet.  Do you want to continue?&quot;, 4, &quot;Jump the Fleet&quot;)
+		else
+			rtncd = MsgBox (&quot;Jumping the fleet will remove all ships from the board, do you want to continue?&quot;, 4, &quot;Jump the Fleet&quot;)
+		end if
+		
+		if rtncd &lt;&gt; 6 then
+			MsgBox &quot;Jump aborted.&quot;,0,&quot;Jump the Fleet&quot;
+			exit sub
+		end if
+	end if
+	
+	LogThis &quot;Jumping the fleet - removing ships from the board...&quot;
+	
+	SweepShips (_ShipViper, FALSE)
+	if UseCylonFleet() then
+		SweepShips (_ShipMarkVII, FALSE)
+		JumpShips FALSE
+	else
+		if SweepShips (_ShipCivilian, FALSE) &gt; 0 then
+			ShuffleCivilians
+		end if
+		SweepShips (_ShipBasestar, FALSE)
+		SweepShips (_ShipRaider, FALSE)
+		SweepShips (_ShipHeavy, FALSE)
+	end if
+	
+	SetJumpTrack 0
+	Board_ClearSpecial &quot;Jump&quot;
+	
+	&apos;Check for an active 33, and prompt to invoke it.
+	GetCrisisSheet
+	if CrisisForm.getByName(&quot;btn33&quot;).enabled = TRUE then
+		rtncd = MsgBox(&quot;Thirty-Three is in effect. Invoke Relentless Pursuit?&quot;, 4, &quot;Relentless Pursuit&quot;)
+		if rtncd = 6 then
+			ThirtyThree
+		end if
+	end if
+	
+	ShipForm.getByName(&quot;lstShip&quot;).StringItemList		= g_emptylst()
+	ShipForm.getByName(&quot;lstShipAction&quot;).StringItemList	= g_emptylst()
+	SetExecShip FALSE
+end sub		&apos;ActivateJump
+
+
+sub ShuffleCivilians (optional inPlace as boolean)
+	dim tmpval, sortval(12) as double
+	dim tmpstr,tmpOff, tmpDestroy as string
+	dim i, j as integer
+	
+	GetShipSheet
+	
+	&apos;inPlace means we don&apos;t want to touch anything that&apos;s destroyed or on the board.
+	&apos;  it&apos;s called when we return a civilian to the reserves outside of a jump, otherwise we assume everything is either destroyed or offboard
+	if IsMissing(inPlace) then 
+&apos; change this so that we are always inPlace.  that way if &quot;Civilian A&quot; is destroyed, &quot;Civilian A&quot; will never be in the game again.
+&apos;		inPlace = FALSE
+&apos; we don&apos;t actually call this anywhere with FALSE
+		inPlace = TRUE
+	end if
+	
+	
+	for i = 1 to 12	
+		if inPlace then
+			if GetShipStatus(_ShipCivilian,i) = _ShipStatusOffBoard then
+				sortval(i)=rnd()
+			else
+				sortval(i) = -1
+			end if
+		else
+			if GetShipStatus(_ShipCivilian,i) &lt;&gt; _ShipStatusDestroyed then
+				sortval(i)=rnd()
+			else
+				sortval(i)=2  	&apos; any civilians that are destroyed need to move to the end of the line
+			end if
+		end if
+	next i
+	
+	for i=1 to 11
+		for j=i+1 to 12
+			if sortval(i) &gt; sortval(j) AND sortval(i) &lt;&gt; -1 and sortval(j)&lt;&gt; -1 then
+				tmpval=sortval(i)
+				tmpstr=ShipSheet.GetCellByPosition(ShipCol(_ShipCivilian,_ShipColName)+1,ShipRow(_ShipCivilian) + i).string
+
+				sortval(i)=sortval(j)
+				ShipSheet.GetCellByPosition(ShipCol(_ShipCivilian,_ShipColName)+1,ShipRow(_ShipCivilian) + i).string=ShipSheet.GetCellByPosition(ShipCol(_ShipCivilian,_ShipColName)+1,ShipRow(_ShipCivilian) + j).string
+				
+				sortval(j)=tmpval
+				ShipSheet.GetCellByPosition(ShipCol(_ShipCivilian,_ShipColName)+1,ShipRow(_ShipCivilian) + j).string=tmpstr
+			end if
+		next j
+	next i
+
+	&apos;now reflag everyone
+	for i=1 to 12
+		if sortval(i) &lt;&gt; -1 then
+			ShipSheet.GetCellByPosition(ShipCol(_ShipCivilian,_ShipColSector),ShipRow(_ShipCivilian) + i).string = &quot;&quot;
+	
+			if 	sortval(i) &lt;&gt; 2 then
+				ShipSheet.GetCellByPosition(ShipCol(_ShipCivilian,_ShipColOffBrd),ShipRow(_ShipCivilian) + i).string = &quot;X&quot;
+				ShipSheet.GetCellByPosition(ShipCol(_ShipCivilian,_ShipColDestroyed),ShipRow(_ShipCivilian) + i).string = &quot;&quot;
+			else
+				ShipSheet.GetCellByPosition(ShipCol(_ShipCivilian,_ShipColOffBrd),ShipRow(_ShipCivilian) + i).string = &quot;&quot;
+				ShipSheet.GetCellByPosition(ShipCol(_ShipCivilian,_ShipColDestroyed),ShipRow(_ShipCivilian) + i).string = &quot;X&quot;
+			end if
+		end if
+	next i
+
+	Board_RefreshCivilians
+end sub		&apos;ShuffleCivilians
+
+sub Initialize_Ships
+	dim pegclr as variant
+	dim i, j as integer
+	&apos;clear everything from the board
+	GetShipSheet
+	
+	for i = _ShipViper to _ShipOccForces
+		SweepShips i, TRUE
+	next i
+	ShuffleCivilians
+	ShuffleBasestarDamage
+	
+	Configure_Ships
+	
+	&apos;set out the initial ships
+	SetShipStatus _ShipBasestar, 1, 1
+	SetShipStatus _ShipRaider, 1, 1
+	SetShipStatus _ShipRaider, 2, 1
+	SetShipStatus _ShipRaider, 3, 1
+	SetShipStatus _ShipCivilian, 1, 4
+	SetShipStatus _ShipCivilian, 2, 4
+	SetShipStatus _ShipViper, 1, 5
+	SetShipStatus _ShipViper, 2, 6
+
+	if UseCylonFleet() then
+		for i = 1 to 4
+			SetShipStatus _ShipMarkVII, i, _ShipStatusDamaged
+		next i
+	end if
+	
+	if GameTypeIsDaybreak() then
+		for i = 2 to 4
+			SetShipStatus _ShipAssaultRaptor, i, _ShipStatusDestroyed
+		next i
+	end if
+	
+	SetJumpTheFleet TRUE
+	ShipForm.getByName(&quot;lstShipType&quot;).SelectedItems() = g_emptylst()
+	UpdateShips
+end sub
+
+
+sub Configure_Ships
+	dim i as integer
+	dim bgclr as variant
+
+	if GameTypeIsPegasus() and NOT UseCylonFleet() then
+		ShipSheet.GetCellByPosition(_ScarCol, _ScarRow).CellBackColor = _white
+	else
+		ShipSheet.GetCellByPosition(_ScarCol, _ScarRow).CellBackColor = _grey
+	end if
+	
+	for i = 1 to ShipCnt(_ShipOccForces)
+		ConfigureAShip _ShipOccForces, i,  ObjectiveIsNewCaprica()
+	next i
+	
+	for i = 7 to 8
+		ConfigureAShip _ShipViper, i, (Not UseCylonFleet())
+	next i
+	
+	for i = 1 to 4
+		ConfigureAShip _ShipMarkVII, i, UseCylonFleet()
+	next i
+	
+	for i = 1 to 4
+		ConfigureAShip _ShipAssaultRaptor, i, GameTypeIsDaybreak()
+	next i
+	
+	for i = 17 to 20
+		ConfigureAShip _ShipRaider, i, UseCylonFleet()
+	next i
+	
+	if UseCylonFleet() then
+		bgclr = _white
+	else
+		bgclr = _grey
+	end if
+
+	for i = 0 to 20
+		ShipSheet.GetCellByPosition(ShipCol(_ShipRaider,_ShipColCylonFleet),ShipRow(_ShipRaider) + i).CellBackColor = bgclr
+	next i
+	
+	for i = 0 to 4
+		ShipSheet.GetCellByPosition(ShipCol(_ShipHeavy,_ShipColCylonFleet),ShipRow(_ShipHeavy) + i).CellBackColor = bgclr
+	next i
+
+	for i = 0 to 2
+		ShipSheet.GetCellByPosition(ShipCol(_ShipBasestar,_ShipColCylonFleet),ShipRow(_ShipBasestar) + i).CellBackColor = bgclr
+	next i
+
+	ShipForm.getByName(&quot;btnAttack&quot;).enabled = UseCylonFleet()
+	
+	if ObjectiveIsIonianNebula() then
+		bgclr = _white
+	else
+		bgclr = _grey
+	end if
+	
+	for i = 5 to 6
+		ShipSheet.GetCellByPosition(_BaseDamageCol, _BaseDamageRow + i).CellBackColor = bgclr
+		ShipSheet.GetCellByPosition(_BaseDamageCol + 1, _BaseDamageRow + i).CellBackColor = bgclr
+	next i
+		
+end sub 	&apos;Configure_Ships
+
+
+sub ConfigureAShip (shiptype as integer, shipID as integer, enableflag as boolean)
+	dim bgclr as variant
+	dim i as integer
+	
+	if enableflag then
+		bgclr = _white
+	else
+		bgclr = _grey
+	end if
+
+&apos;	ShipSheet.GetCellbyPosition(ShipCol(shiptype,_ShipColName), ShipRow(shiptype)+shipID).CellBackColor = bgclr
+&apos;	ShipSheet.GetCellbyPosition(ShipCol(shiptype,_ShipColOffBrd), ShipRow(shiptype)+shipID).CellBackColor = bgclr
+	if enableflag then	
+		ShipSheet.GetCellbyPosition(ShipCol(shiptype,_ShipColOffBrd), ShipRow(shiptype)+shipID).string = &quot;X&quot;
+	else
+		ShipSheet.GetCellbyPosition(ShipCol(shiptype,_ShipColOffBrd), ShipRow(shiptype)+shipID).string = &quot;&quot;
+	end if
+	for i = _ShipColName to _ShipColCylonFleet
+		if ShipCol(shiptype, i) &gt; 0 then
+			ShipSheet.GetCellbyPosition(ShipCol(shiptype, i), ShipRow(shiptype) + shipID).CellBackColor = bgclr
+			if i &gt; _ShipColOffBrd then
+				ShipSheet.GetCellbyPosition(ShipCol(shiptype, i), ShipRow(shiptype) + shipID).string = &quot;&quot;
+			end if
+		end if
+	next i
+end sub
+
+sub EnableExec
+	GetShipSheet
+	SetExecShip TRUE
+end sub
+
+sub SetExecShip (onFlag as boolean)
+&apos;	GetShipSheet
+	ShipForm.getByName(&quot;btnExecShip&quot;).enabled = onFlag
+end sub
+
+sub SetJumpTheFleet (onFlag as boolean)
+	ShipForm.getByName(&quot;btnJumpTheFleet&quot;).enabled = onFlag
+end sub
+
+
+sub SetScarID (NewScarID as integer)
+	ShipSheet.GetCellByPosition(_ScarCol, _ScarRow).value = NewScarID
+end sub
+
+function GetScarID as integer
+	GetScarID = ShipSheet.GetCellByPosition(_ScarCol, _ScarRow).value
+end function
+
+sub Scar
+	dim ScarID as integer
+	GetShipSheet
+	
+	ScarID = GetAvailableShip(_ShipRaider)
+	if ScarID &gt; 0 and ScarID &lt; 17 then
+		SetShipStatus _ShipRaider, ScarID, 2
+		SetScarID ScarID
+		UpdateShips
+		MsgBox &quot;Scar has launched in Sector 2&quot;
+		LogThis &quot;Scar DEPLOYED in Sector 2&quot;
+	end if
+end sub
+
+sub UnScar
+	dim ScarID as integer
+	GetShipSheet
+	
+	SetScarID 0
+	Board_ClearSpecial &quot;Scar&quot;
+	LogThis &quot;Scar DESTROYED&quot;
+end sub
+
+sub LandShips
+	dim shipID as integer
+	GetShipSheet
+	
+	shipID = GetAvailableShip(_ShipCivilian)
+	do while shipID &lt;&gt; 0
+		SetShipStatus _ShipCivilian, shipID, _ShipStatusLocked
+	
+		shipID = GetAvailableShip(_ShipCivilian)
+	loop
+	SetJumpTheFleet FALSE
+end sub
+
+</script:module>

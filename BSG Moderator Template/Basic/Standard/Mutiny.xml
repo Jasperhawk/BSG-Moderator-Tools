@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Mutiny" script:language="StarBasic">REM  *****  BASIC  *****
+
+dim MutinySheet as object
+dim MutinyForm as object
+
+const _MutinyCount	= 22
+
+const _MutinyRow		= 11
+const _MutinyTypeCol	= 0
+const _MutinyDeckCol	= _MutinyTypeCol + 1
+const _MutinyHandCol	= _MutinyDeckCol + 1
+const _MutinyDiscardCol	= _MutinyHandCol + 1
+const _MutinyRemovedCol	= _MutinyDiscardCol + 1
+const _MutinyDescCol	= _MutinyRemovedCol + 1
+
+const _MutinyCountsRow		= _MutinyRow	&apos; We always do e.g. _MutinyRow + cardID, and cardID is 1-22. So the counts are 0.
+const _MutinyHandCountCol	= 1
+const _MutinyHandCountRow	= 1
+const _BuriedMutinyCol		= 4
+const _BuriedMutinyRow		= 6
+
+sub GetMutinySheet
+	if MutinySheet &lt;&gt; NULL then
+		exit sub
+	end if
+	
+	MutinySheet	= ThisComponent.Sheets.getByName(&quot;Mutiny&quot;)
+	MutinyForm	= MutinySheet.DrawPage.Forms.GetByName(&quot;formMutiny&quot;)
+end sub
+
+sub DrawMutiny (playerID as integer, optional zarek as boolean)
+	dim cardID, zarekID as integer
+	GetMutinySheet
+	
+	if GetPlayerName(playerID) = &quot;Tom&quot; then
+		zarek	= false
+	elseif IsMissing(zarek) then
+		zarek	= true
+	end if	
+	
+	&apos; Check for Zarek
+	if zarek then
+		for zarekID = 1 to PlayerCnt()
+			if GetPlayerName(zarekID) = &quot;Tom&quot; then
+				MsgBox(&quot;Don&apos;t forget to use Necessary Steps.&quot;)
+			end if
+		next zarekID
+	end if
+	
+	cardID = 1
+	do until MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string = &quot;&quot;
+		cardID	= cardID + 1
+	loop
+	MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string	= GetPlayerName(playerID)
+	LogThis(GetPlayerName(playerID) &amp; &quot; draws Mutiny Card: &quot; &amp; MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string)
+	&apos; If we&apos;re going to do any post-draw checking, like throwing someone in the Brig, do it here.
+	
+	&apos; Is the deck empty? If so, move the discards to the deck and shuffle it.
+	cardID	= cardID + 1
+	if MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string = &quot;&quot; then
+		MsgBox &quot;Mutiny deck empty, reshuffling it.&quot;
+			
+		&apos; Discards are on top of the removed pile.
+		do until cardID &gt; _MutinyCount or MutinySheet.getCellByPosition(_MutinyDiscardCol, _MutinyRow + cardID).string = &quot;&quot;
+			MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string = MutinySheet.getCellByPosition(_MutinyDiscardCol, _MutinyRow + cardID).string
+			MutinySheet.getCellByPosition(_MutinyDiscardCol, _MutinyRow + cardID).string = &quot;&quot;
+			cardID	= cardID + 1
+		loop
+		SetBuriedMutiny(true)
+		ShuffleMutinyDeck
+	end if
+end sub
+
+sub DrawMutinyButton
+	dim playerID as integer
+	
+	playerID = GetSelected(_ListMutinyPlayers)
+	if playerID &lt; 1 then
+		MsgBox &quot;Please select a player.&quot;
+		exit sub
+	end if
+	
+	if IsRevealed(playerID) and not IsInfiltrating(playerID) then 
+		MsgBox GetPlayerName(playerID) &amp; &quot; is a Cylon and cannot draw Mutiny Cards.&quot;
+		exit sub
+	end if
+	
+	DrawMutiny(playerID)
+	UpdateMutinyCardList	
+end sub
+
+sub UpdateMutinyCardList
+	dim playerID, cardID, numcards as integer
+	dim cardlst() as string
+	dim playername as string
+	GetMutinySheet
+	
+	playerID = GetSelected(_ListMutinyPlayers)
+	if playerID &lt; 1 then
+		MutinyForm.getByName(&quot;lstMutinyCards&quot;).StringItemList	= cardlst()
+		exit sub
+	end if
+	
+	playername	= GetPlayerName(playerID)
+	numcards	= 0
+	for cardID = 1 to _MutinyCount
+		if MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string = playername then
+			numcards	= numcards + 1
+			redim preserve cardlst(numcards) as string
+			cardlst(numcards)	= MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string
+		end if
+	next cardID
+	
+	MutinyForm.getByName(&quot;lstMutinyCards&quot;).StringItemList	= cardlst()
+	MutinyForm.getByName(&quot;btnPlayMutiny&quot;).enabled			= false
+	MutinyForm.getByName(&quot;btnDiscardMutiny&quot;).enabled		= false
+	MutinyForm.getByName(&quot;btnBuryMutiny&quot;).enabled			= false
+end sub
+
+sub SelectedMutinyCardChanged
+	dim cardID as integer
+	GetMutinySheet
+	
+	cardID	= GetSelected(_ListMutinyCards)
+	MutinyForm.getByName(&quot;btnPlayMutiny&quot;).enabled			= (cardID &gt; 0)
+	MutinyForm.getByName(&quot;btnDiscardMutiny&quot;).enabled		= (cardID &gt; 0)
+	MutinyForm.getByName(&quot;btnBuryMutiny&quot;).enabled			= (cardID &gt; 0)
+end sub
+
+function GetMutinyHandCout(playerID as integer) as integer
+	GetMutinySheet
+	GetMutinyHandCount	= MutinySheet.getCellByPosition(_MutinyHandCountCol, _MutinyHandCountRow + playerID).value
+end function
+
+function GetCardIDFromHandID (playerID as integer, handID as integer) as integer
+	dim cardID, match as integer
+	dim player as string
+	
+	match	= 0
+	player	= GetPlayerName(playerID)
+	for cardID = 1 to _MutinyCount
+		if MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string = player then
+			match	= match + 1
+			if match = handID then
+				GetCardIDFromHandID = cardID
+				exit function
+			end if
+		end if
+	next cardID	
+	GetCardIDFromHandID	= -1
+end function
+
+sub PlayMutinyButton
+	dim playerID, handID, cardID as integer
+
+	playerID = GetSelected(_ListMutinyPlayers)
+	if playerID &lt; 1 then
+		MsgBox &quot;Please select a player.&quot;
+		exit sub
+	end if
+		
+	handID	= GetSelected(_ListMutinyCards)
+	if handID &lt; 1 then
+		MsgBox &quot;Please choose a Mutiny Card.&quot;
+		exit sub
+	end if
+	
+	cardID	= GetCardIDFromHandID(playerID, handID)
+	LogThis(GetPlayerName(playerID) &amp; &quot; plays Mutiny Card: &quot; &amp; MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string)
+	if MutinySheet.getCellByPosition(_MutinyTypeCol, _MutinyRow + cardID).string	= &quot;D&quot; then
+		DiscardMutiny(cardID)
+	elseif MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string = &quot;Controversial Speech&quot; then
+		if MsgBox(&quot;Was Controversial Speech successful?&quot;, 4, &quot;Controversial Speech&quot;) &lt;&gt; 6 then
+			DiscardMutiny(cardID)
+		else
+			RemoveMutiny(cardID)
+		end if
+	else
+		RemoveMutiny(cardID)
+	endif 
+end sub
+
+sub RemoveMutiny (cardID as integer)
+	dim bottomrow, col as integer
+	dim temp as string
+	GetMutinySheet
+
+	&apos; Remove from hand, place in removed column.		
+	MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string		= &quot;&quot;
+	MutinySheet.getCellByPosition(_MutinyRemovedCol, _MutinyRow + cardID).string	= MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string
+	MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string		= &quot;&quot;
+
+	&apos; Move it to the bottom of the deck.
+	do until MutinySheet.getCellByPosition(_MutinyRemovedCol, _MutinyRow + cardID + 1).string &lt;&gt; &quot;&quot; or cardID = _MutinyCount
+		for col = _MutinyTypeCol to _MutinyDescCol
+			temp	= MutinySheet.getCellByPosition(col, _MutinyRow + cardID + 1).string
+			MutinySheet.getCellByPosition(col, _MutinyRow + cardID + 1).string	= MutinySheet.getCellByPosition(col, _MutinyRow + cardID).string
+			MutinySheet.getCellByPosition(col, _MutinyRow + cardID).string		= temp
+		next col
+		cardID	= cardID + 1
+	loop
+	
+	LogThis(&quot;Mutiny Card: &quot; &amp; MutinySheet.getCellByPosition(_MutinyRemovedCol, _MutinyRow + cardID).string &amp; &quot; removed from the game.&quot;)
+	UpdateMutinyCardList
+end sub
+
+sub DiscardMutiny (cardID as integer)
+	dim bottomrow, col as integer
+	dim temp as string
+	GetMutinySheet
+
+	&apos; Remove from hand, place in discard column.		
+	MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string		= &quot;&quot;
+	MutinySheet.getCellByPosition(_MutinyDiscardCol, _MutinyRow + cardID).string	= MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string
+	MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string		= &quot;&quot;
+
+	&apos; Move it to the bottom of the deck.
+	do until MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID + 1).string = &quot;&quot; or cardID = _MutinyCount
+		for col = _MutinyTypeCol to _MutinyDescCol
+			temp	= MutinySheet.getCellByPosition(col, _MutinyRow + cardID + 1).string
+			MutinySheet.getCellByPosition(col, _MutinyRow + cardID + 1).string	= MutinySheet.getCellByPosition(col, _MutinyRow + cardID).string
+			MutinySheet.getCellByPosition(col, _MutinyRow + cardID).string		= temp
+		next col
+		cardID	= cardID + 1
+	loop
+	
+	LogThis(&quot;Mutiny Card: &quot; &amp; MutinySheet.getCellByPosition(_MutinyDiscardCol, _MutinyRow + cardID).string &amp; &quot; discarded.&quot;)
+	UpdateMutinyCardList
+end sub
+
+sub DiscardAllMutiny (playerID as integer)
+	dim cardID as integer
+	dim player, hand as string
+	GetMutinySheet
+	
+	cardID = 1
+	player	= GetPlayerName(playerID)
+	do
+		hand	= MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string
+		if hand = player then
+			DiscardMutiny(cardID)
+		else
+			cardID	= cardID + 1
+		end if
+	loop until hand = &quot;&quot;
+end sub
+
+sub DiscardMutinyButton
+	dim playerID, handID as integer
+
+	playerID = GetSelected(_ListMutinyPlayers)
+	if playerID &lt; 1 then
+		MsgBox &quot;Please select a player.&quot;
+		exit sub
+	end if
+		
+	handID	= GetSelected(_ListMutinyCards)
+	if handID &lt; 1 then
+		MsgBox &quot;Please choose a Mutiny Card.&quot;
+		exit sub
+	end if
+		
+	DiscardMutiny(GetCardIDFromHandID(playerID, handID))
+end sub
+
+sub BuryMutiny (cardID as integer)
+	dim bottomrow as integer
+	GetMutinySheet
+
+	&apos; Remove from hand, but don&apos;t place in discard column.		
+	MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string	= &quot;&quot;
+
+	&apos; Move it to the bottom of the deck.
+	do until MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID + 1).string = &quot;&quot; or cardID = _MutinyCount
+		for col = _MutinyTypeCol to _MutinyDescCol
+			temp	= MutinySheet.getCellByPosition(col, _MutinyRow + cardID + 1).string
+			MutinySheet.getCellByPosition(col, _MutinyRow + cardID + 1).string	= MutinySheet.getCellByPosition(col, _MutinyRow + cardID).string
+			MutinySheet.getCellByPosition(col, _MutinyRow + cardID).string		= temp
+		next col
+		cardID	= cardID + 1
+	loop
+	SetBuriedMutiny(false)
+	LogThis(&quot;Mutiny Card: &quot; &amp; MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string &amp; &quot; buried.&quot;)
+	UpdateMutinyCardList
+end sub
+
+sub BuryMutinyButton
+	dim playerID, handID as integer
+
+	playerID = GetSelected(_ListMutinyPlayers)
+	if playerID &lt; 1 then
+		MsgBox &quot;Please select a player.&quot;
+		exit sub
+	end if
+		
+	handID	= GetSelected(_ListMutinyCards)
+	if handID &lt; 1 then
+		MsgBox &quot;Please choose a Mutiny Card.&quot;
+		exit sub
+	end if
+	
+	BuryMutiny(GetCardIDFromHandID(playerID, handID))
+end sub
+
+sub Initialize_Mutiny
+	dim cardID, playerID as integer
+	GetMutinySheet
+	
+	&apos; Put everything back in the deck.
+	for cardID = 1 to _MutinyCount
+		MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string	= &quot;&quot;
+		if MutinySheet.getCellByPosition(_MutinyDiscardCol, _MutinyRow + cardID).string &lt;&gt; &quot;&quot; then
+			MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string = MutinySheet.getCellByPosition(_MutinyDiscardCol, _MutinyRow + cardID).string 
+			MutinySheet.getCellByPosition(_MutinyDiscardCol, _MutinyRow + cardID).string = &quot;&quot;
+		elseif MutinySheet.getCellByPosition(_MutinyRemovedCol, _MutinyRow + cardID).string &lt;&gt; &quot;&quot; then
+			MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string = MutinySheet.getCellByPosition(_MutinyRemovedCol, _MutinyRow + cardID).string 
+			MutinySheet.getCellByPosition(_MutinyRemovedCol, _MutinyRow + cardID).string = &quot;&quot;		
+		end if		
+	next cardID
+	
+	&apos; Now shuffle the deck.
+	SetBuriedMutiny(true)
+	ShuffleMutinyDeck
+	
+	for playerID = 1 to PlayerCnt()
+		if GetPlayerName(playerID) = &quot;Tom&quot; then
+			MsgBox &quot;Dealing two Mutiny Cards to Tom Zarek, don&apos;t forget to bury one.&quot;
+			DrawMutiny(playerID, false)
+			DrawMutiny(playerID, false)
+		end if
+	next playerID
+	UpdateMutinyCardList
+end sub
+
+sub SetBuriedMutiny (reset as boolean)
+	GetMutinySheet
+	
+	if reset then
+		MutinySheet.getCellByPosition(_BuriedMutinyCol, _BuriedMutinyRow).value	= 0
+	else
+		MutinySheet.getCellByPosition(_BuriedMutinyCol, _BuriedMutinyRow).value	= MutinySheet.getCellByPosition(_BuriedMutinyCol, _BuriedMutinyRow).value + 1
+	end if
+end sub
+
+function GetBuriedMutiny as integer
+	GetMutinySheet
+	
+	GetBuriedMutiny	= MutinySheet.getCellByPosition(_BuriedMutinyCol, _BuriedMutinyRow).value
+end function
+
+&apos; The sheet always resets the bury count if it wants a full shuffle.
+sub ShuffleMutinyDeck
+	dim top, bottom, cardID, swapCard, swapcol as integer
+	dim sortOrder(_MutinyCount) as double
+	dim tempSort as double
+	dim temp as string
+	GetMutinySheet
+	
+	top	= 1
+	for cardID = 1 to _MutinyCount
+		if MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string &lt;&gt; &quot;&quot; then
+			top		= cardID + 1
+		elseif MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string &lt;&gt; &quot;&quot; then
+			sortOrder(cardID)	= rnd()
+			bottom	= cardID
+		end if
+	next cardID
+	bottom	= bottom - GetBuriedMutiny
+	
+	for cardID = top to bottom - 1
+		for swapCard = cardID + 1 to bottom
+			if sortOrder(cardID) &gt; sortOrder(swapCard) then
+				&apos; Swap Orders
+				tempSort			= sortOrder(cardID)
+				sortOrder(cardID)	= sortOrder(swapCard)
+				sortOrder(swapCard)	= tempSort
+				
+				&apos; Swap contents
+				for swapCol = _MutinyTypeCol to _MutinyDescCol
+					temp	=  MutinySheet.getCellByPosition(swapCol, _MutinyRow + cardID).string
+					MutinySheet.getCellByPosition(swapCol, _MutinyRow + cardID).string		= MutinySheet.getCellByPosition(swapCol, _MutinyRow + swapCard).string
+					MutinySheet.getCellByPosition(swapCol, _MutinyRow + swapCard).string	= temp
+				next SwapCol
+			end if
+		next swapCard
+	next cardID
+end sub
+
+sub ShuffleMutinyButton
+
+end sub
+
+</script:module>

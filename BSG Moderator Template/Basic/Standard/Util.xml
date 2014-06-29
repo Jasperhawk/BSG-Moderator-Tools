@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Util" script:language="StarBasic">REM  *****  BASIC  *****
+
+option explicit
+
+global const _white		= &amp;Hffffff
+global const _yellow	= &amp;Hffff00
+global const _orange	= &amp;Hffcc99
+global const _bluegrey	= &amp;He6e6ff
+global const _red		= &amp;Hff0000
+global const _blue		= &amp;h0000ff
+global const _blue8		= &amp;h99ccff
+global const _black		= &amp;h000000
+global const _green		= &amp;h009900
+global const _purple	= &amp;h990099
+global const _grey		= &amp;H909090
+global const _ltgrey	= &amp;He6e6e6
+global const _blue2		= &amp;h0084D1
+global const _green1	= &amp;h355e00
+global const _red2 		= &amp;hcc3300
+global const _blue3		= &amp;h0099cc
+global const _brown		= &amp;h800000
+
+global const _ListGamePlayers 		= 1
+global const _ListGameLocations 	= 2
+global const _ListGameDamaged 		= 3
+global const _ListGameDamagedPeg	= 4
+global const _ListSkillPlayers 		= 5
+global const _ListSkillCards 		= 6
+global const _ListSkillDecks 		= 7
+global const _ListQuorumHand 		= 8
+global const _ListMutinyPlayers		= 9
+global const _ListMutinyCards		= 10
+
+function GetSelected (listid as integer) as integer
+	dim tmplst() as string
+	
+	select case listid
+		case _ListGamePlayers
+			GetGS
+			tmplst	= GameForm.getByName(&quot;lstPlayers&quot;).SelectedItems()
+		
+		case _ListGameLocations
+			GetGS
+			tmplst	= GameForm.getByName(&quot;lstLocations&quot;).SelectedItems()
+		
+		case _ListGameDamaged
+			GetGS
+			tmplst	= GameForm.getByName(&quot;lstDamaged&quot;).SelectedItems()
+			
+		case _ListGameDamagedPeg
+			GetGS
+			tmplst	= GameForm.getByName(&quot;lstDamagedPeg&quot;).SelectedItems()
+
+		case _ListSkillPlayers
+			GetSF
+			tmplst	= SkillForm.getByName(&quot;lstPlayers&quot;).SelectedItems()
+
+		case _ListSkillCards
+			GetSF
+			tmplst	= SkillForm.getByName(&quot;lstPlyrHand&quot;).SelectedItems()
+			
+		case _ListSkillDecks
+			GetSF
+			tmplst	= SkillForm.getByName(&quot;lstSkillDecks&quot;).SelectedItems()
+			
+		case _ListQuorumHand
+			GetQrm
+			tmplst	= QrmForm.getByName(&quot;lstPresidentsHand&quot;).SelectedItems()
+
+		case _ListMutinyPlayers
+			GetMutinySheet
+			tmplst	= MutinyForm.getByName(&quot;lstPlayers&quot;).SelectedItems()
+			
+		case _ListMutinyCards
+			GetMutinySheet
+			tmplst	= MutinyForm.getByName(&quot;lstMutinyCards&quot;).SelectedItems()
+
+		case else
+			GetSelected = -1
+			exit function
+	end select
+
+	if ubound(tmplst) = -1 then
+		GetSelected	= -1
+	else
+		GetSelected	= val(tmplst(0))
+	end if
+end function
+
+sub SaveVersion
+rem ----------------------------------------------------------------------
+rem define variables
+dim document   as object
+dim dispatcher as object
+rem ----------------------------------------------------------------------
+rem get access to the document
+document   = ThisComponent.CurrentController.Frame
+dispatcher = createUnoService(&quot;com.sun.star.frame.DispatchHelper&quot;)
+
+rem ----------------------------------------------------------------------
+dim args1(0) as new com.sun.star.beans.PropertyValue
+args1(0).Name = &quot;VersionComment&quot;
+args1(0).Value = &quot;Turn &quot; &amp; GetCurTurn()
+
+dispatcher.executeDispatch(document, &quot;.uno:Save&quot;, &quot;&quot;, 0, args1())
+end sub
+</script:module>

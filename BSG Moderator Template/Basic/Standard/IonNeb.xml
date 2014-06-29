@@ -1,0 +1,1107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="IonNeb" script:language="StarBasic">REM  *****  BASIC  *****
+option explicit
+
+dim IonNebSheet as object
+dim IonNebForm as object
+
+const _TT_PlayerRow = 0
+const _TT_DisCol = 0
+const _TT_BenCol = 1
+const _TT_AntCol = 2
+const _TT_BrigRow = 11
+const _TT_SickbayRow = 12
+const _TT_PoolRow = 19
+const _TT_PoolCol = 6
+const _TT_PoolSizeRow = _TT_PoolRow + 38
+const _TT_Src_Pool = 0
+const _TT_Src_Brig = 1
+const _TT_Src_Sickbay = 2
+
+const _AllyRow = 18
+const _AllyNameCol = 0
+const _AllyLocCol = _AllyNameCol + 1
+const _AllyStatusCol = _AllyNameCol + 2
+const _AllyBenCol = _AllyNameCol + 3
+const _AllyAntCol = _AllyNameCol + 4
+const _AllyMaxCnt = 35
+const _AllyColCnt = 5
+const _FirstAvailableAllyRow = 54
+
+const _AllyStatusAvailable = 0
+const _AllyStatusNeedAToken = 1
+const _AllyStatusBenevolent = 2
+const _AllyStatusAntagonistic = 3
+const _AllyStatusDisaster = 4
+const _AllyStatusInTheBox = 5
+
+const _TokenTypeDisaster = _AllyStatusDisaster
+const _TokenTypeBenevolent = _AllyStatusBenevolent
+const _TokenTypeAntagonistic = _AllyStatusAntagonistic
+const _TokenTypeAll = 0
+
+const _XRRow = 57
+const _XRMaxCnt = 7
+const _XRColCnt = 5
+const _XRNameCol = 0
+const _XRPlayerCol = 1
+const _XRTokenCol = 2
+
+sub GetIonNeb
+	if IonNebSheet &lt;&gt; NULL then
+		exit sub
+	end if 
+	
+	IonNebSheet= ThisComponent.Sheets.getByName(&quot;Ionian Nebula&quot;)
+	IonNebForm = IonNebSheet.DrawPage.Forms.GetByName(&quot;FormIonianNebula&quot;)
+end sub
+
+function GetAllyID (allyName as string)  as integer
+	dim allyID as integer
+	
+	allyID = 1
+	while instr(IonNebSheet.GetCellByPosition(_AllyNameCol, _AllyRow + allyID).String, allyName) = 0 and instr(allyName, IonNebSheet.GetCellByPosition(_AllyNameCol, _AllyRow + allyID).String) = 0 and allyID &lt;= _AllyMaxCnt
+		allyID = allyID + 1
+	wend
+	if allyID &gt; _AllyMaxCnt then
+		GetAllyID = 0
+	else
+		GetAllyID = allyID
+	end if
+end function	&apos;GetAllyID
+
+function GetAllyName (allyID as integer) as string
+	GetAllyName = IonNebSheet.getCellByPosition(_AllyNameCol, _AllyRow + allyID).String
+end function 	&apos;GetAllyName
+
+
+function GetAllyLoc (allyID as integer) as string
+	GetAllyLoc = IonNebSheet.getCellByPosition(_AllyLocCol, _AllyRow + allyID).String
+end function	&apos;GetAllyLoc
+
+function GetAvailableAlly () as integer
+	dim allyID as integer
+	GetIonNeb
+&apos; We&apos;ve pushed all of the unavailable Allies to the top of the list, so this should be the first unmarked ally.
+	GetAvailableAlly = IonNebSheet.getCellByPosition(_AllyNameCol, _FirstAvailableAllyRow).value + 1
+	
+end function &apos;GetAvailableAlly
+
+function TokenTypeName (tokenType as integer) as string
+	select case tokenType
+		case _TokenTypeDisaster
+			TokenTypeName = &quot;DISASTER&quot;
+		
+		case _TokenTypeBenevolent
+			TokenTypeName = &quot;BENEVOLENT&quot;
+		
+		case _TokenTypeAntagonistic
+			TokenTypeName = &quot;ANTAGONISTIC&quot;
+	end select
+end function
+
+function GetAllyStatus (allyID as integer) as integer
+	dim curstatus as string
+	dim statusID as integer
+	
+	curstatus = IonNebSheet.GetCellByPosition(_AllyStatusCol,_AllyRow + allyID).String
+	GetAllyStatus = StatusTypeFromName(curStatus)
+end function &apos;GetAllyStatus
+
+function StatusName (statusID as integer) as string
+	dim statuslst() as string
+	statuslst = Array (&quot;&quot;,&quot;Need A Token&quot;,&quot;Benevolent&quot;,&quot;Antagonistic&quot;,&quot;Disaster&quot;,&quot;In The Box&quot;)
+	StatusName = statuslst(statusID)
+end function
+
+function StatusTypeFromName (status as string) as integer
+	dim test as integer
+	
+	StatusTypeFromName = _AllyStatusAvailable
+	for test = _AllyStatusAvailable to _AllyStatusInTheBox
+		if StatusName(test) = status then
+			StatusTypeFromName = test
+		end if
+	next test
+end function
+
+function StatusBackColor (statusID as integer) as variant
+	dim statusclr() as variant
+	statusclr = Array (_white, _yellow, _blue2, _red, _orange, _white)
+	StatusBackColor = statusclr(statusID)
+end function
+
+sub SetAllyStatus (allyID as integer, newStatus as integer)	
+	IonNebSheet.GetCellByPosition(_AllyStatusCol,_AllyRow + allyID).CellBackColor = StatusBackColor(newStatus)
+	IonNebSheet.GetCellByPosition(_AllyStatusCol,_AllyRow + allyID).String = StatusName(newStatus)
+	UpdateTTTargetList
+end sub	&apos;SetAllyStatus
+
+function GetCylonWithMostTokens as integer
+	&apos;this is needed for the case in which an ally on the board is inactivated
+	dim cylons(4), cylonCnt as integer
+	dim maxtokens, winner, tokencnt, player as integer
+	
+	cyloncnt = 0
+	for player = 1 to PlayerCnt()
+		if (IsRevealed(player) and NOT IsInfiltrating(player)) and GetPlayerTTCnt(player,_TokenTypeALL) &gt; 0 then
+			cylonCnt = cylonCnt+1
+			Cylons(cyloncnt) = player
+		end if
+	next player
+	
+	if cylonCnt = 0 then
+		GetCylonWithMostTokens = 0
+		
+	elseif cylonCnt = 1 then
+		GetCylonWithMostTokens = Cylons(1)
+
+	else	&apos;we have more than one cylon with tokens
+		maxtokens = GetPlayerTTCnt(Cylons(1),_TokenTypeAll)
+		winner = Cylons(1)
+
+		for player = 2 to cylonCnt
+			tokencnt = GetPlayerTTCnt(Cylons(player),_TokenTypeAll)
+			if tokencnt &gt; maxtokens then
+				maxtokens = tokencnt
+				winner = Cylons(player)
+				
+			elseif tokencnt = maxtokens then
+				winner = -1	&apos;tie
+				
+			end if
+		next player
+
+		GetCylonWithMostTokens = winner
+	end if
+end function	&apos;GetCylonWithMostTokens
+
+function GetTraumaPoolCount as integer
+	GetIonNeb
+	
+	GetTraumaPoolCount = IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolSizeRow).value
+end function
+
+sub InactivateTest
+	InactivateAllyPlayer 1
+end sub
+
+
+sub InactivateAllyPlayer (playerID as integer)
+	GetIonNeb
+	dim playername as string
+	dim allyID as integer
+	playername = GetPlayerName(playerID)
+	&apos;two special cases to deal with due to family
+	if playername = &quot;Adama&quot; then
+		playername = &quot;William&quot;
+	elseif playername = &quot;Tigh&quot; then 
+		playername = &quot;Saul&quot;
+	end if
+	InactivateAlly GetAllyID(playername)
+end sub
+
+sub InactivateAllyLocation (locname as string)
+	dim allyid, check as integer
+	dim test as string
+	
+	for check = 1 to 3
+		allyID = GetAvailableAlly - check
+		test = GetAllyLoc(allyID)
+		if test = locname then
+			InactivateAlly(allyID)
+		end if
+	next check
+end sub
+
+sub ReturnAllyToBox (allyID as integer)
+	dim allystatus, col, allyCache as integer
+	dim allyInfo as string
+	GetIonNeb
+	allyStatus = GetAllyStatus(allyID)
+	allyCache = allyID
+	
+	&apos; Move them up to the bottom of the &quot;in the box&quot; stack
+	while allyCache &gt; 1 and not (GetAllyStatus(allyCache - 1) = _AllyStatusInTheBox)
+		for col = 0 to _AllyColCnt - 1
+			allyInfo = IonNebSheet.getCellByPosition(col, _AllyRow + allyCache - 1).string
+			IonNebSheet.getCellByPosition(col, _AllyRow + allyCache - 1).string = IonNebSheet.getCellByPosition(col, _AllyRow + allyCache).string
+			IonNebSheet.getCellByPosition(col, _AllyRow + allyCache).string = allyInfo
+		next col
+		IonNebSheet.getCellByPosition(_AllyStatusCol, _AllyRow + allyCache - 1).CellBackColor = StatusBackColor(allyStatus)
+		IonNebSheet.getCellByPosition(_AllyStatusCol, _AllyRow + allyCache).CellBackColor = StatusBackColor(GetAllyStatus(allyCache))
+		allyCache = allyCache - 1
+	wend
+		
+	&apos;If they were Available, we can just mark them as in the box
+	if allyStatus = _AllyStatusAvailable then
+		SetAllyStatus allyCache, _AllyStatusInTheBox
+	else
+		&apos;If not, we need to put their token back in the pool.
+		if not (allyStatus = _AllyStatusNeedAToken) then
+			&apos; This should always be the case - why would an Ally who needs a token be resolved/destroyed? But it&apos;s protection.
+			&apos; Return the token to the pool
+			AddToTTPool allyStatus
+		end if
+		SetAllyStatus allyCache, _AllyStatusInTheBox
+		MsgBox &quot;Ally &quot; &amp; GetAllyName(allyCache) &amp; &quot; has been removed from the board and the &quot; &amp; TokenTypeName(allyStatus) &amp; &quot; token has been returned to the pool.&quot;
+	end if		
+end sub
+	
+sub InactivateAlly (allyID as integer)
+	dim allystatus, col, allyCache, bestcylon, newtoken, nextavailable as integer
+	dim allyInfo as string
+	GetIonNeb
+	allyStatus = GetAllyStatus(allyID)
+	allyCache = allyID
+	
+	&apos; If they&apos;re not already in the box, we need to do something.
+	if not (allyStatus = _AllyStatusInTheBox) then
+		ReturnAllyToBox (allyID)
+		
+		&apos; There are two reasons to return Inactivate an Ally. If they were on the board, they need to be replaced 
+		&apos; (either location damaged, or picked after Execution). If they were available, they were picked after Execution
+		&apos; and don&apos;t need to be replaced.
+		if not (allyStatus = _AllyStatusAvailable) then
+			&apos; Now we need to add a new Ally.
+			allyCache = GetAvailableAlly
+			
+			if allyCache &lt; _AllyMaxCnt then
+				MsgBox &quot;New ally in play: &quot; &amp; GetAllyName(allyCache) &amp; &quot;.&quot; 
+			
+				&apos; Find the Cylon player with the most tokens
+				bestcylon = GetCylonWithMostTokens()
+				if bestcylon = 0 then	
+				&apos; there are no revealed cylons with tokens, we deploy randomly.
+					newtoken = GetTTFromPool()
+					MsgBox &quot;There are no Cylons with Trauma Tokens, so a token will be assigned from the Pool: &quot; &amp; TokenTypeName(newtoken)
+					SetAllyStatus allyCache, newtoken
+				elseif bestcylon = -1 then
+					&apos; tie between two or more cylons
+					MsgBox GetPlayerName(GetCurrentPlayer()) &amp; &quot; needs to choose which Cylon will give a token to the new ally.&quot;
+					SetAllyStatus allyCache, _AllyStatusNeedAToken
+				else
+					MsgBox GetPlayerName(bestCylon) &amp; &quot; has the most Trauma and may place one on &quot; &amp; GetAllyName(allyCache) &amp; &quot;.&quot;
+					if GetPlayerTTCnt(bestCylon, _TokenTypeBenevolent) = 0 then
+						&apos; They only have antagonistic.
+						MsgBox GetPlayerName(bestCylon) &amp; &quot; has only ANTAGONISTIC Trauma, and places one on &quot; &amp; GetAllyName(allyCache) &amp; &quot;.&quot;
+						SetAllyStatus allyCache, _TokenTypeAntagonistic
+						UpdatePlayerTTCnt(bestCylon, _TokenTypeAntagonistic, -1)
+					elseif GetPlayerTTCnt(bestCylon, _TokenTypeAntagonistic) = 0 then
+						&apos; They only have benevolent.
+						MsgBox GetPlayerName(bestCylon) &amp; &quot; has only BENEVOLENT Trauma, and places one on &quot; &amp; GetAllyName(allyCache) &amp; &quot;.&quot;
+						SetAllyStatus allyCache, _TokenTypeBenevolent
+						UpdatePlayerTTCnt(bestCylon, _TokenTypeBenevolent, -1)
+					else
+						&apos; They have both types.
+						MsgBox GetPlayerName(bestCylon) &amp; &quot; must choose which type of Trauma to place on &quot; &amp; GetAllyName(allyCache) &amp; &quot;.&quot;
+						SetAllyStatus allyCache, _AllyStatusNeedAToken
+					end if
+				end if
+			else
+				MsgBox(&quot;There are no more Allies to place!&quot;)
+			end if
+		end if
+		UpdateTTTargetList
+	end if
+end sub	&apos;InactivateAlly
+
+sub DiscardAllTokens (playerID as integer)
+	GetIonNeb
+	
+	while GetPlayerTTCnt(playerID, _TokenTypeBenevolent) &gt; 0 
+		UpdatePlayerTTCnt(playerID, _TokenTypeBenevolent, -1)
+		AddToTTPool(_TokenTypeBenevolent)
+	wend
+	while GetPlayerTTCnt(playerID, _TokenTypeAntagonistic) &gt; 0 
+		UpdatePlayerTTCnt(playerID, _TokenTypeAntagonistic, -1)
+		AddToTTPool(_TokenTypeAntagonistic)
+	wend
+end sub
+
+sub Initialize_IonianNebula
+	dim i as integer
+	dim allyID, playerID, playername as integer
+	GetIonNeb
+	
+	&apos;first clear the Allies&apos; statuses
+	for allyID = 1 to _AllyMaxCnt
+		SetAllyStatus(allyID, _AllyStatusAvailable)
+	next allyID
+
+	&apos;reset the Trauma Token Pool
+	ResetTTPool
+	
+	&apos;Clear the players&apos; tokens
+	for playerID = 1 to 7
+		IonNebSheet.getCellByPosition(_TT_DisCol, _TT_PlayerRow + playerID).CellBackColor = _white
+		IonNebSheet.getCellByPosition(_TT_BenCol, _TT_PlayerRow + playerID).value = 0
+		IonNebSheet.getCellByPosition(_TT_AntCol, _TT_PlayerRow + playerID).value = 0
+	next playerID
+
+	ResetCrossroads
+
+	&apos;we&apos;ve cleared everything, now do the actual setup if necessary.
+	if ObjectiveIsIonianNebula() then
+		ShuffleAllies
+		
+		&apos;remove any allies who are also characters in play
+		for playerID = 1 to playerCnt()
+			InactivateAllyPlayer (playerID)
+		next playerID
+	
+		&apos;deal tokens to the locations
+		SetLocationTT (&quot;Brig&quot;, GetTTFromPool())
+		SetLocationTT (&quot;Sickbay&quot;, GetTTFromPool()
+		
+		&apos;deal tokens to players
+		for playerID = 1 to PlayerCnt()
+			for i = 1 to 3
+				UpdatePlayerTTCnt(playerID, GetTTFromPool(TRUE), 1)	&apos;TRUE in the GetTTFromPool call for no disasters
+			next i
+		next playerID
+		
+		&apos;activate 3 allies
+		SetAllyStatus(GetAvailableAlly(), GetTTFromPool())
+		SetAllyStatus(GetAvailableAlly(), GetTTFromPool())
+		SetAllyStatus(GetAvailableAlly(), GetTTFromPool())
+		UpdateTTTargetList
+				
+		ShuffleCrossroads
+	end if
+		
+end sub &apos;Initialize_IonianNebula
+
+sub UpdateTTTargetList
+	dim targetlist(3), target as string
+	dim ally, allyID as integer
+	GetIonNeb
+	
+	if GetTotalDistance() &lt; 8 then
+		for ally = 1 to 3
+			allyID = GetAvailableAlly - 4 + ally
+			target = &quot;&quot;
+			if GetAllyStatus(allyID) = _AllyStatusNeedAToken then
+				target = &quot;(&quot;
+			end if
+			target = target + GetAllyName(allyID)
+			if GetAllyStatus(allyID) = _AllyStatusNeedAToken then
+				target = target + &quot;)&quot;
+			end if
+			targetlist(ally) = target
+		next ally
+	else
+		targetlist(1) = &quot;Crossroads Card&quot;
+	end if
+	IonNebForm.getByName(&quot;lstTTTargets&quot;).StringItemList = g_emptylst()
+	IonNebForm.getByName(&quot;lstTTTargets&quot;).StringItemList = targetlist()
+
+end sub
+
+sub ButtonDrawTrauma
+	dim tmplst(), playername, playerloc as string
+	dim playerID, rtncd, source as integer
+	dim grpOpt as object
+	GetIonNeb
+
+	tmplst = IonNebForm.getByName(&quot;lstPlayers&quot;).SelectedItems()
+	playername = IonNebForm.getByName(&quot;lstPlayers&quot;).StringItemList(val(tmplst(0)))
+	
+	playerID = GetPlayerID(playername)
+	if playerID &gt; 0 then
+		if GetPlayerLoc(playerID) = &quot;Brig&quot; then
+			rtncd = MsgBox(playername &amp; &quot; is in the Brig. Draw the Brig Trauma?&quot;, 4, &quot;Draw Trauma&quot;)
+			if rtncd = 6 then
+				source = _TT_Src_Brig
+			elseif rtncd = 7 then
+				source = _TT_Src_Pool
+			else
+				exit sub
+			end if
+		elseif GetPlayerLoc(playerID) = &quot;Sickbay&quot; then
+			rtncd = MsgBox(playername &amp; &quot; is in Sickbay. Draw the Sickbay Trauma?&quot;, 4, &quot;Draw Trauma&quot;)
+			if rtncd = 6 then
+				source = _TT_Src_Sickbay
+			elseif rtncd = 7 then
+				source = _TT_Src_Pool
+			else
+				exit sub
+			end if
+		else
+			source = _TT_Src_Pool
+		end if
+		DrawTrauma playerID, source
+	end if
+end sub
+
+sub DrawLocTrauma(playerID as integer, source as string)
+	GetIonNeb
+
+	if source = &quot;Brig&quot; then
+		DrawTrauma(playerID, _TT_Src_Brig)
+	elseif source = &quot;Sickbay&quot; then
+		DrawTrauma(playerID, _TT_Src_Sickbay)
+	end if
+end sub
+
+sub DrawTrauma (playerID as integer, source as integer)
+	dim token as integer
+	dim srcname as string
+	dim twodis as boolean
+	
+	select case source
+		case _TT_Src_Pool
+			token = GetTTFromPool
+			srcname = &quot;the Pool.&quot;
+		case _TT_Src_Brig
+			token = GetLocationTT(&quot;Brig&quot;)
+			srcname = &quot;the Brig.&quot;
+		case _TT_Src_Sickbay
+			token = GetLocationTT(&quot;Sickbay&quot;)
+			srcname = &quot;Sickbay.&quot;
+	end select
+	
+	if token = _TokenTypeDisaster then
+		if IsRevealed(playerID) and not IsInfiltrating(playerID) then
+			twodis = false
+			&apos; Draw two more, but check for another disaster
+			token = GetTTFromPool
+			if token = _TokenTypeDisaster then
+				&apos;That&apos;s number two, no need to keep checking.
+				UpdatePlayerTTCnt(playerID, GetTTFromPool, 1)
+				UpdatePlayerTTCnt(playerID, GetTTFromPool, 1)
+				twodis = true
+			else
+				UpdatePlayerTTCnt(playedID, token, 1)
+			end if
+			
+			&apos; Second draw from the first disaster
+			token = GetTTFromPool
+			if token = _TokenTypeDisaster then
+				UpdatePlayerTTCnt(playerID, GetTTFromPool, 1)
+				UpdatePlayerTTCnt(playerID, GetTTFromPool, 1)
+				twodis = true
+			else
+				UpdatePlayerTTCnt(playedID, token, 1)
+			end if
+
+			&apos; Return a second disaster (we&apos;ll return the first in a second)
+			if twodis then
+				AddToTTPool _TokenTypeDisaster				
+			end if
+		else
+			MsgBox(GetPlayerName(playerID) &amp; &quot; draws a DISASTER and must be Executed!&quot;)
+		end if
+		AddToTTPool _TokenTypeDisaster	
+	else
+		UpdatePlayerTTCnt(playerID, token, 1)
+		MsgBox(GetPlayerName(playerID) &amp; &quot; draws a(n) &quot; &amp; TokenTypeName(token) &amp; &quot; token from &quot; &amp; srcname)
+	endif
+
+	select case source
+		case _TT_Src_Brig
+			SetLocationTT(&quot;Brig&quot;, GetTTFromPool)
+		case _TT_Src_Sickbay
+			SetLocationTT(&quot;Sickbay&quot;, GetTTFromPool)
+	end select
+end sub
+
+sub ButtonDiscardTrauma
+	dim tmplst(), playername as string
+	dim playerID, token as integer
+	dim grpOpt as object
+	GetIonNeb
+	
+	tmplst = IonNebForm.getByName(&quot;lstPlayers&quot;).SelectedItems()
+	playername = IonNebForm.getByName(&quot;lstPlayers&quot;).StringItemList(val(tmplst(0)))
+	IonNebForm.GetGroupByName(&quot;optTTSrcType&quot;, grpOpt)
+	
+	playerID = GetPlayerID(playername)	
+	if playerID &gt; 0 then
+		if grpOpt(0).state = 1 then
+			&apos;benevolent
+			token = _TokenTypeBenevolent
+		else
+			token = _TokenTypeAntagonistic			
+		end if
+		if MsgBox(playername &amp; &quot; discards a(n) &quot; &amp; TokenTypeName(token) &amp; &quot; token?&quot;, 4, &quot;Discard Trauma&quot;) = 6 then
+			if GetPlayerTTCnt(playerID, token) &gt; 0 then
+				MsgBox(TokenTypeName(token) &amp; &quot; token discarded.&quot;)
+				UpdatePlayerTTCnt(playerID, token, -1)
+				AddToTTPool(token)
+			else
+				MsgBox(playername &amp; &quot; has no &quot; &amp; TokenTypeName(token) &amp; &quot; tokens to discard!&quot;)
+			end if
+		end if
+	end if
+end sub
+
+sub PlaceTraumaOnAlly (playerid as integer, allyID as integer, token as integer)
+	MsgBox(GetPlayerName(playerID) &amp; &quot; places &quot; &amp; TokenTypeName(token) &amp; &quot; token on &quot; &amp; GetAllyName(allyID))
+	UpdatePlayerTTCnt(playerID, token, -1)
+	SetAllyStatus(allyID, token)
+end sub
+
+sub ButtonPlaceTrauma
+	dim tmplst(), playername, targetname as string
+	dim playerID, token, allyID as integer
+	dim grpOpt as object
+	GetIonNeb
+	
+	tmplst = IonNebForm.getByName(&quot;lstPlayers&quot;).SelectedItems()
+	playername = IonNebForm.getByName(&quot;lstPlayers&quot;).StringItemList(val(tmplst(0)))
+	IonNebForm.GetGroupByName(&quot;optTTSrcType&quot;, grpOpt)
+	
+	playerID = GetPlayerID(playername)	
+	if playerID &gt; 0 then
+		if grpOpt(0).state = 1 then
+			&apos;benevolent
+			token = _TokenTypeBenevolent
+		else
+			token = _TokenTypeAntagonistic			
+		end if
+		
+		if GetPlayerTTCnt(playerID, token) &gt; 0 then
+			tmplst = IonNebForm.getByName(&quot;lstTTTargets&quot;).SelectedItems()
+			targetname = IonNebForm.getByName(&quot;lstTTTargets&quot;).StringItemList(val(tmplst(0)))
+			if targetname = &quot;Crossroads Card&quot; then
+				PlaceTraumaOnXR(playerID, token)
+			else
+				allyID = GetAllyID(targetname)
+				if allyID = 0 then
+					MsgBox &quot;Please select an Ally.&quot;
+				elseif GetAllyStatus(allyID) = _AllyStatusNeedAToken then
+					PlaceTraumaOnAlly(playerID, allyID, token)
+				else
+					MsgBox targetname &amp; &quot; already has a trauma token.&quot;
+				end if
+			end if
+		else
+			MsgBox(playername &amp; &quot; has no &quot; &amp; TokenTypeName(token) &amp; &quot; tokens!&quot;)
+		end if
+	else
+		MsgBox &quot;Please select a player.&quot;
+	end if
+end sub
+
+sub EncounterAlly (playerID as integer, allyID as integer)
+	dim allyToken, newAlly as integer
+	GetIonNeb
+	
+	&apos; Get the token and prompt to resolve it.
+	allyToken = getAllyStatus(allyID)
+	MsgBox GetPlayerName(playerID) &amp; &quot; encounters &quot; &amp; GetAllyName(allyID) &amp; &quot;, who is &quot; &amp; TokenTypeName(allyToken) &amp; &quot;!&quot;
+	if allyToken = _TokenTypeBenevolent then
+		MsgBox IonNebSheet.getCellByPosition(_AllyBenCol, _AllyRow + allyID).string
+	elseif allyToken = _TokenTypeAntagonistic then
+		MsgBox IonNebSheet.getCellByPosition(_AllyAntCol, _AllyRow + allyID).string
+	else
+		&apos; Was a Disaster, no effect.
+		MsgBox &quot;No effect (Disaster).&quot;
+	endif
+	
+	&apos; Ally resolved, remove old Ally and return to the box. This will implicitly add the Trauma to the pool
+	ReturnAllyToBox(allyID)
+	
+	&apos; Place a new Ally, have the Current Player place a Trauma on them
+	newAlly = GetAvailableAlly
+		
+	if newAlly &lt; _AllyMaxCnt then
+		SetAllyStatus newAlly, _AllyStatusNeedAToken
+		MsgBox &quot;New ally in play: &quot; &amp; GetAllyName(newAlly) &amp; &quot;.&quot; 
+		
+		&apos; Special Placement
+		if GameTypeIsPegasus then
+			if GetAllyName(newAlly) = &quot;Kendra Shaw&quot;  then
+				if MsgBox(&quot;Kendra Shaw is about to be placed in Weapons Control, place her in Main Batteries instead?&quot;, 4, &quot;Kendra Shaw&quot;) = 6 then
+					IonNebSheet.getCellByPosition(_AllyLocCol, _AllyRow + newAlly).string = &quot;Main Batteries&quot;
+				else
+					IonNebSheet.getCellByPosition(_AllyLocCol, _AllyRow + newAlly).string = &quot;Weapons Control&quot;
+				end if
+			elseif GetAllyName(newAlly) = &quot;Helena Cain&quot;  then
+				if MsgBox(&quot;Helena Cain is about to be placed in Command, place her in Pegasus CIC instead?&quot;, 4, &quot;Helena Cain&quot;) = 6 then
+					IonNebSheet.getCellByPosition(_AllyLocCol, _AllyRow + newAlly).string = &quot;Pegasus CIC&quot;
+				else
+					IonNebSheet.getCellByPosition(_AllyLocCol, _AllyRow + newAlly).string = &quot;Command&quot;
+				end if
+			end if
+		end if
+		
+		&apos; Current Player places a trauma. Can&apos;t force any placement, because a player may draw Trauma.
+		MsgBox GetPlayerName(playerID) &amp; &quot; must place a Trauma Token on &quot; &amp; GetAllyName(newAlly) &amp; &quot;.&quot;
+		SetAllyStatus newAlly, _AllyStatusNeedAToken
+	else
+		MsgBox(&quot;There are no more Allies to place!&quot;)
+	end if
+end sub &apos;EncounterAlly
+
+sub EncounterLocationAllies (locname as string)
+	&apos; This only gets called when the current player moves. 
+	&apos; It&apos;s possible (Brig, Sickbay) that a player can move on their turn after their movement phase, so we need to ask.
+	dim prompt as string
+	dim ally, allies(3), numAllies, allyID as integer
+	
+	numAllies = 0
+	for ally = 1 to 3
+		allyID = GetAvailableAlly - 4 + ally
+		if GetAllyLoc(allyID) = locname then
+			numAllies = numAllies + 1
+			allies(numAllies) = allyID
+		end if
+	next ally
+	
+	if numAllies = 1 then
+		if MsgBox(GetPlayerName(GetCurrentPlayer()) &amp; &quot; is moving to the same location as &quot; &amp; GetAllyName(allies(1)) &amp; &quot;. Encounter them?&quot;, 4, &quot;Encounter Ally&quot;) = 6 then
+			EncounterAlly(GetCurrentPlayer, allies(1))
+		end if
+	elseif numAllies &gt; 1 then
+		prompt = GetPlayerName(GetCurrentPlayer()) &amp; &quot; is moving to the same location as &quot; &amp; GetAllyName(allies(1))
+		for ally = 2 to numAllies
+			prompt = prompt &amp; &quot; and &quot; &amp; GetAllyName(allies(ally))
+		next ally
+		MsgBox prompt &amp; &quot;. Choose one to Encounter.&quot;
+	end if
+end sub
+
+sub ButtonEncounterAlly
+	dim tmplst(), playername, targetname as string
+	dim playerID, cur, token, allyID as integer
+	dim grpOpt as object
+	GetIonNeb
+	
+	tmplst = IonNebForm.getByName(&quot;lstPlayers&quot;).SelectedItems()
+	playername = IonNebForm.getByName(&quot;lstPlayers&quot;).StringItemList(val(tmplst(0)))
+	IonNebForm.GetGroupByName(&quot;optTTSrcType&quot;, grpOpt)
+	
+	playerID = GetPlayerID(playername)	
+	if playerID &gt; 0 then
+		&apos; Player selected, let&apos;s get the target.
+		tmplst = IonNebForm.getByName(&quot;lstTTTargets&quot;).SelectedItems()
+		targetname = IonNebForm.getByName(&quot;lstTTTargets&quot;).StringItemList(val(tmplst(0)))
+		
+		&apos; Make sure the target is valid.
+		allyID = GetAllyID(targetname)
+		if allyID = 0 then
+			MsgBox &quot;Please select an Ally.&quot;
+		else
+			cur	= GetCurrentPlayer()
+			if playerID &lt;&gt; cur then
+				if MsgBox(GetPlayerName(playerID) &amp; &quot; is not the Current Player. Encounter &quot; &amp; targetname &amp; &quot; anyway?&quot;, 4, &quot;Encounter Ally&quot;) &lt;&gt; 6 then
+					exit sub
+				end if
+			end if
+			if GetPlayerLoc(playerID) &lt;&gt; GetAllyLoc(allyID) then
+				if MsgBox(GetPlayerName(playerID) &amp; &quot; is not in &quot; &amp; GetAllyLoc(allyID) &amp; &quot;. Encounter &quot; &amp; targetname &amp; &quot; anyway?&quot;, 4, &quot;Encounter Ally&quot;) &lt;&gt; 6 then
+					exit sub
+				end if
+			end if
+			EncounterAlly(playerID, allyID)
+		end if
+	else
+		MsgBox &quot;Please select a player.&quot;
+	end if	
+end sub
+
+&apos;ShuffleAllies will resort the ally deck, sorted by status, randomized within status
+sub ShuffleAllies
+	dim tmpval, sortOrder(_AllyMaxCnt) as double
+	dim tmpAlly, allylst(_AllyMaxCnt) as variant
+	dim allyData(_AllyColCnt) as variant
+	dim nextAvailable, allyID, i, j as integer
+	GetIonNeb
+	nextAvailable = GetAvailableAlly
+
+	for allyID = nextAvailable to _AllyMaxCnt
+		redim allyData(_AllyColCnt) as variant
+		for i = 1 to _AllyColCnt
+			allyData(i) = IonNebSheet.getCellByPosition(_AllyNameCol - 1 + i , _AllyRow + allyID).string
+		next i
+		allyData(3) = GetAllyStatus(allyID)
+		sortOrder(allyID) = rnd() + allyData(3)
+		Allylst(allyID) = allydata()
+	next allyID
+	
+	for i = nextAvailable to _AllyMaxCnt -1
+		for j=i+1 to _AllyMaxCnt
+			if sortOrder(i) &gt; sortOrder(j) then
+				tmpval = sortOrder(i)
+				tmpAlly = allylst(i)
+				
+				sortOrder(i) = sortOrder(j)
+				allylst(i) = allylst(j)
+				
+				sortOrder(j) = tmpval
+				allylst(j) = tmpAlly
+			end if
+		next j
+	next i
+	
+	for allyID = nextAvailable to _AllyMaxCnt
+		tmpally = allylst(allyID)
+		for i = 1 to _AllyColCnt
+			IonNebSheet.getCellByPosition(_AllyNameCol - 1 + i, _AllyRow + allyID).string = tmpAlly(i)
+		next i
+		SetAllyStatus(allyID, tmpAlly(3))
+	next allyID
+end sub &apos;ShuffleAllies
+
+
+function GetPlayerTTCnt (playerID as integer, TokenType as integer) as integer
+	if TokenType = _TokenTypeBenevolent then
+		GetPlayerTTCnt = IonNebSheet.getCellByPosition(_TT_BenCol, _TT_PlayerRow + playerID).value
+		
+	elseif TokenType = _TokenTypeAntagonistic then
+		GetPlayerTTCnt = IonNebSheet.getCellByPosition(_TT_AntCol, _TT_PlayerRow + playerID).value
+		
+	else &apos;_TokenTypeALL
+		GetPlayerTTCnt = IonNebSheet.getCellByPosition(_TT_BenCol, _TT_PlayerRow + playerID).value + IonNebSheet.getCellByPosition(_TT_AntCol, _TT_PlayerRow + playerID).value
+		
+	end if
+end function &apos;GetPlayerTTCnt
+
+function UpdatePlayerTTCnt (playerID as integer, tokenType as integer, change as integer) as integer
+	GetIonNeb
+	
+	if TokenType = _TokenTypeBenevolent then
+		IonNebSheet.getCellByPosition(_TT_BenCol, _TT_PlayerRow + playerID).value =	IonNebSheet.getCellByPosition(_TT_BenCol, _TT_PlayerRow + playerID).value + change
+	else
+		IonNebSheet.getCellByPosition(_TT_AntCol, _TT_PlayerRow + playerID).value = IonNebSheet.getCellByPosition(_TT_AntCol, _TT_PlayerRow + playerID).value + change
+	end if
+	UpdatePlayerTTCnt = GetPlayerTTCnt(playerID, tokenType)
+end function &apos;GetPlayerTTCnt
+
+
+sub SetLocationTT (locname as string, tokenType as integer)
+	dim locrow as integer
+	if locname = &quot;Brig&quot; then
+		locrow = _TT_BrigRow
+	else
+		locrow = _TT_SickbayRow
+	end if
+	
+	IonNebSheet.getCellByPosition(_TT_DisCol, locrow).String = &quot;&quot;
+	IonNebSheet.getCellByPosition(_TT_BenCol, locrow).String = &quot;&quot;
+	IonNebSheet.getCellByPosition(_TT_AntCol, locrow).String = &quot;&quot;
+	
+	select case tokentype
+		case _TokenTypeDisaster
+			IonNebSheet.getCellByPosition(_TT_DisCol, locrow).String = &quot;X&quot;
+		
+		case _TokenTypeBenevolent 
+			IonNebSheet.getCellByPosition(_TT_BenCol, locrow).String = &quot;X&quot;
+		
+		case else
+			IonNebSheet.getCellByPosition(_TT_AntCol, locrow).String = &quot;X&quot;
+	end select
+end sub
+
+function GetLocationTT (locname as string) as integer
+	dim locrow as integer
+	if locname = &quot;Brig&quot; then
+		locrow = _TT_BrigRow
+	else
+		locrow = _TT_SickbayRow
+	end if
+
+	if IonNebSheet.getCellByPosition(_TT_DisCol, locrow).String = &quot;X&quot; then
+		GetLocationTT = _TokenTypeDisaster
+			
+	elseif IonNebSheet.getCellByPosition(_TT_BenCol, locrow).String = &quot;X&quot; then
+		GetLocationTT = _TokenTypeBenevolent
+		
+	else
+		GetLocationTT = _TokenTypeAntagonistic
+	end if
+end function &apos;GetLoctionTT
+
+sub ResetTTPool
+	dim tokenrow, tokentype as integer
+
+	GetIonNeb
+	tokentype = _TokenTypeBenevolent
+	for tokenrow = 0 to 37
+		if tokenrow = 18 then
+			tokentype = _TokenTypeAntagonistic
+		elseif tokenrow = 36 then
+			tokentype = _TokenTypeDisaster
+		end if
+		IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolRow + tokenrow).String = StatusName(tokentype)
+		IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolRow + tokenrow).CellBackColor = StatusBackColor(tokentype)
+	next tokenrow
+	
+	ShuffleTraumaPool
+end sub	&apos;ResetTTPool
+
+sub ShuffleTraumaPool
+	dim tmpVal, sortOrder() as double
+	dim poolsize, tokenID, i, j, tmptoken, tokenList() as integer
+	
+	poolsize = GetTraumaPoolCount
+	redim sortOrder(poolsize) as double
+	redim tokenlist(poolsize) as integer
+	
+	for tokenID = 1 to poolsize
+		tokenlist(tokenID) = StatusTypeFromName(IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolRow + tokenID - 1).String
+		sortOrder(tokenID) = rnd()
+	next tokenID
+	
+	for i = 1 to poolsize - 1
+		for j = i + 1 to poolsize
+			if sortOrder(i) &gt; sortOrder(j) then
+				tmpToken	= tokenlist(i)
+				tmpVal		= sortOrder(i)
+				
+				tokenlist(i)	= tokenlist(j)
+				sortOrder(i)	= sortOrder(j)
+				
+				tokenlist (j)	= tmpToken
+				sortOrder(j)	= tmpVal
+			end if
+		next j
+	next i
+	
+	for tokenID = 1 to poolsize
+		tmpToken = tokenList(tokenID)
+		IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolRow + tokenID - 1).String	= StatusName(tmpToken)
+		IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolRow + tokenID - 1).CellBackColor	= StatusBackColor(tmpToken)
+	next tokenID
+end sub
+
+sub AddToTTPool (tokenType as integer)
+	dim poolsize as integer
+	GetIonNeb
+	poolsize = GetTraumaPoolCount
+	
+	IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolRow + poolsize).String = StatusName(tokenType)
+	IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolRow + poolsize).CellBackColor = StatusBackColor(tokenType)
+	
+	ShuffleTraumaPool
+end sub &apos;AddToTTPool
+
+sub CompressTraumaPool
+	dim ttcnt as integer
+	GetIonNeb
+	
+	ttcnt = 0
+	while ttcnt &lt; GetTraumaPoolCount - 1
+		IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolRow + ttcnt).string = IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolRow + ttcnt + 1).string
+		IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolRow + ttcnt).CellBackColor = IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolRow + ttcnt + 1).CellBackColor
+		ttcnt = ttcnt + 1
+	wend
+	IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolRow + ttcnt).string = &quot;&quot;
+	IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolRow + ttcnt).CellBackColor = _white
+end sub
+
+function GetTTFromPool (optional NOdisaster as boolean) as integer
+	dim dcnt, bcnt, acnt, ttcnt, whichtoken as integer
+	
+	GetIonNeb
+	if IsMissing(NOdisaster) then
+		NOdisaster = FALSE
+	end if
+
+	whichtoken = StatusTypeFromName(IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolRow).string)
+	CompressTraumaPool
+	
+	if NODisaster then
+		while whichtoken = _TokenTypeDisaster
+			AddToTTPool _TokenTypeDisaster
+			whichtoken = StatusTypeFromName(IonNebSheet.getCellByPosition(_TT_PoolCol, _TT_PoolRow).string)
+			CompressTraumaPool
+		wend
+	end if
+	
+	GetTTFromPool = whichtoken
+end function &apos;GetTTFromPool
+	
+sub ResetCrossroads
+	dim XRID as integer
+	
+	for XRID = 1 to _XRMaxCnt
+		IonNebSheet.getCellByPosition(_XRPlayerCol, _XRRow + XRID).string = &quot;&quot;
+		IonNebSheet.getCellByPosition(_XRTokenCol, _XRRow + XRID).string = &quot;&quot;
+		IonNebSheet.getCellByPosition(_XRTokenCol, _XRRow + XRID).CellBackColor = _white
+	next XRID
+	
+	IonNebForm.GetByName(&quot;btnResolveCrossroads&quot;).Enabled = false
+	IonNebForm.GetByName(&quot;btnEncounterAlly&quot;).enabled = true
+	IonNebForm.GetByName(&quot;btnShuffleAllies&quot;).enabled = true
+end sub	&apos;ResetCrossroads
+
+
+sub ShuffleCrossroads
+	dim tmpval, sortOrder(_XRMaxCnt) as double
+	dim tmpXR, XRlst(_XRMaxCnt) as variant
+	dim XRData(_XRColCnt) as variant
+	dim XRID, i, j as integer
+	GetIonNeb
+
+	for XRID = 1 to _XRMaxCnt
+		redim XRData(_XRColCnt) as variant
+		for i = 1 to _XRColCnt
+			XRData(i) = IonNebSheet.getCellByPosition(i-1 , _XRRow + XRID).string
+		next i
+		sortOrder(XRID) = rnd() 
+		XRlst(XRID) = XRData()
+	next XRID
+	
+	for i = 1 to _XRMaxCnt -1
+		for j=i+1 to _XRMaxCnt
+			if sortOrder(i) &gt; sortOrder(j) then
+				tmpval = sortOrder(i)
+				tmpXR = XRlst(i)
+				
+				sortOrder(i) = sortOrder(j)
+				XRlst(i) = XRlst(j)
+				
+				sortOrder(j) = tmpval
+				XRlst(j) = tmpXR
+			end if
+		next j
+	next i
+	
+	for XRID = 1 to _XRMaxCnt
+		tmpXR = XRlst(XRID)
+		for i = 1 to _XRColCnt
+			IonNebSheet.getCellByPosition( i-1, _XRRow + XRID).string = tmpXR(i)
+		next i
+
+	next XRID
+end sub &apos;ShuffleCrossroads
+
+sub ClearLocationAllies (locName as string)
+	dim allyID as integer
+	GetIonNeb
+	
+	for allyID = 1 to _AllyMaxCnt
+		if (locName = &quot;Colonial One&quot; and IsColonialOneLoc(GetAllyLoc(allyID))) or _
+				(locname = &quot;Pegasus&quot; and IsPegasusLoc(GetAllyLoc(allyID))) then
+			InactivateAlly allyID
+		end if
+	next allyID	
+end sub
+
+sub PlaceTraumaOnXR (playerID as integer, token as integer)
+	dim XRID as integer
+	GetIonNeb
+	
+	for XRID = 1 to PlayerCnt()
+		if IonNebSheet.getCellByPosition(_XRPlayerCol, _XRRow + XRID).string = GetPlayerName(playerID) then
+			IonNebSheet.getCellByPosition(_XRTokenCol, _XRRow + XRID).string = StatusName(token)
+			IonNebSheet.getCellByPosition(_XRTokenCol, _XRROw + XRID).CellBackColor = StatusBackColor(token)
+			UpdatePlayerTTCnt(playerID, token, -1)
+			MsgBox GetPlayerName(playerID) &amp; &quot; places &quot; &amp; TokenTypeName(token) &amp; &quot; on &quot; &amp; IonNebSheet.getCellByPosition(_XRNameCol, _XRRow + XRID).string &amp; &quot;.&quot;
+		end if
+	next XRID
+end sub
+
+sub ButtonResolveCrossroads
+	dim XRID, playerID, good, bad, maxTrauma, numBoxed, boxedIDs(7), numHuman, guilty(7) as integer
+	dim guiltyParties as string
+	GetIonNeb
+	
+	&apos; Check that trauma has been placed on all cards.
+	for playerID = 1 to playercnt()
+		if IonNebSheet.getCellByPosition(_XRTokenCol, _XRRow + playerID).string = &quot;&quot; then
+			MsgBox &quot;Not all players have placed Trauma on their Crossroads cards.&quot;
+			exit sub
+		end if
+	next playerID
+	
+	&apos;Discard trauma
+	for playerID = 1 to playercnt()
+		if IsRevealed(playerID) and not IsInfiltrating(playerID) then
+		&apos;Cylons discard all Antagonistic and keep all but two Benevolent.
+			good = _TokenTypeAntagonistic
+			bad = _TokenTypeBenevolent
+		else		
+		&apos;Humans (and infiltrating Cylon Leaders) are the opposite.
+			good = _TokenTypeBenevolent
+			bad = _TokenTypeAntagonistic
+		end if
+		
+		while GetPlayerTTCnt(playerID, good) &gt; 0
+			UpdatePlayerTTCnt(playerID, good, -1)
+		wend
+		if GetPlayerTTCnt(playerID, bad) &gt; 0 then
+			UpdatePlayerTTCnt(playerID, bad, -1)
+		end if
+		if GetPlayerTTCnt(playerID, bad) &gt; 0 then
+			UpdatePlayerTTCnt(playerID, bad, -1)
+		end if
+	next playerID
+	
+	&apos; Find out who gets boxed
+	maxTrauma = 0
+	for playerID = 1 to PlayerCnt()
+		if GetPlayerTTCnt(playerID, _TokenTypeAll) &gt; maxTrauma then
+			numBoxed = 1
+			boxedIDs(1) = playerID
+			maxTrauma = GetPlayerTTCnt(playerID, _TokenTypeAll)
+		elseif GetPlayerTTCnt(playerID, _TokenTypeAll) = maxTrauma and maxTrauma &gt; 0 then
+			numBoxed = numBoxed + 1
+			boxedIDs(numBoxed) = playerID
+		end if
+	next playerID
+	
+	if maxTrauma = 0 then
+	&apos;Everyone&apos;s safe
+		MsgBox &quot;Everyone gets through the Crossroads alive.&quot;
+	else
+		&apos; All tied Cylons are boxed. Only one tied Human is guilty.
+		numHuman = 0
+		for bad = 1 to numBoxed
+			playerID = boxedIDs(bad)
+			if IsRevealed(playerID) and not IsInfiltrating(playerID) then
+				MsgBox GetPlayerName(playerID) &amp; &quot; is Boxed!&quot;
+			else
+				numHuman = numHuman + 1
+				guilty(numHuman) = playerID
+			end if
+			IonNebSheet.getCellByPosition(_TT_DisCol, _TT_PlayerRow + playerID).CellBackColor = _red
+		next bad
+		
+		if numHuman = 1 then
+			MsgBox GetPlayerName(guilty(1)) &amp; &quot; is found Guilty! Remember to Execute them during Elimination.&quot;
+		elseif numHuman &gt; 1 then
+			guiltyParties = &quot;&quot;
+			for bad = 1 to numHuman
+				guiltyParties = guiltyParties &amp; GetPlayerName(guilty(bad))
+				if bad &lt; numHuman then
+					guiltyParties = guiltyParties &amp; &quot; and &quot;
+				end if
+			next bad
+			MsgBox guiltyParties &amp; &quot; are found Guilty! The President chooses which one to Eliminate.&quot;
+		end if
+	end if
+	IonNebForm.GetByName(&quot;btnResolveCrossroads&quot;).enabled = false
+end sub
+
+sub DealCrossroads
+	dim XRID, playerID, i, allyID as integer
+	GetIonNeb
+		
+	playerID = GetCurrentPlayer()
+	for i = 1 to PlayerCnt()
+		IonNebSheet.getCellByPosition(_XRPlayerCol , _XRRow + i).string = GetPlayerName(playerID)
+		playerID = playerID + 1
+		if playerID &gt; PlayerCnt() then
+			playerID = 1
+		end if
+	next i
+
+	MsgBox &quot;Crossroads cards have been dealt.&quot;
+	UpdateTTTargetList	
+	for allyID = 1 to _AllyMaxCnt
+		if GetAllyStatus(allyID) = _AllyStatusBenevolent or GetAllyStatus(allyID) = _AllyStatusAntagonistic or GetAllyStatus(allyID) = _AllyStatusDisaster then
+			SetAllyStatus(allyID, _AllyStatusAvailable)
+		end if
+	next allyID
+	MsgBox &quot;Allies have been removed from the board.&quot;
+	
+	IonNebForm.GetByName(&quot;btnResolveCrossroads&quot;).Enabled = true
+	IonNebForm.GetByName(&quot;btnEncounterAlly&quot;).enabled = false
+	IonNebForm.GetByName(&quot;btnShuffleAllies&quot;).enabled = false
+end sub	&apos;DealCrossroads
+</script:module>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Image" script:language="StarBasic">option explicit
+
+sub SaveCSV
+	Dim mFilePropertiesCSV(1) As New com.sun.star.beans.PropertyValue
+
+	mFilePropertiesCSV(0).Name = &quot;FilterName&quot;
+	mFilePropertiesCSV(0).Value = &quot;Text - txt - csv (StarCalc)&quot;
+	mFilePropertiesCSV(1).Name = &quot;FilterOptions&quot;
+	mFilePropertiesCSV(1).Value = &quot;44,34,ANSI,1&quot;
+
+	ThisComponent.CurrentController.setActiveSheet(ThisComponent.sheets.getbyname(&quot;Image Data&quot;))
+	ThisComponent.StoreToURL(ConvertToURL(GetPath(FALSE) &amp; GetCSVFName()), mFilePropertiesCSV())
+	
+	ThisComponent.CurrentController.setActiveSheet(ThisComponent.sheets.getbyname(&quot;Game State&quot;))
+end sub
+
+function GetPath (padslash as boolean) as string
+	dim path as string
+	dim offset,i as integer
+	dim delim as string
+	path=ConvertFromURL(ThisComponent.getURL())
+	
+	&apos; unix and windows have different delimiters in paths...
+	if instr(path, &quot;\&quot;) &gt; 0 then
+		delim=&quot;\&quot;
+	else
+		delim=&quot;/&quot;
+	end if
+	
+	if padslash then
+		i=1
+		do while i &lt; len(path)
+			if mid(path,i,1)=delim then
+				path=left(path,i) &amp; mid(path,i,len(path))
+				i=i+1
+			end if
+			i=i+1
+		loop
+	end if	
+	offset = len(path)
+	do while offset &gt; 0 and mid(path,offset,1) &lt;&gt; delim
+		offset = offset -1
+	loop
+	GetPath = left(path, offset) 
+end function
+
+
+function GetCSVFName as string
+	dim fname as string
+&apos;	if GameTypeIsPegasus() then
+		fname = &quot;BSGP &quot;
+&apos;	else
+&apos;		fname = &quot;BSG &quot;
+&apos;	end if
+	GetCSVFName = fname &amp; ThisComponent.Sheets.getByName(&quot;Image Data&quot;).GetCellByPosition(1,0).String &amp; &quot; - &quot; &amp; ThisComponent.Sheets.getByName(&quot;Image Data&quot;).GetCellByPosition(2,0).String &amp; &quot;.csv&quot;
+end function
+
+function GetXCFMasterName as string
+	GetXCFMasterName = &quot;BSGP &quot; &amp; ThisComponent.Sheets.getByName(&quot;Image Data&quot;).GetCellByPosition(1,0).String &amp; &quot; - MASTER.xcf&quot;
+end function
+</script:module>

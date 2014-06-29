@@ -1,0 +1,421 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="z_ChangeLog" script:language="StarBasic">REM  *****  BASIC  *****
+
+Sub Main
+
+End Sub
+
+&apos; 5/2/10 - updating this template.  Most of the work on Pegasus was done by Jason (Mordenthral),
+&apos;			so now I feel like I have to tinker with it. ;-)
+
+&apos; 5/2/10 - Allow custom colors for the skill cards
+&apos;	-added 2 rows to model the color tags and display colors and added a button.
+&apos;   -modified lots of little functions on the Skills tab.
+&apos;
+&apos; 5/2/10 - fixed Verify Skill Card Distribution button on skills tab
+
+&apos; 5/4/10 - updated ships tab significantly
+&apos;	-now supports selection of multiple ships for orders
+&apos;	-cleaned up the civilians so that the names aren&apos;t so messy
+&apos;	-when civilians are destroyed, the resources are decreased automatically
+
+&apos; 5/4/10 - Quorum tab updated
+&apos;	-will support explicit hand limit
+
+&apos; 5/4/10 - Synced all pegasus code with updates from base moderator template...lots of follow up actions needed.
+
+&apos; 5/4/10 - Attack Crises now automatically deploy ships.
+
+&apos; 5/5/10 - cleaned up empty slots for players not in game on gamestate (slot 7 in 6-player, etc)
+
+&apos; 5/5/10 - added Game Phase on GameState tab
+&apos;	-added gamestate.SetGamePhase and gamestate.IsGamePhase
+
+&apos; 5/5/10 - Civilians now land and are locked automatically when we move to New Caprica
+&apos;	-civilians are now prepped, evacuated or destroyed normally through the select boxes
+
+&apos; 5/5/10 - Cleaned up occupation forces and civilians on New Caprica
+
+&apos; 5/5/10 - Added GalacticaReturns phase movement, deploying ships n stuff.
+
+&apos; 5/6/10 - If Pegasus takes 4 hits, it is destroyed.
+&apos;	-&quot;redded&quot; out on BoardStatus like Colonial 1
+&apos;	-is now a &quot;Board Special&quot; on the Image Data tab for the .csv file.
+&apos;	-the GIMP script &amp; image now read this and display a destroyed pegasus layer
+
+&apos; 5/12/10 - Setup tab - added option boxes and &quot;unlock options&quot; button
+&apos;	-options not fully implemented but the framework now exists.
+&apos;	-QuorumLimit option now works.
+
+&apos; 5/12/10 - skills tab, added button to sort skill check cards, plus checkbox for autosort.
+
+&apos; 6/4/10 - Kat is a stim junkie...if she ends the turn where she started, she&apos;s in Sickbay/Medical Center automatically
+
+&apos; 6/5/10 - Locations on GameState tab are updated based on the player type and current game phase
+
+&apos; 6/5/10 - Ships available for actions are updated based on the game phase (occupation forces only shop up on NC, etc)
+
+&apos; 12/9/10 - added Posting Templates tab
+&apos;		- added bgg image id columns for characters on reference tab
+&apos;	-fixed current player field reference (in Roles) on Image Data tab
+
+&apos;    - updated GameState.SetGamePhase to support _NoNewCaprica phase, which will make the NC board not show up.
+&apos;   - fixed GameState.GenerateBoardImage  viewoption checks were inverted, also updated GameState.chkViewGMP control to update
+&apos;			the hidden cell correctly.
+
+&apos; 12/11/10 - added button on skills tab to reshuffle any skill deck.
+
+&apos; 12/11/10 - if Guts and Initiative is played, immediately start the skill check &amp; don&apos;t play in destiny.
+
+&apos; 12/11/10 - fixed Skills.SortSkillCheckCards to do values instead of string.  Also updated the skill check cells to remove
+&apos;				leading zeros for formatting
+
+&apos; 12/13/10 - SCAR now correctly deploys from the card, also can be moved properly on the ship tab
+&apos;	-made updates to Ships (Scar, Unscar, GetScarID, SetScarID, SetShipStatus, UpdateShipActions, possibly others)
+&apos;	-updates to BoardStatus (Clear_ and Set_ to deal with Scar)
+&apos;   -updates to Crisis.PlayCrisisCard
+
+&apos; 12/13/10 - Destination buttons now disable when you land on NC or go distance 8+
+
+&apos; 12/14/10 - Fixed initial cards reference on skill tab for players with variable draws
+&apos;		-Skills.GetPlyrDrawDisplay and Skills.GetPlyrDraw updated
+
+&apos; 12/14/10 - updated cards reference on skill tab when a player move to or from sickbay/medical center 
+&apos;	- also updated when a cylon infiltrates or reveals
+
+&apos; 12/15/10 - cleaned up cell references for the image id&apos;s on Posting Templates tab
+
+&apos; 12/16/10 - CRISIS TAB ERRORS FOUND - checked the list by hand
+&apos;	-I don&apos;t know how long they&apos;ve been there, but it appears that there are duplicates in the main crisis list of:
+&apos;		Hangar Accident
+&apos;		Reunite the Fleet
+&apos;		Sabotage Investigated
+&apos;		Scouting for Water
+&apos;		Security Breach 
+&apos;	-Conversely, the following were missing:
+&apos;		Build Cylon Detector
+&apos;		Food Shortage x2 (should be 4 total)
+&apos;		Water Shortage [C-Basestar/nojump] 
+&apos;		Unsettling Stories
+
+&apos; 12/16/10 - DESTINATION DECK ERRORS FOUND - check the list by hand
+&apos;	One Extra Deep Space, one to few Barren Planet
+
+&apos; 12/16/10 - Crisis, SuperCrisis, Quorum, and Destination cards now have flags indicating if they are Base or Pegasus.
+&apos;		-their respective shuffling macros have been updated to include the extra column
+&apos;		-they have all been verified by hand for content accuracy.
+
+&apos; 12/16/10 - When a location is damaged, any characters there are sent to Sickbay automatically.
+
+&apos; 12/16/10 - Implmented the ability to &quot;give&quot; a card on the skills tab. 
+&apos;	-this should support:
+&apos;  		- Human Fleet (base): Cylon steals a card from a Human
+&apos;  		- Politically Adroit: Ellen gives a card to another player
+&apos;  		- Glimpse the Face of God: Leoben trades 1-2 cards with the top of Destiny (2 steps using &quot;glimpse&quot; button)
+&apos;  		- Intimate: Six steals a random card from a another player. (randomizer not built in)
+&apos;	-added Give Card To button and related player list.
+&apos;	-added Glimpse the Face of God button
+&apos;	-added Skills.GiveCard, Skills.GlimpseTheFaceOfGod, Skills.PopulateGiveCardPlayers
+&apos;	-updated Skills.Populate_Handlist, Skills.EnableCardButtons
+
+&apos; 12/18/10 - chnaged the Die Roll on the GameState tab so that it could be something other than an 8-sided die.
+&apos;	-updated GameState.RandomDieRoll, added visible cell on Gamestate tab, update GameState.Initialize_GameState
+
+&apos; 12/20/10 - updated .xcf file...&quot;FTL Location&quot; corrected to &quot;FTL Control&quot; for the damage token
+
+&apos; 12/20/10 - added button on skills tab to manually resort all hands
+
+&apos; 12/20/10 - added Undeal button on skills tab to put a card back into a skill deck.  added Skills.UndealSkill
+
+&apos; 12/20/10 - reorganized buttons on the Skills tab a bit...in general, true &quot;admin&quot; functions (for fixing problems)
+&apos;			should now have orange backgrounds, whereas yellow is for all the &quot;normal&quot; functions
+
+&apos; 12/20/10 - added Reshuffle button to crisis tab to reshuffle the crisis deck.
+&apos;	- added Crisis.ReshuffleCrisis, Crisis.SetBuryCnt, Crisis.GetBuryCnt
+&apos;	- updated Crisis.Initialize_CrisisCards, Crisis.ShuffleCrisis, Crisis.BuryCrisis, Crisis.ThirtyThree
+
+&apos; 12/21/10 - implemented Leoben&apos;s Cryptic Message
+&apos;	- added button on Skills tab
+&apos;	- added Skills.EnableCryptic, Skills.CrypticMessage
+&apos;	- updated Skills.Initialize_SkillCards
+
+&apos; 12/21/10 - removed confirmation of moving ships in Ships.ShipAction
+
+&apos; 12/21/10 - fixed bug with skills.sorthand so that it calls Populate_Handlist to refresh card selection
+
+&apos; 12/21/10 - Cain&apos;s starting position is variable, start her in CIC and remind the mod to check about Command
+
+&apos; 12/21/10 - President now receives a Quorum card on starup (updated Quorum.Initialize_Quorum)
+
+&apos; 12/21/10 - updated BSG-Pegasus.scm to support Objective switch.
+&apos;	- Added Objective area on GameState and updated Initialize_gamestate to set it properly
+&apos;	- added Objective field on Image Data to send the value properly to the .scm
+
+&apos; 12/23/10 - Quorum Tab updates
+&apos;	- Added full support for Skilled Politician
+&apos;	- Simplified the buttons...got rid of &quot;remove&quot; and &quot;assign&quot; and now just have &quot;play&quot; and &quot;discard&quot;
+&apos;	- Any card in the hand can be discarded, since there is a hand limit.  
+&apos;	- Any assignment card can be discarded, but not played.
+
+&apos; 12/23/10 - Civilian ships that are deployed now have the &quot;Return to the Reserves&quot; option
+
+&apos; 12/23/10 - fixed problem with Attack Crisis cards mis-deploying vipers when a piloted viper is already out.
+&apos;	- updated Ships.UpdateShips and Ships.GetShipStatus
+
+&apos; 12/24/10 - added button on the Quorum tab to Undeal a card and reshuffle the deck.
+
+&apos; 12/24/10 - added ability on GameState to select loction on Galactica or Pegasus to damage, if needed.
+
+&apos; 12/24/10 - remove the hole/placeholders for positioning player cards on the .xcf image.
+
+&apos; 12/26/10 - Split the Destination deck into it&apos;s onw tab, each deck type now has it&apos;s own tab (skills, crisis, quorum, destination)
+
+&apos; 12/26/10 - added ability to reshuffle the destination deck 
+&apos;	(note: undeal is too complex since all sorts of things can happen once a destination is played, just rollback instead)
+
+&apos; 12/26/10 - When the fleet jumps and a destination is chosen, fuel and other resources are reduced, and ships are deployed
+&apos;	-additionally, the mod will get a message about any optional action
+
+&apos; 12/28/10 - Split Setup &amp; Loyalty into different tabs
+&apos;	-Created easy step-by-step setup process on the Setup tab
+
+&apos; 1/6/11 - moved the auto-save so it occurs before the turn ends, instead of after the new one starts.
+
+&apos; 1/6/11 - Generalization is complete to allow running of Base OR Pegasus games from this spreadsheet.
+&apos;	-If playing a base game, all Pegasus functionality is disabled and all Pegasus cards are removed or hidden.
+&apos;	-As part of setup, only game-appropriate characters can be selected.
+&apos;	-framework is in place to easily add Exodus characters and cards
+
+&apos; 1/7/11 - fixed bug with cylon pilots not being able to move
+
+&apos; 1/7/11 - fixed destinations that destroy civilians to mark the civilian properly on ships and give a better message
+
+&apos; 1/11/11 - fixed quorum and crisis deck counters
+
+&apos; 1/11/11 - updated ships to grey out scar if we&apos;re not using pegasus and occupation forces if we&apos;re not using NC
+
+&apos; 1/16/11 - generally reformatted Loyalty tab
+&apos;	-fixed loyalty management on GameState
+&apos;	-fixed Sympathetic Cylon coding in general
+
+&apos; 1/17/11 - Loyalty/Execution overhaul
+&apos;	-Added the ability to move loyalty cards on the Loyalty page
+&apos;	-Execution should now be fully functional.  If a human is executed, all loyalty cards are &quot;discarded&apos;.
+&apos;	-When an execution occurs, the &quot;new&quot; character is selected from a dropdown on gamestate.  Player is also moved to the correct location.
+&apos;	-if a Cylon reveals or is Executed, his cylon loyalty card is &quot;discarded&quot; so other cards can be given away.
+&apos;	-Sympathetic Cylon should now work correctly...the player can subsequently infiltrate.
+&apos;	-rechecked code to make sure individual abilities are disabled for revealed/infiltrating cylons.
+&apos;	-Rearranged GameState controls a bit
+
+&apos; 1/23/11 - Exodus Updates
+&apos;	-Added CAG on GameState (column, button, various code to support the role)
+&apos;	-Added destination cards, updated code to support new effects
+&apos;	-Added Quorum cards
+&apos;	-Added Super Crisis cards
+
+&apos; 1/24/11 - Redesigned Loyalty Card decks to support Exodus
+
+&apos; 1/26/11 - Redesigned skills deck managedment to be a little easier to understand.
+&apos;	-Implemented God&apos;s Plan (sounding like Leoben while doing so...)
+
+&apos; 1/26/11 - support Reveal of Personal Goals on Loyalty
+&apos;	-if we&apos;re not 7 distance, add a card from NOT a Cylon to Loyalty, reshuffle, and deal one to the player.
+
+&apos; 1/26/11 - player card draw is pulled from reference now.   supporting expansion and customization.
+
+&apos; 1/27/11 - Removed Mining Asteroid if we&apos;re using Cylon Fleet
+
+&apos; 1/27/11 - updated Execution to support Exodus
+
+&apos; 1/28/11 - fixed a bug in undeal
+
+&apos; 1/28/11 - fixed a bug that didn&apos;t properly empty the graves at game initialization
+
+&apos; 1/29/11 - Cylon Fleet Support
+&apos;	-Added Pursuit track to GameState and BoardStatus
+&apos; 	-Added Basestar Bridge location (Gamestate location list, Board Status, Reference)
+
+&apos; 1/30/11 - fixed bug in Glimpse the Face of God (really tied to the setup, but that&apos;s where it shows up).
+
+&apos; 1/30/11 - redesigned the ship action management to make it clearer and more efficient.
+
+&apos; 1/30/11 - when returning a civilian to the reserves, shuffle the offboard civilians
+
+&apos; 1/30/11 - Cylon Fleet Support
+&apos;	- added Viper Mark VIIs, Extra Raiders to the Ships tab
+&apos;	- updated configure to remove Mark II&apos;s and add the Mark VIIs and extra Raiders for Cylon Fleet
+&apos;	- added CylonFleet column for the raiders, heavies, and basestars.  these now have the option to deploy a cylon fleet location.
+&apos;		once on a cylon fleet location, they can jump to the main board or return to the reserves (in case of error).
+
+&apos; 1/31/11 - fixed Labor Disbute, Beseiged and Sleep Deprivation (again!) on Crisis and Reference2
+
+&apos; 1/31/11 - Cylon Fleet Support
+&apos;	- supports the ability to pilot a Mark VII
+&apos;   - updated JumpTheFleet so to move cylon ships back to the Cylon Fleet board and leave the civilians in place
+&apos;   - add the Attack from the pursuit track and the ships tab to jump all cylons from the Cylon Fleet to the Main Board
+&apos;	- CylonFleet elements added to the Image Data tab.  Basestars update there as well.  File Specification updated.
+
+&apos; 2/1/11 - fixed Command Authority
+
+&apos; 2/1/11 - fixed Raiding Party (space in Heavy Raider deploy)
+
+&apos; 2/1/11 - Cylon Fleet Support
+&apos;	- added Mark VII to combat reference
+&apos;	- added die roll/sector mapping to reference
+&apos;	- added Mk VII Board Status
+&apos;	- add Cylon Fleet sectors to BoardStatus
+
+&apos; 2/2/11 - In Setup, Loyalty is now the first thing initialized.  The titles were not always correct because of the loyalty status of players from a previous game.
+
+&apos; 2/2/11 - RefreshBoard_PlayerAssignments now clears all slots, not just to playercnt(), so we don&apos;t have lingering titles from previous games.
+
+&apos; 2/2/11 - did some tweaking to Setup to make it run faster and clean up better from a previous game
+
+&apos; 2/5/11 - fixed image data so if pegasus is destroyed the damage tokens are hidden.
+
+&apos; 2/7/11 - Cylon Fleet support on Image Data tab
+&apos; - Added CAG to the roles
+&apos; - Added pilots in Mk VIIs
+&apos; - Added Mark VII counts (reserves &amp; damaged) 
+&apos; - updated the Game row to reflect the new spec, remove &quot;objective&quot; 
+&apos; - updated Reserves to support Mark VIIs 
+&apos; - updated JumpTrack to support Pursuit 
+
+&apos; 2/8/11 - GIMP: Widen the text fields for skill cards (so 10 is clear) and crisis (so 100 is clear)
+
+&apos; 2/23/11 - Updated to support automated generation of Pegasus/CylonFleet/Kobol combo
+&apos; ***GIMP***
+&apos; - Added Cylon Fleet Board &amp; Pursuit marker 
+&apos; - Added 4 Raiders 
+&apos; - Added 4 Mark VIIs
+&apos; - Added Mark VII to the reserves, including damage and counters
+&apos; - Added Mark VII Pilots
+&apos; - Added CAG token 
+&apos;
+&apos; ***Scripts***
+&apos; - Added ability to reconfigure based on destination and cylonfleet 
+&apos; - moved Destination token into the &quot;Game&quot; token as well as the cylonfleet flag - note...bsgp-Objective as deprecated
+&apos; - added location(s) for basestar bridge for characters to move to 
+&apos; - support cylon fleet deploys (&quot;CylonFleet&quot; set and locations on the board) 
+&apos; - support pursuit token  
+&apos; - a character in a Sector N* location is in a Mark VII 
+&apos; - move CAG token (roles) 
+&apos;
+&apos; ***CALC***
+&apos; - Added CAG to the Image Data (roles) 
+&apos; - Added way to put pilots in Mk VIIs to Image Data 
+&apos; - Added Mark VII counts (reserves &amp; damaged) to Image Data 
+&apos; - Image Data - updated the Game row to reflect the new spec, remove &quot;objective&quot; 
+&apos; - image data - updated Reserves to support Mark VIIs
+&apos; - image data - updated JumpTrack to support Pursuit 
+ 
+&apos; 2/24/11 - Airlock and Resistance HQ skill checks now correctly include Treachery
+ 
+&apos; 2/27/11 - fixed ship count by sector to support all 20 raiders
+
+&apos; 2/27/11 - Multiple Heavy Raiders can now board Galactica together
+
+&apos; 2/27/11 - Trust Instinct now enables the &quot;play from destiny&quot; button.
+&apos;    - framework is set up for the 0-value skill cards.
+
+&apos; 2/28/11 - fixed Cylon Leaders not showing Revealed, which caused problems allowing them to Infiltrate
+&apos;  - All the Leader and Infiltrate behavior should be correct now
+
+&apos; 2/28/11 - CAG title is now reassigned when the CAG is sent to the Brig.
+
+&apos; 2/28/11 - Quorum cards can be assigned to the 7th player now, only liked 6 before.
+
+&apos; 2/28/11 - Deal Super Crisis button is now enabled for any Revealed Cylon (who is not infiltrating)
+
+&apos; 2/28/11 - When a player starts a turn in Sickbay or Medical Center, a popup warns the mod to only deal 1 card instead of
+&apos;			 changing the allocation on skills tab
+
+&apos; 2/28/11 - Pilots correctly leave their ships and return them safely to the reserves when executed or revealed
+
+&apos; 2/28/11 - Massive Assault now correctly lists a Basestar attack instead of a Raider Launch
+
+&apos; 2/28/11 - Multiple Super Crisis cards in hand is now handled properly
+
+&apos; 3/1/11 - Scar is showing up correctly again
+
+&apos; 4/2/11 - Added Complex Destiny variant
+
+&apos; 4/2/11 - unpiloted Mark VII vipers now deploy correctly in the image
+
+&apos; 4/2/11 - added banner ID&apos;s for players on the reference page
+
+&apos; 6/13/11 - added support for Ionian Nebula
+&apos; - Added Ionian Nebula Tab and all attendant functionality
+&apos; - Added 2 new basestar damage tokens on ships tab, updated setup and basestar damage code
+&apos; - update Gamestate to clear allies on setup and when Pegasus blows up
+&apos; - updated crisis to clear allies when C1 blows up 
+
+&apos; 6/14/11 - added Crossroads functionality
+
+&apos; 6/15/11 - added in bug fixes &amp; additions from Jasperhawk
+&apos; - Sickbay image issue
+&apos; - Destination: Misjump showed under base instead of Pegasus
+&apos; - prompts for character abilities during skill checks (Cylon Hatred, Friends in Low Places, Insubordination)
+&apos; - Airlock prompts to see if we&apos;re executing a brigged prisoner
+&apos; - Tory gets Amoral reminder for CPC crisis on her turn.
+
+&apos; 6/15/11 - replaced my old posting templates with Jasperhawk&apos;s, which are better
+&apos; - added (2 max) for infiltrating cylon and cleaned up the skill check links to make it more understandable, I hope
+&apos; - added module flags on Game State from Jasperhawk&apos;s ss for posting template use
+
+&apos; 6/15/11 - fixed bug with log viewer
+
+&apos; 6/15/11 - added columns for Partial and Consequence
+
+&apos; 6/15/11 - updated skill check functions, inspired by Jasperhawk
+&apos; - Inspirational Leader, Investigative Committee, Guts &amp; Initiative now are functional and have nicer flags
+&apos; - Reckless checks have a flag
+&apos; - if a reckless card or a consequence is triggered, a msg pops up and a flag is set on the skills tab
+
+&apos; 6/17/11 - Added GIMP support for Ionian Nebula
+&apos; - includes updates to the Image Data tab.
+
+&apos; 6/18/11 - cleaned up interface for trauma tokens, hopefully it&apos;s a bit more intuitive now.
+
+&apos; 6/22/11 - added outlines for all counters in the image and added a switch for it on Game State.
+
+&apos; 6/22/11 - all combinations of Kobol/New Caprica/Ionian Nebula and Pegasus/not-Pegasus and Cylon Fleet/Standard Pursuit 
+&apos;		are now supported in the GIMP image file.
+
+&apos; 6/22/11 - Base is now fully supported in the GIMP file, we no longer need separate files for base and non-base.
+
+&apos; 6/25/11 - Civilian ships that are destroyed no longer get shuffled to the bottom, so if Civilian B is destroyed, 
+&apos;			that named ship is out of the game permenantly.
+
+&apos; 6/25/11 - added display on the skills tab above the character name if the character is in sickbay/med center as a reminder.
+
+&apos; 6/25/11 - fixed outline bug in GIMP  script
+
+&apos; 7/4/11 - fixed deck size tracking on the Board Status (thanks to jwcleveland for the bug report)
+
+&apos; 7/5/11 - added logging to Trauma Tokens
+
+&apos; 7/6/11 - added BGColor to image template to reset the background of the GIMP image
+
+&apos; 7/11/11 - fixed bug with board status not updating correctly for damaged locations. (thanks to jwcleveland for the bug report)
+
+&apos; 7/11/11 - CAG title now shows up correctly on Board Status (thanks to jwcleveland for the bug report)
+
+&apos; 7/12/11 - fixed a bug with multiple unmanned Mark VII&apos;s in one sector crashing (BSG-Pegasus.scm)
+
+&apos; 7/12/11 - Crisis cards now play in two steps.  The first &quot;plays&quot; the card, which moves it from the top of the deck to the discard area.
+&apos;	  if it&apos;s an attack card or has a skill check, the &quot;Cylon Attack/Initialize Skill Check&quot; button is enabled.  Clicking that makes it happen.
+
+&apos; 7/13/11 - added checks to make sure the jump track has advanced and/or ships have been activated before turn end.  
+&apos;	If this becomes annoying (particularly in non-CF games in which activation might be nothing) then make the notification optional.
+
+&apos; 7/27/11 - fixed but in Crisis.ActivateCrisis in which the special crisis effects were not happening (33/scar/etc). [thanks Jasperhawk]
+
+&apos; 7/28/11 - Added &quot;Manipulate Destiny&quot; and &quot;Reshuffle Destiny&quot; buttons on skill tab.  This supports:
+&apos; -[Quorum Card]Consult the Oracle -  discard 2 cards from destiny and reshuffle it
+&apos; -[Crisis Card]An Offer of Peace - add 2 Treachery to destiny and reshuffle it
+&apos; -[SuperCrisis]Psychological Warfare - discard destiny and then rebuild it with 6 Treachery cards
+
+
+</script:module>
