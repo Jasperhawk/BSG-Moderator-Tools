@@ -180,12 +180,19 @@ sub GenerateHandLists
 			print #fileno, &quot;Your Agenda is: &quot; &amp;  LoyaltySheet.getCellByPosition(playerID, _LoyaltyAgendaRow).string
 		elseif GetLoyaltyCount(playerID) &gt; 0 then
 			print #fileno, &quot;&quot;
+			Dim MaxLoyaltyToPrint as Integer
 			if IsCylonLeader(playerID) then
 				print #fileno, &quot;Your Motives are:&quot;
+				if GetSleeperState() then
+					MaxLoyaltyToPrint = 4
+				else
+					MaxLoyaltyToPrint = 2
+				end if
 			else
 				print #fileno, &quot;Your Loyalty is:&quot;
+				MaxLoyaltyToPrint = _MaxLoyaltyInHand
 			end if
-			for cardID = 1 to _MaxLoyaltyInHand
+			for cardID = 1 to MaxLoyaltyToPrint
 				card	= LoyaltySheet.getCellByPosition(playerID, _LoyaltyRow + cardID).string
 				if card &lt;&gt; &quot;&quot; then
 					print #fileno, card

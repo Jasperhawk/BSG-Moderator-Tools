@@ -647,6 +647,9 @@ sub EnableDestButtons (enflag as boolean)
 	DestnForm.getByName(&quot;btnLegendary&quot;).enabled = enflag
 end sub
 
+sub GetSleeperState as boolean
+	GetSleeperState = (GetTotalDistance() &gt;= _SleeperDistance)
+end sub
 
 
 
