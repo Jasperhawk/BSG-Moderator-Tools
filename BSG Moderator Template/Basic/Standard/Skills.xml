@@ -52,6 +52,7 @@ const _SkillCheckChanceCol			= 10
 const _SkillCheckGutsCol 			= 10
 const _SkillCheckFixCol				= 12
 const _SkillCheckRecklessCol 		= 13
+const _SkillCheckTypeCol            = 7
 
 const _SkillCheckTriggeredRow 			= 25
 const _SkillCheckTriggerConsequenceCol	= 14
@@ -457,13 +458,8 @@ sub Populate_Skills
 	Ctl_cards.SelectedItems		= selectlist
 end sub		&apos;Populate_Skills
 
-
-Sub DealCard
-	dim srccol,srcrow,destcol,destrow as integer
+Sub DealSelectedCard
 	dim srcskill, destplayer as integer
-	dim cardtxt as string
-
-	GetSF
 	srcskill	= GetSelected(_ListSkillDecks)
 	if srcskill = -1 then
 		MsgBox &quot;Please select a skill deck.&quot;
@@ -475,6 +471,27 @@ Sub DealCard
 		MsgBox &quot;Please select a player.&quot;
 		exit sub
 	end if
+	
+	DealCard(destplayer, srcskill)
+end sub
+
+Sub DealCard(destplayer as integer, srcskill as integer)
+	dim srccol,srcrow,destcol,destrow as integer
+&apos;	dim srcskill, destplayer as integer
+	dim cardtxt as string
+
+	GetSF
+&apos;	srcskill	= GetSelected(_ListSkillDecks)
+&apos;	if srcskill = -1 then
+&apos;		MsgBox &quot;Please select a skill deck.&quot;
+&apos;		exit sub
+&apos;	end if
+
+&apos;	destplayer = GetSelected(_ListSkillPlayers)
+&apos;	if destplayer &lt; 1 then
+&apos;		MsgBox &quot;Please select a player.&quot;
+&apos;		exit sub
+&apos;	end if
 	
 	
 	SkillForm.getByName(&quot;btnDeal&quot;).enabled = FALSE
@@ -735,6 +752,45 @@ sub DiscardFromHand
 	end if
 end sub		&apos;DiscardFromHand
 
+sub GetSkillType() as string
+	GetSkillType = SkillSheet.getCellByPosition(_SkillCheckValueCol + 3, _SkillCheckHeaderRow).string
+end sub
+
+sub GetSkillFlag (flag as string) as boolean
+	dim row, col as integer
+	row = _SkillCheckFlagsRow
+	GetSF
+	
+	select case flag
+		case &quot;Committee&quot;
+			col	= _SkillCheckCommitteeCol
+
+		case &quot;Reckless&quot;
+			col	= _SkillCheckRecklessCol
+			
+		case &quot;Inspirational&quot;
+			col	= _SkillCheckInspirationalCol
+			row = row + 1
+			
+		case &quot;Guts&quot;
+			col	= _SkillCheckGutsCol
+			row = row + 1
+			
+		case &quot;Order&quot;
+			col	= _SkillCheckOrderCol
+			
+		case &quot;Chance&quot;
+			col	= _SkillCheckChanceCol
+	
+	end select
+	if SkillSheet.getCellByPosition(col, row).string &lt;&gt; &quot;&quot; then
+		GetSkillFlag = TRUE
+	else
+		GetSkillFlag = FALSE
+	end if
+		
+end sub
+
 sub SetSkillFlag (flag as string, optional state as boolean)
 	dim whichcol, whichrow as integer
 	dim whichtxt as string
@@ -823,7 +879,12 @@ sub PlayFromHand
 		exit sub
 	end if
 
+	if GetSkillType = &quot;Mission&quot; then
+		MsgBox(&quot;You can&apos;t play cards on a Mission Skill Check&quot;)
+		exit sub
+	end if
 
+	
 	&apos;lets do some special checks here for specific cards...
 &apos;+== revisit these, right now we&apos;re playing them always, do we need to add the IsSkillCheckClear() back in?
 	select case SkillCardFromText(CardInHand(player,cardNo))
@@ -915,7 +976,7 @@ sub DiscardFromDestiny (cardtxt as string)
 end sub &apos;DiscardFromDestiny
 
 
-sub StartSkillCheck(crisisname as string, crisisskills() as variant, difficulty as integer, location as boolean, partial as integer, consequence as boolean)
+sub StartSkillCheck(crisisname as string, crisisskills() as variant, difficulty as integer, location as boolean, partial as integer, consequence as boolean, checktype as string)
 	dim skillid as integer
 	GetSF
 
@@ -951,7 +1012,10 @@ sub StartSkillCheck(crisisname as string, crisisskills() as variant, difficulty 
 		SkillSheet.getCellByPosition(_SkillCheckValueCol + 2, _SkillCheckHeaderRow).string	= &quot;&quot;
 	end if
 	
-	if GetPlayerName(GetCurrentPlayer()) = &quot;Adama&quot; and (Not IsRevealed(GetCurrentPlayer())) and not location then
+	&apos; Check type
+	SkillSheet.getCellByPosition(_SkillCheckValueCol + 3, _SkillCheckHeaderRow).string	= checktype
+	
+	if GetPlayerName(GetCurrentPlayer()) = &quot;Adama&quot; and (Not IsRevealed(GetCurrentPlayer())) and not location and checktype &lt;&gt; &quot;Mission&quot; then
 		SetSkillFlag &quot;Inspirational&quot;
 		MsgBox &quot;Adama is an Inspirational Leader!&quot;
 	end if
@@ -966,6 +1030,11 @@ sub ClearSkillCheck
 	if rtncd &lt;&gt; 6 then
 		exit sub
 	end if
+	
+	if GameTypeIsDaybreak and GetSkillFlag(&quot;Reckless&quot;) then
+		MsgBox &quot;Remember to resolve the Reckless Skill Check&quot;
+	end if
+	
 	DiscardSkillCheckCards
 end sub
 
@@ -993,7 +1062,7 @@ sub DiscardSkillCheckCards
 		next i	
 	next cardno
 	
-	for i = 0 to 9
+	for i = 0 to 11
 		SkillSheet.getCellByPosition(_SkillCheckCol + i, _SkillCheckRow - 1).string	= &quot;&quot;
 	next i
 
@@ -1131,6 +1200,8 @@ sub ShuffleDestiny
 		exit sub
 	end if
 
+	&apos; We have to compress the deck first, THEN shuffle
+	CompressSkillCards _SkillSetDestiny, 0
 	ShuffleASkillDeck _SkillIDDestiny
 end sub
 
@@ -1334,6 +1405,9 @@ sub Initialize_SkillCards
 
 	EnableCommandAuthority FALSE
 	EnableCryptic FALSE
+
+	GetSF
+	SkillForm.getByName(&quot;btnDrawCurrentPlayerHand&quot;).enabled = TRUE
 
 	for playerid = 1 to 7
 		SetDrawCards(playerid)
@@ -1722,7 +1796,9 @@ sub LaunchSkillCheck
 			brigflag=TRUE
 		end if		
 	next playerid
-		
+	
+	&apos;skillchecktype(&quot;Location&quot;)
+	
 	select case checkname
 		case &quot;Administration&quot;
 			skillsincheck(_SkillIDPolitics)		= &quot;X&quot;
@@ -1812,7 +1888,7 @@ sub LaunchSkillCheck
 			exit sub
 	end select
 	
-	StartSkillCheck(checkname, skillsincheck(), difficulty, TRUE, partial, FALSE)
+	StartSkillCheck(checkname, skillsincheck(), difficulty, TRUE, partial, FALSE, &quot;Location&quot;)
 
 end sub	&apos;LaunchSkillCheck
 
@@ -2004,6 +2080,8 @@ end function	&apos;GetSkillCardFrom
 
 sub CompressSkillCards (whichset as integer, setID as integer)
 	dim srccol, srcrow, firstempty, maxcnt, i as integer
+	
+	GetSF
 
 	srccol	= GetSkillSetCol(whichset, setID)
 	srcrow	= GetSkillSetRow(whichset)
@@ -2043,4 +2121,67 @@ sub ManipulateDestiny
 		SkillForm.getByName(&quot;btnManipulateDestiny&quot;).label = &quot;Manipulate Destiny&quot;		
 	end if
 end sub
+
+sub DrawCurrentPlayerHand
+	dim CP as integer
+	dim cards as variant
+	dim skillname as variant
+	dim skillid as integer
+	dim drawstr as string
+	dim optstr as string
+	dim cntr as integer
+	
+	optstr		= &quot;&quot;
+	skillname	= Array(&quot;&quot;,&quot;Politics&quot;,&quot;Leadership&quot;,&quot;Tactics&quot;,&quot;Piloting&quot;,&quot;Engineering&quot;,&quot;Treachery&quot;,&quot;Faith&quot;)
+	CP			= GetCurrentPlayer	
+	cards 		= GetPlyrDraw(CP)
+
+	GetSF
+	SkillForm.getByName(&quot;btnDrawCurrentPlayerHand&quot;).enabled = FALSE
+
+	if isCylon(CP) and not isCylonLeader(CP) then
+		MsgBox(GetPlayerName(CP) + &quot; is a CYLON; Draw manually 2 cards from different colors&quot;)
+		exit sub
+	elseif GetPlayerName(CP) = &quot;Athena&quot; and IsHazardous(GetPlayerLoc(CP)) then
+		MsgBox &quot;Athena is Grieving, and draws no cards this turn.&quot;
+		exit sub
+	elseif IsSick(CP) then
+		MsgBox GetPlayerName(CP) &amp; &quot; is in &quot; &amp; GetPlayerLoc(CP) &amp; &quot; and only receives 1 card this turn. Please choose manually.&quot;
+		exit sub
+	elseif GetPlayerName(CP) = &quot;Karl&quot; and not IsGalacticaLoc(GetPlayerLoc(CP)) then
+		MsgBox &quot;Karl is not on Galactica and draws only 4 cards this turn. Please choose manually&quot;
+		exit sub
+	end if
+	
+	for skillid = _SkillIDMin to _SkillIDMax
+		if int(cards(skillid)) &gt; 0 then
+&apos;			msgbox int(cards(skillid)) &amp; &quot; &quot; &amp; skillname(skillid)
+&apos;			drawstr = drawstr &amp; &quot; &quot; &amp; int(cards(skillid)) &amp; &quot; &quot; &amp; skillname(skillid)
+			for cntr = 1 to int(cards(skillid))
+				DealCard(CP, skillid)
+			next cntr
+		end if
+		
+		if int(cards(skillid)) &lt;&gt; cards(skillid) then
+			if optstr &lt;&gt; &quot;&quot; then
+				optstr = optstr &amp; &quot; or &quot;
+			end if
+			optstr = optstr &amp; (cards(skillid) - int(cards(skillid))) * 10 &amp; &quot; &quot; &amp; skillname(skillid)
+		end if
+	next skillid
+	
+	if optstr &lt;&gt; &quot;&quot; then
+		MsgBox &quot;Remember to draw manually &quot; + optstr + &quot;.&quot;
+		drawstr = drawstr &amp; &quot; / &quot; &amp; optstr
+	end if
+
+	if GetPlayerName(CP) = &quot;Doral&quot; and IsInfiltrating(CP) then
+		MsgBox &quot;Doral is Infiltrating and draws two extra cards instead of one.&quot;
+	elseif isCylonLeader(CP) and isInfiltrating(CP) then
+		MsgBox &quot;Since &quot; + GetPlayerName(CP) + &quot; is INFILTRATING, you need to draw an extra card&quot;
+	end if
+	
+end sub
+
+
 </script:module>

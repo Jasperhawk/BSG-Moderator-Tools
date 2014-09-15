@@ -564,6 +564,10 @@ sub ButtonPlaceTrauma
 		
 		if GetPlayerTTCnt(playerID, token) &gt; 0 then
 			tmplst = IonNebForm.getByName(&quot;lstTTTargets&quot;).SelectedItems()
+			if UBound(tmplst) = -1 then
+				MsgBox &quot;Select an Ally first&quot;
+				exit sub
+			end if
 			targetname = IonNebForm.getByName(&quot;lstTTTargets&quot;).StringItemList(val(tmplst(0)))
 			if targetname = &quot;Crossroads Card&quot; then
 				PlaceTraumaOnXR(playerID, token)
@@ -600,6 +604,18 @@ sub EncounterAlly (playerID as integer, allyID as integer)
 		&apos; Was a Disaster, no effect.
 		MsgBox &quot;No effect (Disaster).&quot;
 	endif
+	
+	&apos; Handle &quot;Odd Behavior&quot;
+	if GetAllyName(allyID) = &quot;Gaius Baltar&quot; and allyToken = _TokenTypeAntagonistic then
+		if GetTotalDistance() &lt;= 7 then
+			MsgBox &quot;You need to manually activate &apos;Odd Behavior&apos; on Loyalty tab&quot;
+			GetLoyalty
+			LoyaltyForm.getByName(&quot;btnOddBehavior&quot;).EnableVisible = TRUE
+			LoyaltyForm.getByName(&quot;btnOddBehavior&quot;).enabled = TRUE
+		else
+			MsgBox &quot;Since distance is &quot; + GetTotalDistance() + &quot;, there is no effect.&quot;
+		end if
+	end if
 	
 	&apos; Ally resolved, remove old Ally and return to the box. This will implicitly add the Trauma to the pool
 	ReturnAllyToBox(allyID)
@@ -678,6 +694,10 @@ sub ButtonEncounterAlly
 	if playerID &gt; 0 then
 		&apos; Player selected, let&apos;s get the target.
 		tmplst = IonNebForm.getByName(&quot;lstTTTargets&quot;).SelectedItems()
+		if UBound(tmplst) = -1 then
+			MsgBox &quot;Select an ally first&quot;
+			exit sub
+		end if
 		targetname = IonNebForm.getByName(&quot;lstTTTargets&quot;).StringItemList(val(tmplst(0)))
 		
 		&apos; Make sure the target is valid.

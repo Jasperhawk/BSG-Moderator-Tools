@@ -40,11 +40,22 @@ const _CapricaValueCol = _CapricaCol + 12
 const _CapricaRow = _CrisisRow + _MaxCrisisCnt + 3
 const _CapricaCnt = 30
 
+const _MissionCol			= 0
+const _MissionActiveCol		= _MissionCol + 1
+const _MissionDiscardCol	= _MissionCol + 2
+const _MissionStatusCol		= _MissionCol + 5
+const _MissionSkillCol		= _CrisisSkillCol
+const _MissionValueCol		= _CrisisValueCol
+const _MissionDistanceCol	= 13
+const _MissionRow			= _CapricaRow + _CapricaCnt + 4
+const _MissionCnt			= 8
+const _MissionColCnt		= 23
+
 const _ColonyCol = 0
 const _ColonyTypeCol = _ColonyCol + 2
 const _ColonySkillCol = _ColonyCol + 6
 const _ColonyValueCol = _ColonyCol + 12
-const _ColonyRow = _CapricaRow + _CapricaCnt + 3
+const _ColonyRow = _MissionRow + _MissionCnt + 3
 const _ColonyCnt = 30
 
 const _CrisisTypeReg = 0
@@ -56,7 +67,7 @@ const _CrisisTypeAttack = 5
 const _CrisisTypeNone = -1	&apos; used for resetting buttons
 
 global const _SuperCol 		= 0
-global const _SuperRow 		= 239	&apos; Can&apos;t be calculated because it&apos;s global
+global const _SuperRow 		= 251	&apos; Can&apos;t be calculated because it&apos;s global
 global const _SuperNameCol	= 1
 const _SuperBaseCnt = 5
 const _SuperPegasusCnt = 5
@@ -82,9 +93,10 @@ const _MaxCrisisDeckCol = 0
 const _MaxSuperCrisisDeckCol = 1
 const _MaxDeckRow = 0
 
-const _DeckCrisis = 0
-const _DeckNewCaprica = 1
-const _DeckColony = 2
+const _DeckCrisis 		= 0
+const _DeckNewCaprica	= 1
+const _DeckMission		= 2
+const _DeckColony 		= 3
 
 dim CrisisSheet, CrisisForm as object
 
@@ -217,6 +229,17 @@ function TopOfCapricaDeck as integer
 	TopOfCapricaDeck	= topofdeck
 end function
 
+function TopOfMissionDeck as integer
+	dim topofdeck as integer
+	
+	topofdeck	= 1
+	do while CrisisSheet.getCellByPosition(_MissionCol, _MissionRow + topofdeck).string = &quot;&quot; and topofdeck &lt;= 8&apos;and CrisisSheet.getCellByPosition(_MissionActiveCol, _MissionRow + topofdeck).string = &quot;&quot;
+		topofdeck	= topofdeck + 1
+	loop
+
+	TopOfMissionDeck	= topofdeck
+end function
+
 function TopOfColonyDeck as integer
 	dim topofdeck as integer
 	
@@ -225,7 +248,7 @@ function TopOfColonyDeck as integer
 		topofdeck	= topofdeck + 1
 	loop
 
-	TopOfColonyDeck=topofdeck
+	TopOfColonyDeck	= topofdeck
 end function
 
 function CheckSpecialAbility as boolean
@@ -459,6 +482,245 @@ sub PlayCrisisCard
 	LogThis &quot;CRISIS: &quot; &amp; CrisisSheet.getCellByPosition(refcol+1, refrow + crisisID).string
 end sub	&apos;PlayCrisisCard
 
+sub DiscardCurrentMission
+	dim refrow, refcol, crisisID as integer
+	
+	GetCrisisSheet
+	
+	refrow = _MissionRow
+	refcol = _MissionDiscardCol
+	crisisID = TopofMissionDeck() - 1
+	if crisisID = 0 then
+		exit sub
+	end if
+	
+	CrisisSheet.getCellByPosition(refcol, refrow + crisisID).string = &quot;X&quot;
+	SetMissionBtns TRUE
+end sub
+
+sub PlayMissionCard
+	dim rtncd, crisisID, skillid, refcol, refrow, difficulty, partial as integer
+	dim skillsincheck(5), crisisName as string &apos; Why can&apos;t we use _SkillIDBaseMax here?
+	dim consequence as boolean
+	
+	GetCrisisSheet
+	
+	refrow = _MissionRow
+	refcol = _MissionCol
+	crisisID = TopofMissionDeck()
+		
+	crisisName = CrisisSheet.getCellByPosition(refcol, refrow + crisisID).string
+	
+	if crisisName = &quot;&quot; then
+		MsgBox(&quot;You already played all of the missions&quot;)
+		SetMissionBtns FALSE
+		exit sub
+	end if
+
+	rtncd = MsgBox (&quot;Play Mission &quot;&quot;&quot; &amp; crisisName &amp; &quot;&quot;&quot;?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	CrisisSheet.getCellByPosition(refcol+1, refrow + crisisID).string = CrisisSheet.getCellByPosition(refcol, refrow + crisisID).string
+	CrisisSheet.getCellByPosition(refcol+1, refrow + crisisID).CharColor = CrisisSheet.getCellByPosition(refcol, refrow + crisisID).CharColor
+	CrisisSheet.getCellByPosition(refcol, refrow + crisisID).string = &quot;&quot;
+
+	LogThis &quot;MISSION: &quot; &amp; CrisisSheet.getCellByPosition(refcol+1, refrow + crisisID).string
+
+
+	&apos; this is called to initialize a skill check for the crisis on the top of the discard pile, as it were
+
+	if CrisisSheet.getCellByPosition(_MissionValueCol, refrow + crisisID).string &lt;&gt; &quot;&quot; then
+	
+		for skillid = _SkillIDMin to _SkillIDBaseMax
+			skillsincheck(skillid) = CrisisSheet.getCellByPosition(_MissionSkillCol + skillID, refrow + crisisID).string
+		next skillid
+		
+		difficulty = CrisisSheet.getCellByPosition(_MissionValueCol, refrow + crisisID).string
+		partial	= 0
+		consequence = False
+		
+		&apos; set up the skill check
+		StartSkillCheck(crisisname, skillsincheck, difficulty, FALSE, partial, consequence, &quot;Mission&quot;)
+		&apos;elseif crisisname = &quot;Legendary Discovery&quot; or crisisname = &quot;The Road Less Traveled&quot; then
+		&apos;	EnableSpecialDistance(crisisname)
+		&apos;end if
+		MsgBox &quot;Skill Check Initialized&quot;
+		LogThis crisisName &amp; &quot;: Skill Check Initialized&quot;
+	end if
+
+	SetMissionBtns FALSE
+	SetMissionResultBtns TRUE
+	SetCrisisBtns FALSE
+end sub	&apos;PlayMissionCard
+
+sub MissionPass
+	dim rtncd, crisisID, playerID, refrow, refcol, basestarID, centurionID, heavyID as integer
+	dim crisisName as string
+	
+	SetMissionResultBtns FALSE
+	
+	GetCrisisSheet
+	
+	refrow = _MissionRow
+	refcol = _MissionActiveCol
+	crisisID = TopofMissionDeck() - 1
+	crisisName = CrisisSheet.getCellByPosition(refcol, refrow + crisisID).string
+
+	rtncd = MsgBox (&quot;Do you want to trigger the PASS effect of Mission &quot;&quot;&quot; &amp; crisisName &amp; &quot;&quot;&quot;?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		SetMissionResultBtns TRUE
+		exit sub
+	end if
+
+	LogThis &quot;Mission &quot; &amp; crisisName &amp; &quot; PASSES.&quot;
+	if crisisName = &quot;Rescue Hera&quot; then
+		for playerID = 1 to playercnt()
+			if OPGUsed(playerID) then
+				SetOPG (playerID, 1)
+				LogThis GetPlayerName(playerID) &amp; &quot; gains a Miracle Token!&quot;
+			end if
+		next playerID
+	elseif crisisName = &quot;Cylon Civil War&quot; then
+		SetDRBBAllegiance(&quot;Human&quot;)
+		LogThis &quot;Rebel Basestar Allegiance now HUMAN&quot;
+		MsgBox(&quot;Rebel Basestar Allegiance now HUMAN&quot;)
+	elseif crisisName = &quot;Needs of the People&quot; then
+		IncreaseResource _ResourceFood
+		IncreaseResource _ResourceFood
+		MsgBox(&quot;+2 Food&quot;)
+		MsgBox(&quot;Remember to repair 1 damaged Location&quot;)
+	elseif crisisName = &quot;Destroy the Hub&quot; then
+		Board_SetSpecial &quot;Hub Destroyed&quot;
+		LogThis &quot;Hub Destroyed&quot;
+		MsgBox(&quot;Hub Destroyed&quot;)
+	elseif crisisName = &quot;Attack on the Colony&quot; then
+		SweepShips(_ShipBasestar, FALSE)
+		basestarID = GetAvailableShip(_ShipBasestar)
+		if basestarID = 0 then
+			MsgBox(&quot;No basestars off board. Please select one and remove it manually&quot;)
+		else
+			SetShipStatus _ShipBasestar, basestarID, _ShipStatusRemoved
+			MsgBox(&quot;One Basestar removed from the game&quot;)
+			LogThis &quot;Basestar Removed from the game&quot;
+		end if
+	elseif crisisName = &quot;The Red Stripes&quot; then
+		SweepShips(_ShipHeavy, FALSE)
+		SweepShips(_ShipCenturion, FALSE)
+		centurionID = GetAvailableShip(_ShipCenturion)
+		SetShipStatus _ShipCenturion, centurionID, _ShipStatusDestroyed
+		centurionID = GetAvailableShip(_ShipCenturion)
+		SetShipStatus _ShipCenturion, centurionID, _ShipStatusDestroyed
+		LogThis &quot;2 Centurions removed from the Game&quot;
+		heavyID = GetAvailableShip(_ShipHeavy)
+		if heavyID = 0 then
+			MsgBox(&quot;No Heavy Raiders off board. Please remove TWO manually&quot;)
+		else
+			SetShipStatus _ShipHeavy, heavyID, _ShipStatusDestroyed
+			heavyID = GetAvailableShip(_ShipHeavy)
+			if heavyID = 0 then
+				MsgBox(&quot;Only one Heavy Raider off board. Please remove another one manually&quot;)
+			else
+				SetShipStatus _ShipHeavy, heavyID, _ShipStatusDestroyed
+				MsgBox(&quot;Removed two Heavy Raiders and two Centurions from the game&quot;)
+				LogThis &quot;2 Heavy Raiders removed from the game&quot;
+			end if
+		end if
+	elseif crisisName = &quot;Digging Up the Past&quot; then
+		EnableSpecialDistance(crisisName)
+		MsgBox(&quot;Destination enabled. Go to the Destination tab and select the destination&quot;)
+		LogThis &quot;Digging Up the Past destination enabled&quot;
+	elseif crisisName = &quot;The Search for Home&quot; then
+		EnableSpecialDistance(crisisName)
+		MsgBox(&quot;Destination enabled. Go to the Destination tab and select the destination&quot;)
+		LogThis &quot;The Search for Home destination enabled&quot;
+	end if
+	&apos; We don&apos;t reset our next mission until the next jump
+	SetMissionBtns FALSE
+	SetCrisisBtns TRUE
+	CrisisSheet.getCellByPosition(_MissionStatusCol, refrow + crisisID).string = &quot;Passed&quot;	
+end sub &apos;MissionPass
+
+sub MissionFail
+	dim rtncd, crisisID, playerID, refrow, refcol, basestarID, centurionID, heavyID, shipid as integer
+	dim crisisName as string
+	
+	SetMissionResultBtns FALSE
+	
+	GetCrisisSheet
+	
+	refrow = _MissionRow
+	refcol = _MissionActiveCol
+	crisisID = TopofMissionDeck() - 1
+	crisisName = CrisisSheet.getCellByPosition(refcol, refrow + crisisID).string
+
+	rtncd = MsgBox (&quot;Do you want to trigger the FAIL effect of Mission &quot;&quot;&quot; &amp; crisisName &amp; &quot;&quot;&quot;?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		SetMissionResultBtns TRUE
+		exit sub
+	end if
+
+	LogThis &quot;Mission &quot; &amp; crisisName &amp; &quot; FAILS.&quot;
+	if crisisName = &quot;Rescue Hera&quot; then
+		ReduceResource _ResourceMorale
+		shipid=GetAvailableShip(_ShipRaptor)
+		if shipid=0 then
+			MsgBox &quot;No Raptors to destroy&quot;
+		else
+			SetShipStatus _ShipRaptor, shipID, _ShipStatusDestroyed
+			MsgBox &quot;Raptor destroyed.&quot;
+		end if
+		MsgBox &quot;-1 Morale &quot;
+	elseif crisisName = &quot;Cylon Civil War&quot; then
+		SetDRBBAllegiance(&quot;Cylon&quot;)
+		LogThis &quot;Rebel Basestar Allegiance now CYLON&quot;
+		MsgBox(&quot;Rebel Basestar Allegiance now CYLON&quot;)
+	elseif crisisName = &quot;Needs of the People&quot; then
+		ReduceResource _ResourceFood
+		MsgBox(&quot;-1 Food. Remember to give 1 Treachery to each Human Player&quot;)
+	elseif crisisName = &quot;Destroy the Hub&quot; then
+		ReduceResource _ResourcePopulation
+		SweepShips(_ShipViper, FALSE)
+		SweepShips(_ShipMarkVII, FALSE)
+		SweepShips(_ShipAssaultRaptor, FALSE)
+		MsgBox(&quot;Vipers removed from the game board. Go to the Ships tab and damage 2 of them.&quot;)
+	elseif crisisName = &quot;Attack on the Colony&quot; then
+		basestarID = GetAvailableShip(_ShipBasestar)
+		if basestarID = 0 then
+			MsgBox(&quot;No basestars off board. Go to the Game State tab and damage Galactica.&quot;)
+		else
+			SetShipStatus _ShipBasestar, basestarID, 1
+			MsgBox(&quot;A basestar was placed on sector 1. Go to the Game State tab and damage Galactica.&quot;)
+		end if
+	elseif crisisName = &quot;The Red Stripes&quot; then
+		heavyID = GetAvailableShip(_ShipHeavy)
+		if heavyID = 0 then
+			MsgBox(&quot;No Heavy Raiders available&quot;)
+		else
+			MsgBox(&quot;Placed 1 Heavy Raider in front of Galactica&quot;)
+			SetShipStatus _ShipHeavy, heavyID, 1
+		end if
+		
+		centurionID = GetAvailableShip(_ShipCenturion)
+		if centurionID = 0 then
+			MsgBox(&quot;No Centurions available&quot;)
+		else
+			SetShipStatus _ShipCenturion, centurionID, 1
+			MsgBox(&quot;Placed 1 Centurion on the Boarding Party Track&quot;)
+		end if
+	elseif crisisName = &quot;Digging Up the Past&quot; then
+		MsgBox(&quot;You have to manually shuffle 2 Treachery Cards into the Destiny&quot;)
+	elseif crisisName = &quot;The Search for Home&quot; then
+		ReduceResource _ResourceFuel
+		MsgBox(&quot;-1 Fuel&quot;)
+	end if
+	&apos; We don&apos;t reset our next mission until the next jump
+	SetMissionBtns FALSE
+	SetCrisisBtns TRUE
+	CrisisSheet.getCellByPosition(_MissionStatusCol, refrow + crisisID).string = &quot;Failed&quot;	
+end sub &apos;MissionPass
+
 
 sub ActivateCrisis 
 	&apos; this is called to initialize a skill check for the crisis on the top of the discard pile, as it were
@@ -509,7 +771,7 @@ sub ActivateCrisis
 		consequence = CrisisSheet.getCellByPosition(_CrisisValueCol + 2, refrow + crisisID).string &lt;&gt; &quot;&quot;
 		
 		&apos; set up the skill check
-		StartSkillCheck(crisisname, skillsincheck, difficulty, FALSE, partial, consequence)
+		StartSkillCheck(crisisname, skillsincheck, difficulty, FALSE, partial, consequence, &quot;Crisis&quot;)
 		if crisisname = &quot;Detector Sabotage&quot; then
 			MsgBox &quot;If the crisis check fails, be sure to hit the &quot;&quot;Sabotage Detector&quot;&quot; button at the top!&quot;
 			CrisisForm.getByName(&quot;btnDetector&quot;).enabled = TRUE
@@ -521,6 +783,7 @@ sub ActivateCrisis
 	end if
 
 	SetCrisisStartButton (&quot;&quot;, _CrisisTypeNone)
+
 end sub	&apos;ActivateCrisis
 
 
@@ -601,6 +864,55 @@ sub BuryCrisisCard
 
 	SetCrisisBtns TRUE
 end sub		&apos;BuryCrisisCard
+
+sub BuryMissionCard
+	dim rtncd, crisisID, i, topofdeck, endofdeck, buryDeck as integer
+	dim refcol, refrow as integer
+	dim skillsincheck(6) as string
+	dim crisisData(_MissionColCnt) as variant
+	GetCrisisSheet
+
+	SetMissionBtns FALSE
+	SetMissionResultBtns FALSE
+
+	refcol = _MissionCol
+	refrow = _MissionRow
+	topofdeck = TopOfMissionDeck()
+	endofdeck = _MissionCnt
+	buryDeck = _DeckMission
+	
+	rtncd = MsgBox (&quot;Bury &quot;&quot;&quot; &amp; CrisisSheet.getCellByPosition(refcol, refrow + topofdeck).string &amp; &quot;&quot;&quot; on the bottom of the deck?&quot;,4,&quot;Bury Mission&quot;)
+	if rtncd &lt;&gt; 6 then
+		SetMissionBtns TRUE
+		exit sub
+	end if
+
+	crisisData(0) = CrisisSheet.getCellByPosition(refcol, refrow + topofdeck).string
+	crisisData(1) = CrisisSheet.getCellByPosition(refcol, refrow + topofdeck).CharColor
+	for i = 2 to _MissionColCnt
+		crisisData(i) = CrisisSheet.getCellByPosition(refcol + i, refrow + topofdeck).string
+	next i
+
+	for crisisID = topofdeck to endofdeck
+		CrisisSheet.getCellByPosition(refcol, refrow + crisisID).string = CrisisSheet.getCellByPosition(refcol, refrow + crisisID + 1).string
+		CrisisSheet.getCellByPosition(refcol, refrow + crisisID).CharColor = CrisisSheet.getCellByPosition(refcol, refrow + crisisID + 1).CharColor
+		for i = 2 to _MissionColCnt
+			CrisisSheet.getCellByPosition(refcol + i, refrow + crisisID).string = CrisisSheet.getCellByPosition(refcol + i, refrow + crisisID + 1).string
+		next i
+	next crisisID 
+	
+	CrisisSheet.getCellByPosition(refcol, refrow + endofdeck).string = crisisData(0)
+	CrisisSheet.getCellByPosition(refcol, refrow + endofdeck).CharColor = crisisData(1)
+	for i = 2 to _MissionColCnt
+		CrisisSheet.getCellByPosition(refcol + i, refrow + endofdeck).string = crisisData(i)
+	next i
+
+	SetBuryCnt buryDeck, FALSE		
+	LogThis &quot;Mission &quot; &amp; crisisData(0) &amp; &quot; moved to the bottom of the deck.&quot;
+	LogBuryCard _CardTypeCrisis, crisisData(0)
+
+	SetMissionBtns TRUE
+end sub		&apos;BuryMissionCard
 
 
 sub ThirtyThree
@@ -802,6 +1114,59 @@ sub ShuffleNCDeck (shuffleALL as boolean)
 	end if
 end sub
 
+sub ShuffleMissionDeck (shuffleALL as boolean)
+	dim tmpval, sortOrder(_MissionCnt) as double
+	dim tmpcrisis, crisislst(_MissionCnt) as variant
+	dim crisisdata(_CrisisColCnt) as variant
+	dim crisisID, i, j, topofdeck, endofdeck as integer
+	GetCrisisSheet
+
+	topofdeck=TopOfMissionDeck()
+	if shuffleALL then
+		endofdeck = _MissionCnt
+	else
+		endofdeck = _MissionCnt - GetBuryCnt(_DeckMission)
+	end if
+
+	for crisisID = topofdeck to endofdeck
+		sortOrder(crisisID) = rnd()	
+		redim crisisdata(_CrisisColCnt) as variant			
+		for i = 0 to _CrisisColCnt
+			crisisdata(i) = CrisisSheet.getCellByPosition(_MissionCol + i, _MissionRow + crisisID).string
+		next i
+		crisisdata(1) = CrisisSheet.getCellByPosition(_MissionCol, _MissionRow + crisisID).CharColor
+		crisislst(crisisID) = crisisdata()
+	next crisisID
+	
+	for i = topofdeck to endofdeck -1
+		for j=i+1 to endofdeck
+			if sortOrder(i) &gt; sortOrder(j) then
+				tmpval = sortOrder(i)
+				tmpcrisis = crisislst(i)
+				
+				sortOrder(i) = sortOrder(j)
+				crisislst(i) = crisislst(j)
+				
+				sortOrder(j) = tmpval
+				crisislst(j) = tmpcrisis
+			end if
+		next j
+	next i
+	
+	for crisisID = topofdeck to endofdeck
+		tmpcrisis = crisislst(crisisID)
+		CrisisSheet.getCellByPosition(_MissionCol, _MissionRow + crisisID).string = tmpcrisis(0)
+		CrisisSheet.getCellByPosition(_MissionCol, _MissionRow + crisisID).CharColor = tmpcrisis(1)
+		for i = 2 to _CrisisColCnt
+			CrisisSheet.getCellByPosition(_MissionCol + i, _MissionRow + crisisID).string = tmpcrisis(i)
+		next i
+	next crisisID
+	
+	if shuffleALL then
+		SetBuryCnt(_DeckMission, TRUE)
+	end if
+end sub
+
 sub ShuffleColonyDeck (shuffleALL as boolean)
 	dim tmpval, sortOrder(_ColonyCnt) as double
 	dim tmpcrisis, crisislst(_ColonyCnt) as variant
@@ -936,6 +1301,11 @@ sub Configure_CrisisCards
 			CrisisSheet.Rows(_CapricaRow + currow).IsVisible = FALSE
 		end if
 	next currow
+	
+	&apos; If we&apos;re not playing with ObjectiveIsEarth(), hide the Mission deck.
+	for currow = -1 to _MissionCnt + 1
+			CrisisSheet.Rows(_MissionRow + currow).IsVisible	= ObjectiveIsEarth()
+	next currow
 
 	&apos; if we&apos;re not playing ObjectiveIsColony(), go ahead and hide theColony crisis card section
 	&apos; in this case we hide or show the whole deck, so the &quot;deck size&quot; row is included
@@ -960,7 +1330,7 @@ sub Initialize_CrisisCards
 			CrisisSheet.getCellByPosition(_CrisisCol, _CrisisRow + crisisID).string = 	CrisisSheet.getCellByPosition(_CrisisCol + 1, _CrisisRow + crisisID).string
 			CrisisSheet.getCellByPosition(_CrisisCol, _CrisisRow + crisisID).CharColor = 	CrisisSheet.getCellByPosition(_CrisisCol + 1, _CrisisRow + crisisID).CharColor
 		end if
-		CrisisSheet.getCellByPosition(_CrisisCol+1, _CrisisRow + crisisID).string = &quot;&quot;
+		CrisisSheet.getCellByPosition(_CrisisCol + 1, _CrisisRow + crisisID).string = &quot;&quot;
 	next crisisID
 	
 	for crisisID = 1 to _CapricaCnt
@@ -968,7 +1338,16 @@ sub Initialize_CrisisCards
 			CrisisSheet.getCellByPosition(_CapricaCol, _CapricaRow + crisisID).string = CrisisSheet.getCellByPosition(_CapricaCol + 1, _CapricaRow + crisisID).string
 			CrisisSheet.getCellByPosition(_CapricaCol, _CapricaRow + crisisID).CharColor = CrisisSheet.getCellByPosition(_CapricaCol + 1, _CapricaRow + crisisID).CharColor
 		end if
-		CrisisSheet.getCellByPosition(_CapricaCol+1, _CapricaRow + crisisID).string = &quot;&quot;
+		CrisisSheet.getCellByPosition(_CapricaCol + 1, _CapricaRow + crisisID).string = &quot;&quot;
+	next crisisID
+	
+	for crisisID = 1 to _MissionCnt
+		if CrisisSheet.getCellByPosition(_MissionCol, _MissionRow + crisisID).string = &quot;&quot; then
+			CrisisSheet.getCellByPosition(_MissionCol, _MissionRow + crisisID).string	= CrisisSheet.getCellByPosition(_MissionActiveCol, _MissionRow + crisisID).string
+		end if
+		CrisisSheet.getCellByPosition(_MissionActiveCol, _MissionRow + crisisID).string	= &quot;&quot;
+		CrisisSheet.getCellByPosition(_MissionDiscardCol, _MissionRow + crisisID).string = &quot;&quot;
+		CrisisSheet.getCellByPosition(_MissionStatusCol, _MissionRow + crisisID).string	= &quot;&quot;
 	next crisisID
 	
 	for crisisID = 1 to _ColonyCnt
@@ -981,17 +1360,23 @@ sub Initialize_CrisisCards
 	
 	SetBuryCnt _DeckCrisis, TRUE
 	SetBuryCnt _DeckNewCaprica, TRUE
+	SetBuryCnt _DeckMission, TRUE
 	SetBuryCnt _DeckColony, TRUE
 	
 	Configure_CrisisCards
 	ShuffleCrisisDeck TRUE
 	ShuffleNCDeck TRUE
+	ShuffleMissionDeck TRUE
 	ShuffleColonyDeck TRUE
 	ResetColors
 	EnableThirtyThree FALSE
 	
 	SetCrisisStartButton (&quot;&quot;, _CrisisTypeNone)
 	ClearCrisisFlags
+
+	SetMissionBtns TRUE
+	SetMissionResultBtns FALSE
+	ShowMissionBtns ObjectiveIsEarth
 
 end sub	&apos;Initialize_CrisisCards
 
@@ -1098,7 +1483,6 @@ sub Initialize_Super
 			crisisdata(i) = CrisisSheet.getCellByPosition(_SuperCol + i, _SuperRow + superID).string
 		next i
 		superlst(superID) = crisisdata()
-
 	next superID
 	
 	for i = 1 to maxcnt -1
@@ -1201,7 +1585,7 @@ sub PlaySuperCrisis
 		consequence = CrisisSheet.getCellByPosition(_CrisisValueCol + 2, _SuperRow + superID).string &lt;&gt; &quot;&quot;
 		
 		&apos; set up the skill check
-		StartSkillCheck(supername, skillsincheck, difficulty, FALSE, partial, consequence)
+		StartSkillCheck(supername, skillsincheck, difficulty, FALSE, partial, consequence, &quot;Super&quot;)
 		
 	elseif CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).string = &quot;Massive Assault&quot; or CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).string = &quot;Lured into a Trap&quot; then
 		&apos; this is a Massive Assault
@@ -1227,11 +1611,31 @@ sub PlaySuperCrisis
 end sub
 
 sub SetCrisisBtns (enflag as boolean)
+	GetCrisisSheet
 	CrisisForm.getByName(&quot;btnPlayCrisis&quot;).enabled = enflag
 	CrisisForm.getByName(&quot;btnBuryCrisis&quot;).enabled = enflag
 	CrisisForm.getByName(&quot;btnReshuffle&quot;).enabled = enflag
 end sub
 
+sub SetMissionBtns (enflag as boolean)
+	GetCrisisSheet
+	CrisisForm.getByName(&quot;btnPlayMission&quot;).enabled = enflag
+	CrisisForm.getByName(&quot;btnBuryMission&quot;).enabled = TRUE
+end sub
+
+sub SetMissionResultBtns (enflag as boolean)
+	GetCrisisSheet
+	CrisisForm.getByName(&quot;btnMissionPass&quot;).enabled = enflag
+	CrisisForm.getByName(&quot;btnMissionFail&quot;).enabled = enflag
+end sub
+
+sub ShowMissionBtns (enflag as boolean)
+	GetCrisisSheet
+	CrisisForm.getByName(&quot;btnPlayCrisis&quot;).enabled = enflag
+	CrisisForm.getByName(&quot;btnBuryMission&quot;).enabled = enflag
+	CrisisForm.getByName(&quot;btnMissionPass&quot;).enabled = FALSE
+	CrisisForm.getByName(&quot;btnMissionFail&quot;).enabled = FALSE
+end sub
 
 sub DiscardSuperCrisis
 	&apos;this is to discard and get a new one
@@ -1455,4 +1859,13 @@ sub BattleOfIonianNebula
 	MsgBox &quot;Setting up the Battle of the Ionian Nebula.&quot;
 	DeployCylonShips(_BattleOfIonianNebulaID)
 end sub
+
+&apos; ALL WORK AND NO PLAY MAKES MAWKEE A DULL BOY ALL WORK AND NO PLAY MAKES MAWKEE A DULL BOY ALL WORK AND NO PLAY MAKES MAWKEE A DULL
+&apos; BOY ALL WORK AND NO PLAY MAKES MAWKEE A DULL BOY ALL WORK AND NO PLAY MAKES MAWKEE A DULL BOY ALL WORK AND NO PLAY MAKES MAWKEE A
+&apos; DULL BOY ALL WORK AND NO PLAY MAKES MAWKEE A DULL BOY ALL WORK AND NO PLAY MAKES MAWKEE A DULL BOY ALL WORK AND NO PLAY MAKES
+&apos; MAWKEE A DULL BOY ALL WORK AND NO PLAY MAKES MAWKEE A DULL BOY ALL WORK AND NO PLAY MAKES MAWKEE A DULL BOY ALL WORK AND NO PLAY
+&apos; MAKES MAWKEE A DULL BOY ALL WORK AND NO PLAY MAKES MAWKEE A DULL BOY ALL WORK AND NO PLAY MAKES MAWKEE A DULL BOY ALL WORK AND NO
+&apos; PLAY MAKES MAWKEE A DULL BOY ALL WORK AND NO PLAY MAKES MAWKEE A DULL BOY ALL WORK AND NO PLAY MAKES MAWKEE A DULL BOY ...
+
+
 </script:module>

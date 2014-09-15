@@ -158,27 +158,27 @@ sub UpdateLocations
 				locidx	= locidx + 1
 			end if
 			
+			if HubDestroyed() then
+				LocCylon(3)	= &quot;Hub Destroyed&quot;
+			end if
+			
 			for tmpidx = 0 to ubound(locCylon)
 				redim preserve loclst(locidx) as string
 				loclst(locidx)	= locCylon(tmpidx)
 				locidx	= locidx + 1
 			next tmpidx
 			
-&apos;			if HubDestroyed() then
-&apos;				loclst(4)	= &quot;Hub Destroyed&quot;
-&apos;			end if
-			
-&apos;			if DaybreakRebelBasestarAvailable() and RebelBasestarAllegiance() = &quot;Cylon&quot; then
-&apos;				redim preserve loclst(locidx) as string
-&apos;				loclst(locidx) = &quot;---------------&quot;
-&apos;				locidx	= locidx + 1
-&apos;				
-&apos;				for tmpidx = 0 to ubound(locRBBDay)
-&apos;					redim preserve loclst(locidx) as string
-&apos;					loclst(locidx)	= locRBBDay(tmpidx)
-&apos;					locidx	= locidx + 1
-&apos;				next tmpidx
-&apos;			end if
+			if DRBBAllegiance() = &quot;Cylon&quot; then
+				redim preserve loclst(locidx) as string
+				loclst(locidx) = &quot;---------------&quot;
+				locidx	= locidx + 1
+				
+				for tmpidx = 0 to ubound(locRBBDay)
+					redim preserve loclst(locidx) as string
+					loclst(locidx)	= locRBBDay(tmpidx)
+					locidx	= locidx + 1
+				next tmpidx
+			end if
 			isfirst = FALSE
 		end if
 	end if
@@ -273,21 +273,21 @@ sub UpdateLocations
 				
 				for tmpidx = 0 to ubound(locDem)
 					redim preserve loclst(locidx) as string
-					loclst(locidx)	= locC1(tmpidx)
+					loclst(locidx)	= locDem(tmpidx)
 					locidx	= locidx + 1
 				next tmpidx
 			
-&apos;				if DaybreakRebelBasestarAvailable() and RebelBasestarAllegiance() = &quot;Human&quot; then
-&apos;					redim preserve loclst(locidx) as string
-&apos;					loclst(locidx) = &quot;---------------&quot;
-&apos;					locidx	= locidx + 1
-&apos;					
-&apos;					for tmpidx = 0 to ubound(locRBBDay)
-&apos;						redim preserve loclst(locidx) as string
-&apos;						loclst(locidx)	= locRBBDay(tmpidx)
-&apos;						locidx	= locidx + 1
-&apos;					next tmpidx
-&apos;				end if
+				if DRBBAllegiance() = &quot;Human&quot; then
+					redim preserve loclst(locidx) as string
+					loclst(locidx) = &quot;---------------&quot;
+					locidx	= locidx + 1
+					
+					for tmpidx = 0 to ubound(locRBBDay)
+						redim preserve loclst(locidx) as string
+						loclst(locidx)	= locRBBDay(tmpidx)
+						locidx	= locidx + 1
+					next tmpidx
+				end if
 			end if
 			isfirst = FALSE
 		end if
@@ -614,6 +614,9 @@ sub NextTurn
 	SortHands
 	SetPlayerSelect curmin
 	
+	&apos; Check if we have to automatically Draw the current player hand or just enable the respective button
+	GetSF
+	SkillForm.getByName(&quot;btnDrawCurrentPlayerHand&quot;).enabled = FALSE
 	if GetPlayerName(curmin) = &quot;Athena&quot; and IsHazardous(GetPlayerLoc(curmin)) then
 		MsgBox &quot;Athena is Grieving, and draws no cards this turn.&quot;
 	elseif GetPlayerLoc(GetCurrentPlayer()) = &quot;Hub Destroyed&quot; then
@@ -624,6 +627,12 @@ sub NextTurn
 		MsgBox &quot;Doral is Infiltrating and draws two extra cards instead of one.&quot;
 	elseif GetPlayerName(curmin) = &quot;Karl&quot; and not IsGalacticaLoc(GetPlayerLoc(curmin)) then
 		MsgBox &quot;Karl is not on Galactica and draws only 4 cards this turn.&quot;
+	else
+		if GameForm.getByName(&quot;chkAutoDraw&quot;).state = 1 then
+			DrawCurrentPlayerHand
+		else
+			SkillForm.getByName(&quot;btnDrawCurrentPlayerHand&quot;).enabled = TRUE
+		end if
 	end if
 	
 	if ObjectiveIsIonianNebula() then
@@ -633,6 +642,7 @@ sub NextTurn
 			end if
 		end if
 	end if
+	
 	
 	&apos;set the raw value for the log viewer
 	GameSheet.GetCellByPosition(_LogViewCol,_LogViewRow).value = (curmaj -1)*PlayerCnt() + curmin
@@ -1455,12 +1465,14 @@ sub DamageLocation (locname as string)
 			SetPlayerLoc i, &quot;Sickbay&quot;
 			LogThis GetPlayerName(i) &amp; &quot; sent to Sickbay.&quot;
 			MsgBox GetPlayerName(i) &amp; &quot; sent to Sickbay!&quot;
+			SetDrawCards i
 		end if
 	next i
 	
 	if ObjectiveIsIonianNebula then
 		InactivateAllyLocation(locname)
 	end if
+	&apos; Set draw cards for player (he&apos;s on sickbay)
 end sub
 
 sub ReduceResource (resid as integer) 
@@ -2235,11 +2247,11 @@ sub Infiltrate
 	
 	playerID = GetSelected(_ListGamePlayers)
 	if IsInfiltrating(playerID) then
-&apos;		if HubDestroyed() then
-&apos;			resship = &quot;Hub Destroyed&quot;
-&apos;		else
+		if HubDestroyed() then
+			resship = &quot;Hub Destroyed&quot;
+		else
 			resship = &quot;Resurrection Ship&quot;
-&apos;		end if
+		end if
 		if MsgBox(&quot;Exfiltrate &quot; &amp; GetPlayerName(playerID) &amp; &quot; to the &quot; &amp; resship &amp; &quot;?&quot;, 4, &quot;Exfiltrate&quot;) = 6 then
 			if GetPlayerLoc(playerID) = &quot;Brig&quot; then
 				MsgBox &quot;Don&apos;t forget to discard down to 3 Skill Cards.&quot;

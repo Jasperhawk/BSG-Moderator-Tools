@@ -71,6 +71,11 @@ sub DrawMutiny (playerID as integer, optional zarek as boolean)
 		SetBuriedMutiny(true)
 		ShuffleMutinyDeck
 	end if
+	
+	if GetPlayerName(playerID) = &quot;Lee&quot; then
+		MsgBox &quot;Remember that Lee has to discard 2 cards after drawing a Mutiny card&quot;
+	end if
+	
 end sub
 
 sub DrawMutinyButton

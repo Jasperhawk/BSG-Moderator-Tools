@@ -439,6 +439,7 @@ sub JumpToDestination
 	LogThis &quot;The Fleet jumps to &quot; &amp; destnstr &amp; &quot; (Distance &quot; &amp; destndist &amp; &quot;)&quot;  &amp; &quot; - Total distance now &quot; &amp; prevdist + destndist
 	
 	HandleDistanceTriggers
+	DiscardCurrentMission
 	
 	if MsgBox (&quot;Do you need to bury any Destinations?&quot;,4,&quot;Bury Destination&quot;) = 6 then
 		BuryDestination
@@ -481,6 +482,7 @@ sub HandleDistanceTriggers (optional legendary as boolean)
 		if GetTotalDistance() &gt;= _KobolDistance and not CheckDistanceTrigger(_DistanceTriggerEndgame) then
 			MsgBox &quot;One more jump to Kobol!&quot;
 			EnableDestButtons FALSE	&apos; no more destination card activity
+			SetDistanceTrigger(_DistanceTriggerEndgame)
 		end if
 	elseif ObjectiveIsNewCaprica() then
 		if GetTotalDistance() &gt;= _NewCapricaDistance and not CheckDistanceTrigger(_DistanceTriggerEndgame) then
@@ -507,7 +509,9 @@ sub HandleDistanceTriggers (optional legendary as boolean)
 		end if
 	elseif ObjectiveIsEarth then
 		if GetTotalDistance() &gt;= _EarthDistance and not CheckDistanceTrigger(_DistanceTriggerEndgame) then
-&apos;		EARTH!
+			MsgBox &quot;One more jump to Earth!&quot;
+			EnableDestButtons FALSE	&apos; no more destination card activity
+			SetDistanceTrigger(_DistanceTriggerEndgame)
 		end if
 	elseif  ObjectiveIsColony() then
 		if GetTotalDistance() &gt;= _ColonyDistance and not CheckDistanceTrigger(_DistanceTriggerEndgame) then
