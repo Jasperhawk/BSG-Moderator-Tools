@@ -6,3 +6,5 @@ meta.xml
 mimetype
 settings.xml
 styles.xml
+
+*.ods#

@@ -11,6 +11,7 @@ const _PlayerStartRow=1
 const _ResourceCol = 16
 const _ResNameRow = 1
 const _ResTrackRow = 18
+const _ResTrackReducedRow = 19
 
 const _NukeCol = 2
 const _NukeRow = 19
@@ -502,7 +503,7 @@ end function
 	
 sub NextTurn
 	dim curmaj,curmin as integer
-	dim i, rtncd, playerid as integer
+	dim i, rtncd, playerid, cntr as integer
 	dim tmploc as string
 	
 	GetGS
@@ -579,6 +580,12 @@ sub NextTurn
 		end if
 	end if
 
+	&apos; Reset &quot;reduced resource this turn&quot; marker
+	for cntr = _ResourceCol to _ResourceCol+3
+		GameSheet.GetCellByPosition(cntr, _ResTrackReducedRow).string = &quot;&quot;
+	next cntr
+	
+	
 	if GameForm.getByName(&quot;chkAutoCreate&quot;).state = 1 then
 		GenerateBoardImage
 	end if
@@ -1195,14 +1202,26 @@ end function	&apos;GetTitle
 
 
 sub UpdateResource
-	dim whichres as integer
+	dim whichres, hotdogID as integer
+	dim hotdog as boolean
 	GetGS
+	
 			
 	for whichres = _ResourceCol to _ResourceCol+3
 		if GameSheet.GetCellByPosition(whichres, _ResTrackRow).value &gt; GameSheet.GetCellByPosition(whichres, _ResTrackRow+2).value then
 			LogThis ucase(GameSheet.GetCellByPosition(whichres, _ResNameRow).string) &amp; &quot; increased to &quot; &amp; GameSheet.GetCellByPosition(whichres, _ResTrackRow).value 
 		elseif GameSheet.GetCellByPosition(whichres, _ResTrackRow).value &lt; GameSheet.GetCellByPosition(whichres, _ResTrackRow+2).value then
 			LogThis ucase(GameSheet.GetCellByPosition(whichres, _ResNameRow).string) &amp; &quot; decreased to &quot; &amp; GameSheet.GetCellByPosition(whichres, _ResTrackRow).value 
+			if GameSheet.GetCellByPosition(whichres, _ResTrackReducedRow).string &lt;&gt; &quot;X&quot; then     &apos; Already reduced this turn
+				GameSheet.GetCellByPosition(whichres, _ResTrackReducedRow).string = &quot;X&quot;
+				if (whichres-_ResourceCol) = _ResourcePopulation then
+					for hotdogID = 1 to PlayerCnt()
+						if GetPlayerName(hotdogID) = &quot;Hot Dog&quot; then    &apos; Hot dog is in play and the resource is Population
+							MsgBox &quot;Remember Hot Dog&apos;s Memento Ability (draw 3 Piloting cards)&quot;
+						end if
+					next hotdogID
+				end if
+			end if
 		end if
 		GameSheet.GetCellByPosition(whichres, _ResTrackRow+2).value = GameSheet.GetCellByPosition(whichres, _ResTrackRow).value
 	next whichres
