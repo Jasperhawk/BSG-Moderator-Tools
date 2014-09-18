@@ -2139,7 +2139,7 @@ sub DrawCurrentPlayerHand
 	GetSF
 	SkillForm.getByName(&quot;btnDrawCurrentPlayerHand&quot;).enabled = FALSE
 
-	if isCylon(CP) and not isCylonLeader(CP) then
+	if isRevealed(CP) and not isCylonLeader(CP) then
 		MsgBox(GetPlayerName(CP) + &quot; is a CYLON; Draw manually 2 cards from different colors&quot;)
 		exit sub
 	elseif GetPlayerName(CP) = &quot;Athena&quot; and IsHazardous(GetPlayerLoc(CP)) then
