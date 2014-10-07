@@ -268,7 +268,7 @@
 				12 14 6 6 32 6 
 				10 2 7 7 7 7
 				1 9 38 3 35
-				1 9 1 2 1 1 1 1 1 5
+				1 9 1 2 2 1 1 1 1 5
 				2 1 1 1 1 1 1 3)
 		)
 		(names #("Filter" "Turn" "Reserves" "FuelCntr" "Distance" 
@@ -1473,7 +1473,8 @@
 	;(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "FinalDest") 4)) (btoint (string=? objective "Colony")))
 	
 	; Show or hide the Cylon Overlay, Pegasus & Treachery
-	(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "CylonLocations")) (btoint (or usePeg useDB)))
+	(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "CylonLocations")) (btoint (and usePeg (not useDB))))
+	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CylonLocations") 1)) (btoint  useDB))
 	(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "Pegasus")) (btoint usePeg))
 	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "PoliticsDeck") 5)) (btoint (or usePeg useDB)))
 	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "PoliticsCntr") 5)) (btoint (or usePeg useDB)))

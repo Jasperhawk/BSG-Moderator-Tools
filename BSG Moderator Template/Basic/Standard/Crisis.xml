@@ -50,6 +50,8 @@ const _MissionDistanceCol	= 13
 const _MissionRow			= _CapricaRow + _CapricaCnt + 4
 const _MissionCnt			= 8
 const _MissionColCnt		= 23
+const _MissionFlagRow		= 0
+const _MissionFlagCol		= 6
 
 const _ColonyCol = 0
 const _ColonyTypeCol = _ColonyCol + 2
@@ -412,6 +414,11 @@ sub SetBuryCnt (deckID as integer, reset as boolean)
 	CrisisSheet.getCellByPosition(_BuryCntCol + deckID , _BuryCntRow).value = newval
 end sub
 
+sub ClearMissionFlag
+	GetCrisisSheet
+	CrisisSheet.getCellByPosition(_MissionFlagCol, _MissionFlagRow).string = &quot;&quot;
+end sub
+
 sub ClearCrisisFlags
 	SetCrisisFlag TRUE, &quot;&quot;
 	SetCrisisFlag FALSE, &quot;&quot;
@@ -455,6 +462,13 @@ sub PlayCrisisCard
 		crisisID = TopofCrisisDeck()
 	end if
 		
+	if CrisisSheet.getCellByPosition(_MissionFlagCol, _MissionFlagRow).string = &quot;X&quot; then
+		rtncd = MsgBox(&quot;A Mission was played on this turn. Are you sure you want to play a Crisis card?&quot;, 4)
+		if rtncd &lt;&gt; 6 then
+			exit sub
+		end if
+	end if
+
 	if GetPlayerLoc(GetCurrentPlayer()) = &quot;Brig&quot; then
 		MsgBox &quot;Current Player (&quot; &amp; GetPlayerName(GetCurrentPlayer()) &amp; &quot;) is in the Brig, no crisis can be played.&quot;
 		exit sub
@@ -522,6 +536,7 @@ sub PlayMissionCard
 		exit sub
 	end if
 	
+	CrisisSheet.getCellByPosition(_MissionFlagCol, _MissionFlagRow).string = &quot;X&quot;
 	CrisisSheet.getCellByPosition(refcol+1, refrow + crisisID).string = CrisisSheet.getCellByPosition(refcol, refrow + crisisID).string
 	CrisisSheet.getCellByPosition(refcol+1, refrow + crisisID).CharColor = CrisisSheet.getCellByPosition(refcol, refrow + crisisID).CharColor
 	CrisisSheet.getCellByPosition(refcol, refrow + crisisID).string = &quot;&quot;
@@ -1373,7 +1388,8 @@ sub Initialize_CrisisCards
 	
 	SetCrisisStartButton (&quot;&quot;, _CrisisTypeNone)
 	ClearCrisisFlags
-
+	ClearMissionFlag
+	
 	SetMissionBtns TRUE
 	SetMissionResultBtns FALSE
 	ShowMissionBtns ObjectiveIsEarth

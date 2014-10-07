@@ -618,6 +618,7 @@ sub NextTurn
 	SetSuperCrisisBtns
 	SetCrisisStartButton
 	ClearCrisisFlags
+	ClearMissionFlag
 	SortHands
 	SetPlayerSelect curmin
 	
