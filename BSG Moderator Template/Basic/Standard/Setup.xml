@@ -598,7 +598,7 @@ sub Step3Complete
 		grpOpt(_ObjectiveIonianNebula).enabled	= TRUE
 	end if
 	if GameTypeIsDaybreak then
-&apos;		grpOpt(_ObjectiveEarth).enabled			= TRUE
+		grpOpt(_ObjectiveEarth).enabled			= TRUE
 	end if
 	if GameTypeIsRevelations then
 &apos;		grpOpt(_ObjectiveColony).enabled 		= TRUE
@@ -770,6 +770,34 @@ sub Initialize_Game
 	
 end sub
 
+sub FindGIMPPath as string
+	dim PossiblePaths(3) as string
+	dim fpath as string
+	
+	SetGIMPPath &quot;&quot;
+	
+	PossiblePaths(0) = &quot;C:\Program Files\GIMP 2\bin\gimp-2.8.exe&quot; &apos; Windows - is there anywhere else to look?
+	PossiblePaths(1) = &quot;/usr/bin/gimp-2.8&quot; &apos; Linux, LSB-based
+	PossiblePaths(2) = &quot;~/Applications/Gimp.app/Contents/MacOS/gimp-2.8&quot; &apos; Mac OS with User Application folder (non-root)
+	PossiblePaths(3) = &quot;/Applications/Gimp.app/Contents/MacOS/gimp-2.8&quot; &apos; Mac OS with global Application folder
+
+	for each fpath in PossiblePaths()
+		if FileExists(fpath) then
+			MsgBox &quot;Found GIMP executable on &quot; + fpath
+			SetGIMPPath fpath
+			exit sub
+		end if
+	next fpath
+	
+	MsgBox &quot;Could not find GIMP executable - make sure you have GIMP 2.8 installed&quot;
+end sub
+
+function SetGIMPPath (fpath as string)
+	GetSetup
+	
+	SetupForm.getByName(&quot;fileGIMPExe&quot;).Text = fpath
+end function
+
 function GetGIMPPath as string
 	GetSetup
 	
@@ -777,14 +805,21 @@ function GetGIMPPath as string
 end function
 
 sub SetImgBGColor
-	dim clrstr, numstr as string
+	dim clrstr, numstr, val1, val2, val3 as string
 
 	GetSetup
 		
-	clrstr = hex(SetupSheet.GetCellByPosition(4, 20).CellBackColor)
+	clrstr = hex(SetupSheet.GetCellByPosition(4, 23).CellBackColor)
 	numstr = cint(&quot;&amp;H&quot; &amp; left(clrstr,2)) &amp; &quot; &quot; &amp; cint(&quot;&amp;H&quot; &amp; mid(clrstr,3,2)) &amp; &quot; &quot; &amp; cint(&quot;&amp;H&quot; &amp; mid(clrstr,5,2))
-		
-	msgbox &quot;To have the selected color as the image background, add the following row of values on the image template tab.&quot; &amp; chr(10) &amp; &quot;BGColor &quot; &amp; numstr
+	val1 = cint(&quot;&amp;H&quot; &amp; left(clrstr,2))
+	val2 = cint(&quot;&amp;H&quot; &amp; mid(clrstr,3,2))
+	val3 = cint(&quot;&amp;H&quot; &amp; mid(clrstr,5,2))
+
+	SetupSheet.GetCellByPosition(4, 26).value = val1
+	SetupSheet.GetCellByPosition(5, 26).value = val2
+	SetupSheet.GetCellByPosition(6, 26).value = val3
+	
+	&apos;msgbox &quot;To have the selected color as the image background, add the following row of values on the image template tab.&quot; &amp; chr(10) &amp; &quot;BGColor &quot; &amp; numstr
 
 end sub
 

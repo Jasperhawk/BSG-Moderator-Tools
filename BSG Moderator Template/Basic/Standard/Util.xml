@@ -36,6 +36,7 @@ global const _ListMutinyCards		= 10
 const _PostCardRow		= 4		&apos; cardID starts at 0, but we want the preamble anyway.
 const _PostCardCol		= 3		&apos; playerID starts at 1
 const _PostQuorumCol	= 11
+const _PostHandLimitCol = 28
 const _PostBenevRow		= 29
 const _PostAntRow		= 30
 
@@ -115,7 +116,7 @@ end sub
 
 sub GenerateHandLists
 	dim playerID, cardID, cardcnt, fileno as integer
-	dim player, card, filename as string
+	dim player, card, handlimit, filename as string
 	dim PostSheet, LoyaltySheet, CrisisSheet as object		&apos; This is the only function that uses the Posting Template tab, so we can leave it local.
 	
 	PostSheet		= ThisComponent.Sheets.getByName(&quot;Posting Templates&quot;)
@@ -141,6 +142,10 @@ sub GenerateHandLists
 			cardID	= cardID + 1
 			card	= PostSheet.getCellByPosition(_PostCardCol + playerID, + _PostCardRow + cardID).string
 		loop
+		handlimit = PostSheet.getCellByPosition(_PostCardCol + playerID, _PostHandLimitCol).string
+		if handlimit &lt;&gt; &quot;&quot; then
+			print #fileno, handlimit
+		end if
 		if cardID &lt; 2 then
 			print #fileno, &quot;You have no Skill Cards.&quot;
 		end if
@@ -180,12 +185,19 @@ sub GenerateHandLists
 			print #fileno, &quot;Your Agenda is: &quot; &amp;  LoyaltySheet.getCellByPosition(playerID, _LoyaltyAgendaRow).string
 		elseif GetLoyaltyCount(playerID) &gt; 0 then
 			print #fileno, &quot;&quot;
+			Dim MaxLoyaltyToPrint as Integer
 			if IsCylonLeader(playerID) then
 				print #fileno, &quot;Your Motives are:&quot;
+				if GetSleeperState() then
+					MaxLoyaltyToPrint = 4
+				else
+					MaxLoyaltyToPrint = 2
+				end if
 			else
 				print #fileno, &quot;Your Loyalty is:&quot;
+				MaxLoyaltyToPrint = _MaxLoyaltyInHand
 			end if
-			for cardID = 1 to _MaxLoyaltyInHand
+			for cardID = 1 to MaxLoyaltyToPrint
 				card	= LoyaltySheet.getCellByPosition(playerID, _LoyaltyRow + cardID).string
 				if card &lt;&gt; &quot;&quot; then
 					print #fileno, card

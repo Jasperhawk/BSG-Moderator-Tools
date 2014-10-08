@@ -486,6 +486,9 @@ sub Initialize_Loyalty
 	LoyaltyForm.getByName(&quot;btnRevealFlaw&quot;).EnableVisible = VariantFlaws
 	LoyaltyForm.getByName(&quot;btnRevealFlaw&quot;).enabled = VariantFlaws
 	
+	LoyaltyForm.getByName(&quot;btnOddBehavior&quot;).EnableVisible = FALSE
+	LoyaltyForm.getByName(&quot;btnOddBehavior&quot;).enabled = FALSE
+
 	PopulateGiveLoyaltyFrom
 end sub	&apos;Initialize_Loyalty
 
@@ -656,8 +659,10 @@ sub DealSleeperCards
 		
 			if GetPlayerName(curID) = &quot;Boomer&quot; then
 				if not VariantManualLoyalty then
-					curcard = GetFromLoyaltyDeck(_DeckLoyalty)
-					LoyaltyToPlayer curID, curcard, _LoyaltySleeper
+					if not (GameTypeIsExodus and IsRevealed(curID)) then
+						curcard = GetFromLoyaltyDeck(_DeckLoyalty)
+						LoyaltyToPlayer curID, curcard, _LoyaltySleeper
+					end if
 				end if
 	
 				&apos; if Boomer is not a revealed Cylon, she should be sent to the brig
@@ -796,7 +801,7 @@ sub GiveLoyaltyCard
 	do until currow &gt; _LoyaltyStartRow + _MaxLoyaltyInHand
 		if LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(fromID), currow).string &lt;&gt; &quot;&quot; AND _
 			LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(fromID), currow).CellBackColor = _white AND _
-			((not mutineer) xor LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(fromID), currow).string = &quot;You are a Mutineer&quot;) _
+			(((not mutineer) xor LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(fromID), currow).string = &quot;You are a Mutineer&quot;) or (IsRevealed(fromID))) _
 		then
 			curcard = LoyaltySheet.getCellByPosition(PlayerLoyaltyCol(fromID), currow).string
 			LoyaltyToPlayer toID, curcard, _LoyaltyOther
@@ -1049,5 +1054,25 @@ sub RevealPersonalGoal
 	end if
 	PopulateGiveLoyaltyFrom
 end sub
+
+sub OddBehavior
+	dim playerID as integer
+	dim rtncd as integer
+	
+	GetLoyalty
+	
+	playerID = SelectedLoyaltyPlayerID()
+	rtncd	= MsgBox(&quot;Shuffle a new &apos;You are NOT a Cylon&apos; card in the Loyalty deck and deal one Loyalty to &quot; + GetPlayerName(playerID) + &quot;?&quot;, 4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+
+	AddToLoyaltyDeck _DeckLoyalty, GetFromLoyaltyDeck(_DeckNotACylon)
+	ShuffleLoyaltyDeck _DeckLoyalty
+	LoyaltyToPlayer playerID, GetFromLoyaltyDeck(_DeckLoyalty), _LoyaltyOther
+	LoyaltyForm.getByName(&quot;btnOddBehavior&quot;).enabled = FALSE
+	
+end sub
+
 
 </script:module>

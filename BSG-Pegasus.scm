@@ -74,7 +74,6 @@
 	(set! civcnt (make-vector 6 0))
 	(set! specialcnt 0)
 	(set! basestarfirst 0)
-	(set! cardoffsetY 225)
 	(set! logfname "bsgp-Run.log")
 	(set! objflag "New Caprica")
 	
@@ -115,15 +114,17 @@
 		
 		; We can't put the 'log' token at the top of the list.
 		(when (and (not (null? (cddr myvalues))) (string-ci=? (caddr myvalues) "Log")) (initlog filepath))
-(p_getlayerpos "ALL")	;debugging only
-(logit (string-append gamename " ---- Turn " gameturn))
+		
+		(p_getlayerpos "ALL")	;debugging only
+		(logit (string-append gamename " ---- Turn " gameturn))
+		
 		(set! fname (string-append filepath (bsgp-make-fname gamename "MASTER.xcf")))
 	
 		(set! image (car (gimp-file-load 1 fname fname)))
 		(set! drawable (car (gimp-image-get-active-drawable image)))
 		(set! mylayers (cadr (gimp-image-get-layers image)))
 		
-		(bsgp-ConfigureBoard image objflag usePeg useExo useCF useDB useRev)	
+		(set! cardoffsetY (bsgp-ConfigureBoard image objflag usePeg useExo useCF useDB useRev) )
 		
 		(gimp-text-layer-set-text (vector-ref mylayers (p_getlayerpos "Turn")) (string-append "Turn " gameturn))
 		
@@ -151,6 +152,7 @@
 				((PlayerCards) (bsgp-Counters myvalues (p_getlayerpos "PlayerCardCntr"))) 
 				((CivShips) (bsgp-Counters myvalues (p_getlayerpos "CivCntr")))
 				((DamagedCivilians) (bsgp-DamagedCivilians myvalues (p_getlayerpos "DamagedCivs")))
+				((DestroyedBasestar) (bsgp-DestroyedBasestar myvalues (p_getlayerpos "DestroyedBasestar")))
 				((Roles) (bsgp-Roles  myvalues))
 				((PlayerLocations) (bsgp-Players  myvalues useDB))
 				((JumpTrack) (bsgp-JumpTrack myvalues))
@@ -175,6 +177,7 @@
 				((LoyaltyCards) (bsgp-TrLoy myvalues "LoyaltyCards"))
 				((Mutiny) (bsgp-TrLoy myvalues "Mutiny"))
 				((BGColor) (bsgp-BGColor myvalues))
+				((SearchForHome) (bsgp-SearchForHome myvalues))
 				((Option) 
 					(case (string->symbol (car myvalues))
 						((ShowShips) (set! showships 1))
@@ -255,31 +258,31 @@
 (define (p_getlayerpos layername)
 (let*
 	(
-		(offsets #(0 4 1 6 4 
-				1 3 1 6 7 
-				7 1 7 7 7 4 2 8 8 
+		(offsets #(0 6 1 6 4 
+				1 3 1 7 7 
+				7 1 7 7 7 4 2 8 2 8 
 				5 4 9 
-				10 38 12 12 12 1 
-				8 3 25 6 1 
+				10 38 12 12 12 1 8 9
+				2 4 30 6 1 
 				7 6 7 4 4 
 				12 14 6 6 32 6 
 				10 2 7 7 7 7
 				1 9 38 3 35
-				1 8 1 1 1 
-				2 1 1 1 1 1 2)
+				1 9 1 2 2 1 1 1 1 5
+				2 1 1 1 1 1 1 3)
 		)
 		(names #("Filter" "Turn" "Reserves" "FuelCntr" "Distance" 
 			"CivCntr" "Destiny" "CrisisCntr" "PoliticsCntr" "PlayerCardCntr"	
-			"QuorumCntr" "LoyaltyCntr" "TraumaCntr" "MutinyCntr" "FuelDial" "ResourceDamage" "DamagedCivs" "DeadViper" "JumpTrack" 
+			"QuorumCntr" "LoyaltyCntr" "TraumaCntr" "MutinyCntr" "FuelDial" "ResourceDamage" "DamagedCivs" "DestroyedBasestar" "DeadViper" "JumpTrack" 
 			"PursuitTrack" "Current" "DamageToken" 
-			"PlayerToken" "Pilot" "PilotMkVII" "PilotAR" "Scar" "Special" 
+			"PlayerToken" "Pilot" "PilotMkVII" "PilotAR" "Scar" "Special" "CurrentMission" "CurrentMissionStatus"
 			"FinalDest" "JumpDistance" "ReserveToken" "CivToken" "Cylon" 
 			"SuperCrisis" "Assign" "OccForce" "Centurion" "Civilian" 
 			"Viper" "ViperMkVII" "AssaultRaptor" "Raider" "HeavyRaider" "BasestarDmg" 
 			"Basestar" "SkillCard" "LoyaltyCard" "Trauma" "Mutiny" "Stranded" 
 			"1PG" "PlayerCard" "BlankCard5" "Allies" "NCCivToken" 
-			"CrisisToken" "CylonLocations" "CylonFleet" "NewCaprica" "TreacheryDeck" 
-			"PegasusDestroyed" "ColonialOneDestroyed" "ColonialOneDaybreak" "Pegasus" "Graveyard" "Borders" "MainBoard")
+			"CrisisToken" "HubDestroyed" "RebelBasestarToken" "CylonLocations" "CylonFleet" "NewCaprica" "Demetrius" "RebelBasestar" "PoliticsDeck" "TreacheryDeck" 
+			"PegasusDestroyed" "ColonialOneDestroyed" "ColonialOneDaybreak" "Pegasus" "Graveyard" "Logo" "Borders" "MainBoard")
 		)
 		(fnd nil)
 		(cnt 0)
@@ -316,11 +319,11 @@
 (define (bsgp-Counters myvalues layerpos)
 (let* 
 	(
-		(fmt (vector -1 -1 -1 -1 -1 ; Filters, turn
+		(fmt (vector -1 -1 -1 -1 -1 -1 -1 ; Filters, turn
 				2 2 2 2 2 2		; Reserves
 				1 1 1 1 		; Resources
 				0 3 3 3 0 		; Distance, Civilians, Destiny 
-				3 3 3 3 3 3		; Crises, Quorum, Supers, Mutiny 
+				3 3 3 3 3 3 3 	; Crises, Quorum, Supers, Mutiny 
 				0 0 0 0 0 0 0	; Skills
 				0 0 0 0 0 0 0 0	; Hands, Quorum
 				0 0 0 0 0 0 0	; loyalty counts
@@ -728,6 +731,18 @@
 				(gimp-drawable-set-visible (vector-ref mylayers (+ c_jumppos (* 5 jumpcnt) 2)) TRUE)
 				(set! distance (++ distance))
 			)	; The Road Less Traveled
+			((DP)
+				(gimp-drawable-set-visible (vector-ref mylayers (+ c_jumppos (* 5 jumpcnt))) TRUE)
+				(gimp-text-layer-set-text (vector-ref mylayers (+ c_jumppos (* 5 jumpcnt))) "DIGGING UP THE PAST")
+				(gimp-drawable-set-visible (vector-ref mylayers (+ c_jumppos (* 5 jumpcnt) 2)) TRUE)
+				(set! distance (++ distance))
+			)	; The Road Less Traveled
+			((SH)
+				(gimp-drawable-set-visible (vector-ref mylayers (+ c_jumppos (* 5 jumpcnt))) TRUE)
+				(gimp-text-layer-set-text (vector-ref mylayers (+ c_jumppos (* 5 jumpcnt))) "THE SEARCH FOR HOME")
+				(gimp-drawable-set-visible (vector-ref mylayers (+ c_jumppos (* 5 jumpcnt) 3)) TRUE)
+				(set! distance (+ 2 distance))
+			)	; The Road Less Traveled
 			((FE)
 				(gimp-drawable-set-visible (vector-ref mylayers (+ c_jumppos (* 5 jumpcnt))) TRUE)
 				(gimp-text-layer-set-text (vector-ref mylayers (+ c_jumppos (* 5 jumpcnt))) "FRAK EARTH")
@@ -759,36 +774,88 @@
 		(voffset nil)
 	)
 	(while (not (null? myvalues))
-		(if (string=5? (car myvalues) "COLON") ;check for colonial one
-			(gimp-drawable-set-visible (vector-ref mylayers (p_getlayerpos "ColonialOneDestroyed")) TRUE)
-			(if (string=5? (car myvalues) "PEGAS") ;check for Pegasus
-				(gimp-drawable-set-visible (vector-ref mylayers (p_getlayerpos "PegasusDestroyed")) TRUE)
-				(begin
-					(if (even? specialcnt)
-						(set! hoffset 0)
-						(set! hoffset 1)
-					)
-					(set! voffset (quotient specialcnt 2))
-					(set! specoff 0)
-					(while (< specoff 8)
-						(when (string=5? (car (gimp-layer-get-name (vector-ref mylayers (+ c_specpos specoff)))) (car myvalues))
-							(begin
-								(gimp-drawable-set-visible (vector-ref mylayers (+ c_specpos specoff)) TRUE)
-								(gimp-layer-translate (vector-ref mylayers (+ c_specpos specoff)) (* hoffset 700) (* voffset 36))
-								(set! specialcnt (++ specialcnt))
-								(set! specoff 8)
-							)
-						) ;when
-						(set! specoff (++ specoff))
-					) ;while
-				) ;begin
+		(if (string=5? (car myvalues) "HUB D")
+			(gimp-drawable-set-visible (vector-ref mylayers (p_getlayerpos "HubDestroyed")) TRUE)
+			(if (string=5? (car myvalues) "COLON") ;check for colonial one
+				(gimp-drawable-set-visible (vector-ref mylayers (p_getlayerpos "ColonialOneDestroyed")) TRUE)
+				(if (string=5? (car myvalues) "PEGAS") ;check for Pegasus
+					(gimp-drawable-set-visible (vector-ref mylayers (p_getlayerpos "PegasusDestroyed")) TRUE)
+					(begin
+						(if (even? specialcnt)
+							(set! hoffset 0)
+							(set! hoffset 1)
+						)
+						(set! voffset (quotient specialcnt 2))
+						(set! specoff 0)
+						(while (< specoff 8)
+							(when (string=5? (car (gimp-layer-get-name (vector-ref mylayers (+ c_specpos specoff)))) (car myvalues))
+								(begin
+									(gimp-drawable-set-visible (vector-ref mylayers (+ c_specpos specoff)) TRUE)
+									(gimp-layer-translate (vector-ref mylayers (+ c_specpos specoff)) (* hoffset 700) (* voffset 36))
+									(set! specialcnt (++ specialcnt))
+									(set! specoff 8)
+								)
+							) ;when
+							(set! specoff (++ specoff))
+						) ;while
+					) ;begin
+				) ;if
 			) ;if
-		) ;if
+		) ; if
 		(set! myvalues (cdr myvalues))
 	) ;while
 ) ;let
 ) ;define
 
+(define (bsgp-SearchForHome myvalues)
+(let*
+	(
+		(rebel_overlay (car myvalues))
+		(mission_name (string-append "MISSION: " (cadr myvalues)))
+		(mission_side (caddr myvalues))
+		(cntr nil)
+	)
+	(begin
+		; First, set the Rebel Basestar Token (Human/Cylon) or the Filter (before the Cylon Civil War Mission is played)
+		(cond ((string=? rebel_overlay "Unallied") (gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "Filter") 5)) 1))
+			  ((string=? rebel_overlay "Human") (gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "RebelBasestarToken")) 1))
+			  ((string=? rebel_overlay "Cylon") (gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "RebelBasestarToken") 1)) 1))
+		) ; cond
+		; Now, we acivate and place the current mission layer based on the ever-mobile Demetrius board
+		(set! cntr 0)
+		(while (< cntr 9)
+			(when (string=? mission_name (car (gimp-drawable-get-name (vector-ref mylayers (+ (p_getlayerpos "CurrentMission") cntr)))))
+				(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CurrentMission") cntr)) 1) ; Activate the current mission layer
+				(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "CurrentMission") cntr)) ; Reposition the current mission layer based on Demetrius
+					(+ (car (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Demetrius")))) 610)
+					(+ (cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Demetrius")))) 45)
+			    )
+				(set! cntr 9)
+			) ;when
+			(set! cntr (++ cntr))
+		) ;while
+		; Last, IF the card needs this info, place the "face up" or "face down" layer, but only for Search for Home and Digging up the Past missions
+		(cond
+			((and (string-ci=? mission_side "Passed") (or (string-ci=? mission_name "MISSION: The Search for Home") (string-ci=? mission_name "MISSION: Digging Up the Past"))) (begin
+				(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "CurrentMissionStatus")) 1)
+				(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "CurrentMissionStatus")) 
+					(+ (car (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Demetrius")))) 610)
+					(+ (cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Demetrius")))) 185)
+			    )
+			))
+			((and (string-ci=? mission_side "Failed") (or (string-ci=? mission_name "MISSION: The Search for Home") (string-ci=? mission_name "MISSION: Digging Up the Past"))) (begin
+				(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CurrentMissionStatus") 1)) 1)
+				(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "CurrentMissionStatus") 1))
+					(+ (car (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Demetrius")))) 610)
+					(+ (cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Demetrius")))) 185)
+			    )
+			))
+		) ; cond
+	)
+) ; let
+) ;define
+
+;	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "CurrentMission") (car myvalues))) 1)
 
 (define (bsgp-Assignments myvalues)
 ; show player assignements
@@ -830,12 +897,12 @@
 			'("Weapons Control" 475 765) '("Communications" 645 765) '("Research Lab" 815 765) '("Sickbay" 1155 765)
 			'("FTL Control" 305 860) '("Armory" 985 860)
 			'("Command" 475 960) '("Admiral's Quarters" 645 960) '("Hangar Deck" 815 960) '("Brig" 1155 960)
-			'("Pegasus CIC" 1610 1230) '("Airlock" 1810 1255) '("Main Batteries" 2015 1255) '("Engine Room" 2225 1230)
+			'("Pegasus CIC" 40 145) '("Airlock" 240 170) '("Main Batteries" 445 170) '("Engine Room" 655 145)
 			'("Medical Center" 1630 585) '("Resistance HQ" 1785 585) 
 			'("Detention" 1625 780) '("Occupation Authority" 1790 785) '("Breeder's Canyon" 1935 785) '("Shipyard" 2080 785)
 			'("Quorum Chamber" 95 210) '("Hub Destroyed" 1140 220)
-			'("Bridge" 0 0) '("Tactical Plot" 0 0) '("Captain's Cabin" 0 0)
-			'("Hybrid Tank" 0 0) '("Datastream" 0 0) '("Raider Bay" 0 0)
+			'("Bridge" 55 110) '("Tactical Plot" 245 110) '("Captain's Cabin" 425 110)
+			'("Hybrid Tank" 95 110) '("Datastream" 345 140) '("Raider Bay" 590 110)
 			'("Stranded on Caprica")
 			'("Sector 1") '("Sector 2") '("Sector 3") '("Sector 4") '("Sector 5") '("Sector 6") )
 		)
@@ -859,8 +926,9 @@
 		(coloff 0)
 		(c_colonialoneend 2)	; The original C1 locations shift to the right with Daybreak.
 		(c_basestarbridge 7) 	; Basestar bridge moves if there are too many boards in play.
-		(c_demetriusstart 30)	; Demetrius won't move - it fits in the Endgame slot (NC, Dem, Colony)
-		(c_rbbstart 33)			; RBB
+		(c_pegasusstart 18)     ; Pegasus now also moves!
+		(c_demetriusstart 30)	; Demetrius moves all the time
+		(c_rbbstart 33)			; Rebel Basestar moves all the time too
 		(c_stranded 36)
 		(c_sectorstart 37)		; 37 not-Space Locations
 		(pilotloc #( ((155 1090) (155 800) (250 750)) ((655 515) (655 595) (655 675))
@@ -878,6 +946,7 @@
 			(when (string=5? (car myvalues) (car (vector-ref lockey locoff)))	; 5-Char match
 				(set! plyrfnd locoff)											; Location match ID
 				(logit (car myvalues))
+				(logit plyrfnd)
 				(when (>= plyrfnd c_sectorstart)		; pilot in space
 					(if (string=? (car myvalues) (car (vector-ref lockey locoff)))	
 						(set! vipertype (append vipertype (list 0))) ;exact match means we're in a standard viper
@@ -925,16 +994,37 @@
 	; now actually place the tokens.
 	(while (not (null? plyrloc))
 		(set! locid (car plyrloc))
-		(if (= locid c_basestarbridge) 
-			(begin
-				(set! boardoffsetX (car (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "CylonFleet")))))
-				(set! boardoffsetY (cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "CylonFleet")))))
-			)
-			(begin
-				(set! boardoffsetX (car (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "MainBoard")))))
-				(set! boardoffsetY (cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "MainBoard")))))
-			)
-		)
+		(cond   ((and (>= locid c_pegasusstart) (<= locid (+ c_pegasusstart 3))) (begin
+					(set! boardoffsetX (car (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Pegasus")))))
+					(set! boardoffsetY (cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Pegasus"))))))
+				)
+				((= locid c_basestarbridge) (begin
+					(set! boardoffsetX (car (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "CylonFleet")))))
+					(set! boardoffsetY (cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "CylonFleet"))))))
+				)
+				((and (>= locid c_demetriusstart) (<= locid (+ c_demetriusstart 2))) (begin
+					(set! boardoffsetX (car (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Demetrius")))))
+					(set! boardoffsetY (cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Demetrius"))))))
+				)
+				((and (>= locid c_rbbstart) (<= locid (+ c_rbbstart 2))) (begin
+					(set! boardoffsetX (car (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "RebelBasestar")))))
+					(set! boardoffsetY (cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "RebelBasestar"))))))
+				)
+				(else (begin
+					(set! boardoffsetX (car (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "MainBoard")))))
+					(set! boardoffsetY (cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "MainBoard"))))))
+				)
+		) ; cond
+;		(if (= locid c_basestarbridge)
+;			(begin
+;				(set! boardoffsetX (car (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "CylonFleet")))))
+;				(set! boardoffsetY (cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "CylonFleet")))))
+;			)
+;			(begin
+;				(set! boardoffsetX (car (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "MainBoard")))))
+;				(set! boardoffsetY (cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "MainBoard")))))
+;			)
+;		)
 		(if (and (<= locid c_colonialoneend) useDB)	; Daybreak Colonial One locations are shifted right.
 			(set! coloff (+ 75 (* locid 5)))
 			(set! coloff 0)
@@ -1344,6 +1434,17 @@
 )
 )
 
+(define (bsgp-DestroyedBasestar myvalues)
+(let*
+	(
+		(basestar (car myvalues))
+		(heavy (cadr myvalues))
+	)
+	(gimp-drawable-set-visible (vector-ref mylayers (p_getlayerpos "DestroyedBasestar")) basestar)
+	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "DestroyedBasestar") 1)) heavy)
+)
+)
+
 (define (bsgp-ConfigureBoard image objective usePeg useExo useCF useDB useRev)
 ; possible board configurations are:
 ; 1 - Base & Kobol/IN - DONE
@@ -1352,9 +1453,15 @@
 ; 4 - Base & CF & Kobol/IN - DONE
 ; 5 - Pegasus & CF & Kobol/IN - DONE
 ; 6 - Pegasus & CF & NC - DONE (double-check this, it's not very pretty. )
+; 7 - Base & Earth
+; 8 - Base & CF & Earth
+; 9 - Pegasus & Earth
+; 10 - Pegasus & CF & Earth
 (let*
 	(
 		(destcnt 0)
+		(auxcont 0)
+		(cardoffsetY 225)
 	)
 
 	; set the objective cards appropriately
@@ -1362,12 +1469,14 @@
 	(gimp-drawable-set-visible (vector-ref mylayers (p_getlayerpos "FinalDest")) (btoint (string=? objective "Kobol")))
 	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "FinalDest") 1)) (btoint (string=? objective "New Caprica")))
 	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "FinalDest") 2)) (btoint (string=? objective "Ionian Nebula")))
-	;(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "FinalDest") 3)) (btoint (string=? objective "Earth")))
+	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "FinalDest") 3)) (btoint (string=? objective "Earth")))
 	;(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "FinalDest") 4)) (btoint (string=? objective "Colony")))
-
+	
 	; Show or hide the Cylon Overlay, Pegasus & Treachery
-	(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "CylonLocations")) (btoint (or usePeg useDB)))
+	(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "CylonLocations")) (btoint (and usePeg (not useDB))))
+	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CylonLocations") 1)) (btoint  useDB))
 	(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "Pegasus")) (btoint usePeg))
+	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "PoliticsDeck") 5)) (btoint (or usePeg useDB)))
 	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "PoliticsCntr") 5)) (btoint (or usePeg useDB)))
 		
 	; Show or hide New Caprica and its filter
@@ -1378,26 +1487,29 @@
 	(gimp-drawable-set-visible (vector-ref mylayers (p_getlayerpos "CylonFleet")) (btoint useCF))
 
 	; Show or hide the new Colonial One, Mutiny Deck
-	(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "TreacheryDeck")) (btoint useDB))	; In case there isn't a Pegasus to provide it.
+	;(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "TreacheryDeck")) (btoint useDB))	; In case there isn't a Pegasus to provide it.
 	(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "ColonialOneDaybreak")) (btoint useDB))
 	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 5)) (btoint useDB))	; Mutiny counter
 	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 5)) (btoint useDB))	; Mutiny deck
 	; Do we need to add a Treachery deck slot if there's no Pegasus board? Probably.
 	
-	; Show or hide the Demetrius, Daybreak Rebel Basestar, Mission Deck and counter
-
+	; Show or hide the Demetrius, Daybreak Rebel Basestar, Mission Deck, Mission Counter
+	(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "Demetrius" )) (btoint (string=? objective "Earth")))
+	(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "RebelBasestar" )) (btoint (string=? objective "Earth")))
+	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 6)) (btoint (string=? objective "Earth")))
+	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 8)) (btoint (string=? objective "Earth")))
+	
 	; Show or hide the Faith Counter and deck placement layer
 	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "TreacheryDeck") 1)) (btoint useRev))
 	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "PoliticsCntr") 6)) (btoint useRev))
 
 	; Show or hide the Revelations Rebel Basestar and filter
 	;(gimp-drawable-set-visible (vector-ref mylayers (p_getlayerpos "RevRebel")) (btoint (string=? objective "Colony")))
-	;(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "Filter") 4)) (btoint (string=? objective "Colony")))
+	;(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "Filter") 5)) (btoint (string=? objective "Colony")))
 
 	; Show or hide the Colony Board and Filter
 	;(gimp-drawable-set-visible (vector-ref mylayers (p_getlayerpos "Colony")) (btoint (string=? objective "Colony")))
-	;(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "Filter") 5)) (btoint (string=? objective "Colony")))
-
+	;(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "Filter") 6)) (btoint (string=? objective "Colony")))
 	; Set up the reserves - these don't move relative to the board, so there shouldn't be an issue if we place them before adjusting image size.
 	(if useCF
 		(begin 
@@ -1581,7 +1693,7 @@
 	);when Pegasus & NC
 
 ; 4 - Base & CF & Kobol/IN
-	(when (and (not usePeg) useCF (not (string=? objective "New Caprica")))
+	(when (and (not usePeg) useCF (not (or (string=? objective "New Caprica") (string=? objective "Earth"))))
 (logit "ConfigureBoard 4 - Base & CF & Kobol/IN")
 		; move the Cylon Fleet down
 		(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "CylonFleet"))  
@@ -1604,12 +1716,12 @@
 		(gimp-image-resize image (+ (car (gimp-image-width image)) 250) (car  (gimp-image-height image)) 250 0)
 	
 		; Move Objective, Distance information.
-		(while (< destcnt 28)
-			(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "FinalDest") destcnt)) 50 
+		(while (< destcnt 34)
+			(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "FinalDest") destcnt)) 50
 				(cadr (gimp-drawable-offsets (vector-ref mylayers (+ (p_getlayerpos "FinalDest") destcnt))))) ; Move Kobol and then next 27 layers over to the right-hand border.
 			(set! destcnt (++ destcnt))
 		); while
-		(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "Distance")) 150			; Move the Distance counter
+		(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "Distance")) 80			; Move the Distance counter
 			(cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Distance")))))
 			
 		; Crisis
@@ -1636,8 +1748,10 @@
 
 		; Needs a 
 		(gimp-image-resize image (+ (car (gimp-image-width image)) 790) (car  (gimp-image-height image)) 790 0)
-		; move the Cylon Fleet
+		; move the Cylon Fleet and its filter
 		(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "CylonFleet")) 0 776)
+		(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "Filter") 4)) 0 776)
+		
 		(set! destcnt 0)
 		(while (< destcnt 4)
 			(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "PursuitTrack") destcnt)) (+ 275 (* destcnt 54)) 820)
@@ -1651,21 +1765,455 @@
 			(
 				(iter 0)
 				(baselayer (p_getlayerpos "DamagedCivs"))
-			)
+		)
 			(while (< iter 8)
 				(gimp-layer-translate (vector-ref mylayers (+ baselayer iter)) -2550 350)
 				(set! iter (++ iter))
 			)
 		)
-	);when Peg & CF & New Caprica
+
+;	(logit "ConfigureBoard 6 - Base & CF & New Caprica")
+;
+;	; Move Objective, Distance information.
+;	(while (< destcnt 34)
+;		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "FinalDest") destcnt)) 0 60) ; Move New Caprica Card and destinations a little down
+;		(set! destcnt (++ destcnt))
+;	); while
+;	(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Distance")) 0 60)			; Also move the Distance counter 
+;	
+;	; "Turn" will go to the left
+;	(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Turn")) -170 0)
+;	
+;	; Move Civilian and Counter below the distance
+;	(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CivCntr")) 170 365)
+;	(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CivToken")) 170 365)
+;	
+;	; Move all decks down
+;	; Crisis
+;	(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CrisisToken")) -50 400)
+;	(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CrisisCntr")) -50 400)
+;
+;	; Supers
+;	(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 3)) -50 400)
+;	(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 4)) -50 400)
+;
+;	; Quorum
+;	(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 2)) -50 400)
+;	(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 2)) -50 400)
+;
+;	; Mutiny
+;	(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 5)) -50 400)
+;	(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 5)) -50 400)		
+;	
+;	;move the graveyard and resize it
+;	(gimp-layer-scale (vector-ref mylayers (p_getlayerpos "Graveyard")) 600 400 FALSE)
+;	(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Graveyard")) -950 0)
+;	(set! destcnt 0)
+;	(while (< destcnt 8)
+;		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "DamagedCivs") destcnt)) -80 50)
+;		(set! destcnt (++ destcnt))
+;	)
+;
+;	; We expand the image by 465 pixels south - that's where we'll place the new boards
+;	(gimp-image-resize image (car (gimp-image-width image)) (+ (car  (gimp-image-height image)) 465) 0 0)
+;
+;	; move New Caprica and Pegasus boards
+;	(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "Pegasus")) 0 1560)
+;	(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "NewCaprica")) 785 1560)
+;	(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "Filter") 4)) 785 1560)
+;
+;	; Spacing all the player-specific stuff
+;	(let* 
+;		(
+;			(category (list->vector '("PlayerCardCntr" "LoyaltyCntr" "TraumaCntr" "MutinyCntr" "SkillCard" "LoyaltyCard" "Trauma" "Mutiny" "1PG")))
+;			(auxcnt nil)
+;		)
+;		(set! auxcnt 0)
+;		(while (< auxcnt (vector-length category))
+;			(set! destcnt 0)
+;			(while (< destcnt 7)
+;				(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos (vector-ref category auxcnt)) destcnt))  
+;					(car (gimp-drawable-offsets (vector-ref mylayers (+ (p_getlayerpos (vector-ref category auxcnt)) destcnt))))
+;					(+ (cadr (gimp-drawable-offsets (vector-ref mylayers (+ (p_getlayerpos (vector-ref category auxcnt)) destcnt)))) (* destcnt 70)))
+;				(set! destcnt (++ destcnt))
+;			); while
+;			(set! auxcnt (++ auxcnt))
+;		); while
+;	); let
+;
+;	; Why are there only 3 blank cards?
+;	(set! destcnt 0)
+;	(while (< destcnt 3)		; Player card counters - Skill
+;		(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "BlankCard5") destcnt))  
+;			(car (gimp-drawable-offsets (vector-ref mylayers (+ (p_getlayerpos "BlankCard5") destcnt))))
+;			(+ (cadr (gimp-drawable-offsets (vector-ref mylayers (+ (p_getlayerpos "BlankCard5") destcnt)))) (* destcnt 70) 280))
+;		(set! destcnt (++ destcnt))
+;	); while
+;
+;	; We'll use a different cardoffset (character sheets) here
+;	(set! cardoffsetY (+ 70 cardoffsetY))
+;
+;	; move the Cylon Fleet
+;	(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CylonFleet")) 0 945)
+;	(set! destcnt 0)
+;	(while (< destcnt 4)
+;		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "PursuitTrack") destcnt)) 0 945)
+;		(set! destcnt (++ destcnt))
+;	)
+;
+;	; move all the skill decks to the left (245 pixels)
+;	(set! destcnt 0)
+;	(while (< destcnt 7)
+;		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "PoliticsDeck") destcnt)) -245 0)
+;		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "PoliticsCntr") destcnt)) -245 0)
+;		(set! destcnt (++ destcnt))
+;	)
+;	; move the Logo
+;	(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Logo")) 1200 -950)
+
+);when Peg & CF & New Caprica
+
+; 7 - Base & Earth
+	(when (and (not usePeg) (not useCF) (string=? objective "Earth"))
+		(logit "ConfigureBoard 7 - Base & Earth")
+		
+		; Move Objective, Distance information.
+		(while (< destcnt 34)
+			(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "FinalDest") destcnt)) 0 60) ; Move Earth Card and destinations a little down
+			(set! destcnt (++ destcnt))
+		); while
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Distance")) 0 60)			; Also move the Distance counter 
+		
+		; "Turn" will go to the left
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Turn")) -170 0)
+		
+		; Move Civilian and Counter below the distance
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CivCntr")) -170 550)
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CivToken")) -170 550)
+		
+		; Move all decks down
+		; Crisis
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CrisisToken")) 0 210)
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CrisisCntr")) 0 210)
+	
+		; Supers
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 3)) 0 210)
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 4)) 0 210)
+	
+		; Quorum
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 2)) 0 210)
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 2)) 0 210)
+
+		; Mutiny
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 5)) 0 210)
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 5)) 0 210)		
+		
+		;move the graveyard and resize it
+		(gimp-layer-scale (vector-ref mylayers (p_getlayerpos "Graveyard")) 600 400 FALSE)
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Graveyard")) -950 0)
+		(set! destcnt 0)
+		(while (< destcnt 8)
+			(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "DamagedCivs") destcnt)) -80 50)
+			(set! destcnt (++ destcnt))
+		)
+
+		; move the Demetrius and Rebel Basestar down
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Demetrius")) 0 480)
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "RebelBasestar")) 0 480)
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "RebelBasestarToken")) 0 480) ; Humans
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "RebelBasestarToken") 1)) 0 480) ; Cylons
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "Filter") 5)) 0 480)
+		(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 6))
+			(+ (car (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Demetrius")))) 610)
+			(+ (cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Demetrius")))) 225))
+		(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 8)) 0)
+
+		; move all the skill decks to the left (245 pixels)
+		(set! destcnt 0)
+		(while (< destcnt 7)
+			(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "PoliticsDeck") destcnt)) -275 0)
+			(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "PoliticsCntr") destcnt)) -275 0)
+			(set! destcnt (++ destcnt))
+		)
+		
+		; move the Logo
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Logo")) 1200 -950)
+
+	);when Base & Earth
+
+; 8 - CF & Earth (Why would ANYONE play like this?!?)
+	(when (and (not usePeg) useCF (string=? objective "Earth"))
+		(logit "ConfigureBoard 8 - Base & CF & Earth")
+
+		; Move Objective, Distance information.
+		(while (< destcnt 34)
+			(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "FinalDest") destcnt)) 0 60) ; Move Earth Card and destinations a little down
+			(set! destcnt (++ destcnt))
+		); while
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Distance")) 0 60)			; Also move the Distance counter 
+		
+		; "Turn" will go to the left
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Turn")) -170 0)
+		
+		; Move Civilian and Counter below the distance
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CivCntr")) 170 365)
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CivToken")) 170 365)
+		
+		; Move all decks down
+		; Crisis
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CrisisToken")) 0 400)
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CrisisCntr")) 0 400)
+	
+		; Supers
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 3)) 0 400)
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 4)) 0 400)
+	
+		; Quorum
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 2)) 0 400)
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 2)) 0 400)
+
+		; Mutiny
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 5)) 0 400)
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 5)) 0 400)		
+		
+		; Missions
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 8)) 0 400)
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 6)) 0 400)		
+
+		;move the graveyard and resize it
+		(gimp-layer-scale (vector-ref mylayers (p_getlayerpos "Graveyard")) 600 400 FALSE)
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Graveyard")) -950 0)
+		(set! destcnt 0)
+		(while (< destcnt 8)
+			(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "DamagedCivs") destcnt)) -80 50)
+			(set! destcnt (++ destcnt))
+		)
+
+		; We expand the image by almost 400 pixels south - that's where we'll place the new boards
+		(gimp-image-resize image (car (gimp-image-width image)) (+ (car  (gimp-image-height image)) 390) 0 0)
+
+		; move the Demetrius and Rebel Basestar down
+		(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "Demetrius")) 0 1560)
+		(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "RebelBasestar")) 785 1560)
+		(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "RebelBasestarToken")) 1458 1605) ; Humans
+		(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "RebelBasestarToken") 1)) 1458 1605) ; Cylons
+		(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "Filter") 5)) 785 1560)
+		(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 8)) 1)
+	
+		; Spacing all the player-specific stuff
+		(let* 
+			(
+				(category (list->vector '("PlayerCardCntr" "LoyaltyCntr" "TraumaCntr" "MutinyCntr" "SkillCard" "LoyaltyCard" "Trauma" "Mutiny" "1PG")))
+				(auxcnt nil)
+			)
+			(set! auxcnt 0)
+			(while (< auxcnt (vector-length category))
+				(set! destcnt 0)
+				(while (< destcnt 7)
+					(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos (vector-ref category auxcnt)) destcnt))  
+						(car (gimp-drawable-offsets (vector-ref mylayers (+ (p_getlayerpos (vector-ref category auxcnt)) destcnt))))
+						(+ (cadr (gimp-drawable-offsets (vector-ref mylayers (+ (p_getlayerpos (vector-ref category auxcnt)) destcnt)))) (* destcnt 60)))
+					(set! destcnt (++ destcnt))
+				); while
+				(set! auxcnt (++ auxcnt))
+			); while
+		); let
+
+		; Why are there only 3 blank cards?
+		(set! destcnt 0)
+		(while (< destcnt 3)		; Player card counters - Skill
+			(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "BlankCard5") destcnt))  
+				(car (gimp-drawable-offsets (vector-ref mylayers (+ (p_getlayerpos "BlankCard5") destcnt))))
+				(+ (cadr (gimp-drawable-offsets (vector-ref mylayers (+ (p_getlayerpos "BlankCard5") destcnt)))) (* destcnt 60) 240))
+			(set! destcnt (++ destcnt))
+		); while
+
+		; We'll use a different cardoffset (character sheets) here
+		(set! cardoffsetY (+ 60 cardoffsetY))
+
+		; move the Cylon Fleet
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CylonFleet")) 0 870)
+		(set! destcnt 0)
+		(while (< destcnt 4)
+			(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "PursuitTrack") destcnt)) 0 870)
+			(set! destcnt (++ destcnt))
+		)
+	
+		; move all the skill decks to the left (245 pixels)
+		(set! destcnt 0)
+		(while (< destcnt 7)
+			(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "PoliticsDeck") destcnt)) -245 0)
+			(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "PoliticsCntr") destcnt)) -245 0)
+			(set! destcnt (++ destcnt))
+		)
+		; move the Logo
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Logo")) 1200 -950)
+	
+	);  when CF & Earth
+
+; 9 - Pegasus & Earth
+	(when (and usePeg (not useCF) (string=? objective "Earth")) ; Used only for Pegasus and Earth, without CF
+		(logit "ConfigureBoard 9 - Base, Pegasus & Earth")
+		; Need a left border - extend the image width by 250, justify all the existing data to the right
+		(gimp-image-resize image (+ (car (gimp-image-width image)) 250) (car  (gimp-image-height image)) 250 0)
+
+		; "Turn" will go to the left
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Turn")) -90 0)
+		
+		; Move Civilian and Counter below the distance
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CivCntr")) -90 0)
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CivToken")) -90 0)
+
+		; Move Objective, Distance information.
+		(while (< destcnt 34)
+			(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "FinalDest") destcnt)) 50 
+				(cadr (gimp-drawable-offsets (vector-ref mylayers (+ (p_getlayerpos "FinalDest") destcnt))))) ; Move Kobol and then next 27 layers over to the right-hand border.
+			(set! destcnt (++ destcnt))
+		); while
+		(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "Distance")) 80			; Move the Distance counter
+			(cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Distance")))))
+		
+		; Crisis
+		(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "CrisisToken")) 50 1360)
+		(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "CrisisCntr")) 50 1480)
+	
+		; Supers
+		(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 3)) 50 1130)
+		(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 4)) 50 1250)
+	
+		; Quorum
+		(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 2)) 50 900)
+		(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 2)) 50 1020)
+
+		; Mutiny
+		(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 5)) 50 670)
+		(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 5)) 50 790)		
+
+		(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 8)) 0)
+		(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 6))
+			(+ (car (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Demetrius")))) 610)
+			(+ (cadr (gimp-drawable-offsets (vector-ref mylayers (p_getlayerpos "Demetrius")))) 225))
+
+	);  when Peg & Earth
+
+; 10 - Pegasus & CF & Earth (The whole deal)
+	(when (and usePeg useCF (string=? objective "Earth"))
+		(logit "ConfigureBoard 10 - Base & Pegasus & CF & Earth")
+
+		; Need a left border - extend the image width by 250, justify all the existing data to the right
+		(gimp-image-resize image (car (gimp-image-width image)) (+ (car  (gimp-image-height image)) 390) 0 0)
+
+		; Move all decks down
+		; Crisis
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CrisisToken")) 0 100)
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CrisisCntr")) 0 100)
+	
+		; Supers
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 3)) 0 100)
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 4)) 0 100)
+	
+		; Quorum
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 2)) 0 100)
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 2)) 0 100)
+
+		; Mutiny
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 5)) 0 100)
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 5)) 0 100)		
+		
+		; move the Demetrius and Rebel Basestar down
+		(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "Demetrius")) 0 1560)
+		(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "RebelBasestar")) 785 1560)
+		(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "RebelBasestarToken")) 1458 1605) ; Humans
+		(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "RebelBasestarToken") 1)) 1458 1605) ; Cylons
+		(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "Filter") 5)) 785 1560)
+		(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 6)) 615 1785)
+		(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 8)) 0)
+		
+		; Spacing all the player-specific stuff
+		(let* 
+			(
+				(category (list->vector '("PlayerCardCntr" "LoyaltyCntr" "TraumaCntr" "MutinyCntr" "SkillCard" "LoyaltyCard" "Trauma" "Mutiny" "1PG")))
+				(auxcnt nil)
+			)
+			(set! auxcnt 0)
+			(while (< auxcnt (vector-length category))
+				(set! destcnt 0)
+				(while (< destcnt 7)
+					(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos (vector-ref category auxcnt)) destcnt))  
+						(car (gimp-drawable-offsets (vector-ref mylayers (+ (p_getlayerpos (vector-ref category auxcnt)) destcnt))))
+						(+ (cadr (gimp-drawable-offsets (vector-ref mylayers (+ (p_getlayerpos (vector-ref category auxcnt)) destcnt)))) (* destcnt 60)))
+					(set! destcnt (++ destcnt))
+				); while
+				(set! auxcnt (++ auxcnt))
+			); while
+		); let
+
+		; Why are there only 3 blank cards?
+		(set! destcnt 0)
+		(while (< destcnt 3)		; Player card counters - Skill
+			(gimp-layer-set-offsets (vector-ref mylayers (+ (p_getlayerpos "BlankCard5") destcnt))  
+				(car (gimp-drawable-offsets (vector-ref mylayers (+ (p_getlayerpos "BlankCard5") destcnt))))
+				(+ (cadr (gimp-drawable-offsets (vector-ref mylayers (+ (p_getlayerpos "BlankCard5") destcnt)))) (* destcnt 60) 240))
+			(set! destcnt (++ destcnt))
+		); while
+
+		; We'll use a different cardoffset (character sheets) here
+		(set! cardoffsetY (+ 60 cardoffsetY))
+
+		; move the Cylon Fleet
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "CylonFleet")) 0 400)
+		(set! destcnt 0)
+		(while (< destcnt 4)
+			(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "PursuitTrack") destcnt)) 0 400)
+			(set! destcnt (++ destcnt))
+		)
+
+		; move the Pegasus board, its overlay and its damage tokens
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Pegasus")) 0 400)
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "PegasusDestroyed")) 0 400)
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "DamageToken") 6)) 0 400)
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "DamageToken") 7)) 0 400)
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "DamageToken") 8)) 0 400)
+		(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "DamageToken") 9)) 0 400)
+
+		; move all the skill decks to the left (245 pixels)
+		(set! destcnt 0)
+		(while (< destcnt 7)
+			(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "PoliticsDeck") destcnt)) -275 0)
+			(gimp-layer-translate (vector-ref mylayers (+ (p_getlayerpos "PoliticsCntr") destcnt)) -275 0)
+			(set! destcnt (++ destcnt))
+		)
+		; move the Logo
+		(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Logo")) 1200 -950)
+		
+	);  when Peg & CF & Earth
+	
+	
+	cardoffsetY      ; Because some configurations might want to use a different Y offset
 ); let
 ); define
 
 
 (define (bsgp-BGColor myvalues)
-	(gimp-context-set-foreground myvalues)
+	(if (= (length myvalues) 3)   ; Old-style CSV
+		(gimp-context-set-foreground myvalues)
+		(begin    ; else
+			(gimp-context-set-foreground (cdr myvalues))
+			(if (string=? (car myvalues) "Match")		; Filters have to match the background color
+				(begin
+					(gimp-drawable-fill (vector-ref mylayers (p_getlayerpos "Filter")) 0)
+					(gimp-drawable-fill (vector-ref mylayers (+ (p_getlayerpos "Filter") 1)) 0)
+					(gimp-drawable-fill (vector-ref mylayers (+ (p_getlayerpos "Filter") 2)) 0)
+					(gimp-drawable-fill (vector-ref mylayers (+ (p_getlayerpos "Filter") 3)) 0)
+					(gimp-drawable-fill (vector-ref mylayers (+ (p_getlayerpos "Filter") 4)) 0)
+					(gimp-drawable-fill (vector-ref mylayers (+ (p_getlayerpos "Filter") 5)) 0)
+				)
+			)
+		)
+	) ; if
 	(gimp-drawable-fill (vector-ref mylayers (p_getlayerpos "Borders")) 0)
 	(gimp-drawable-fill (vector-ref mylayers (+ (p_getlayerpos "Borders") 1)) 0)
+	(gimp-drawable-fill (vector-ref mylayers (+ (p_getlayerpos "Borders") 2)) 0)
 ); define
 
 ;
@@ -1678,8 +2226,8 @@
 ;4) For Non-NC games.  Same as (1), but hide the New Caprica layer as well.
 (let*
 	(
-;		showflags order: GalFilter, C1Filter, PegFil, NCFil, CrisisDeck, OffboardCiv
-		(showflags #( () (0 0 0 1 1 1 1) (1 1 1 0 0 0 1) (0 1 0 0 0 0 1) (0 0 0 1 1 1 0)))
+;		showflags order: GalFilter, C1Filter, PegFil, NCFil, CFFil, CrisisDeck, OffboardCiv
+		(showflags #( () (0 0 0 1 0 1 1 1) (1 1 1 0 1 0 0 1) (0 1 0 0 0 0 0 1) (0 0 0 1 0 1 1 0)))
 		(myflags nil)
 		(curflag nil)
 		(notflag nil)
@@ -1694,9 +2242,10 @@
 	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "Filter") 1)) (cadr myflags))
 	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "Filter") 2)) (caddr myflags))
 	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "Filter") 3)) (cadddr myflags))
+	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "Filter") 4)) (car (cddddr myflags)))
 
 	; next is crisis decks
-	(set! myflags (cddddr myflags))
+	(set! myflags (cdr (cddddr myflags)))
 	(set! curflag (car myflags))
 	(if (= curflag 1) (set! notflag 0) (set! notflag 1))
 	(gimp-drawable-set-visible (vector-ref mylayers (p_getlayerpos "CrisisCntr")) curflag)
@@ -1806,4 +2355,3 @@
 ; 12/21/10 - added bsgp-destination and the "destination" option to support variable  final destinations.
 
 ; 1/27/11 - added Exodus characters, tokens, & 3rd nuke
-

@@ -47,8 +47,9 @@ global const _ShipStatusPrepped		= 10
 global const _ShipStatusCylonFleet1	= 11
 global const _ShipStatusCylonFleet6	= 16
 global const _ShipStatusActivate	= 17
+global const _ShipStatusRemoved		= 18
 
-const _ScarCol = 14
+const _ScarCol = 15
 const _ScarRow = 17
 
 sub GetShipSheet
@@ -120,12 +121,12 @@ sub PopulateShipLoc
 	ShipNames(_ShipCivilian)	= &quot;Civilian&quot;
 
 	ShipCol(_ShipBasestar, _ShipColName)		= 8
-	ShipCol(_ShipBasestar, _ShipColOffBrd)		= ShipCol(_ShipBasestar, _ShipColName) + 1
-	ShipCol(_ShipBasestar, _ShipColSector)		= ShipCol(_ShipBasestar, _ShipColName) + 2
+	ShipCol(_ShipBasestar, _ShipColOffBrd)		= ShipCol(_ShipBasestar, _ShipColName) + 2
+	ShipCol(_ShipBasestar, _ShipColSector)		= ShipCol(_ShipBasestar, _ShipColName) + 3
 	ShipCol(_ShipBasestar, _ShipColDamaged)		= 0
-	ShipCol(_ShipBasestar, _ShipColDestroyed)	= 0
-	ShipCol(_ShipBasestar, _ShipColSpecial)		= ShipCol(_ShipBasestar, _ShipColName) + 4
-	ShipCol(_ShipBasestar, _ShipColCylonFleet)	= ShipCol(_ShipBasestar, _ShipColName) + 3
+	ShipCol(_ShipBasestar, _ShipColDestroyed)	= ShipCol(_ShipBasestar, _ShipColName) + 1
+	ShipCol(_ShipBasestar, _ShipColSpecial)		= ShipCol(_ShipBasestar, _ShipColName) + 5
+	ShipCol(_ShipBasestar, _ShipColCylonFleet)	= ShipCol(_ShipBasestar, _ShipColName) + 4
 	ShipRow(_ShipBasestar)		= 35
 	ShipNames(_ShipBasestar)	= &quot;Basestar&quot;
 
@@ -140,26 +141,26 @@ sub PopulateShipLoc
 	ShipNames(_ShipRaider)	= &quot;Raider&quot;
 	
 	ShipCol(_ShipHeavy, _ShipColName)		= 8
-	ShipCol(_ShipHeavy, _ShipColOffBrd)		= ShipCol(_ShipHeavy, _ShipColName) + 1
-	ShipCol(_ShipHeavy, _ShipColSector)		= ShipCol(_ShipHeavy, _ShipColName) + 2
+	ShipCol(_ShipHeavy, _ShipColOffBrd)		= ShipCol(_ShipHeavy, _ShipColName) + 2
+	ShipCol(_ShipHeavy, _ShipColSector)		= ShipCol(_ShipHeavy, _ShipColName) + 3
 	ShipCol(_ShipHeavy, _ShipColDamaged)	= 0
-	ShipCol(_ShipHeavy, _ShipColDestroyed)	= 0
+	ShipCol(_ShipHeavy, _ShipColDestroyed)	= ShipCol(_ShipHeavy, _ShipColName) + 1
 	ShipCol(_ShipHeavy, _ShipColSpecial)	= 0
-	ShipCol(_ShipHeavy, _ShipColCylonFleet)	= ShipCol(_ShipHeavy, _ShipColName) + 3
+	ShipCol(_ShipHeavy, _ShipColCylonFleet)	= ShipCol(_ShipHeavy, _ShipColName) + 4
 	ShipRow(_ShipHeavy)		= 27
 	ShipNames(_ShipHeavy)	= &quot;Heavy Raider&quot;
 
-	ShipCol(_ShipCenturion, _ShipColName)		= 13
-	ShipCol(_ShipCenturion, _ShipColOffBrd)		= ShipCol(_ShipCenturion, _ShipColName) + 1
-	ShipCol(_ShipCenturion, _ShipColSector)		= ShipCol(_ShipCenturion, _ShipColName) + 4
+	ShipCol(_ShipCenturion, _ShipColName)		= 14
+	ShipCol(_ShipCenturion, _ShipColOffBrd)		= ShipCol(_ShipCenturion, _ShipColName) + 3
+	ShipCol(_ShipCenturion, _ShipColSector)		= ShipCol(_ShipCenturion, _ShipColName) + 5
 	ShipCol(_ShipCenturion, _ShipColDamaged)	= 0
-	ShipCol(_ShipCenturion, _ShipColDestroyed)	= 0
+	ShipCol(_ShipCenturion, _ShipColDestroyed)	= ShipCol(_ShipCenturion, _ShipColName) + 1
 	ShipCol(_ShipCenturion, _ShipColSpecial)	= 0
 	ShipCol(_ShipCenturion, _ShipColCylonFleet)	= 0
 	ShipRow(_ShipCenturion)		= 27
 	ShipNames(_ShipCenturion)	= &quot;Centurion&quot;
 
-	ShipCol(_ShipOccForces, _ShipColName)		= 13
+	ShipCol(_ShipOccForces, _ShipColName)		= 14
 	ShipCol(_ShipOccForces, _ShipColOffBrd)		= ShipCol(_ShipOccForces, _ShipColName) + 1
 	ShipCol(_ShipOccForces, _ShipColSector)		= ShipCol(_ShipOccForces, _ShipColName) + 4
 	ShipCol(_ShipOccForces, _ShipColDamaged)	= 0
@@ -781,7 +782,7 @@ end sub
 
 
 sub SetShipStatus (shiptype, shipid, ByVal targetstatus)
-	dim centID, civID as integer
+	dim centID, civID, rtncd as integer
 	GetShipSheet
 	
 	if shiptype = _ShipBasestar then
@@ -792,6 +793,9 @@ sub SetShipStatus (shiptype, shipid, ByVal targetstatus)
 		elseif targetstatus = _ShipStatusDestroyed then
 			Board_ClearSpecial(&quot;Thirty-Three&quot;)
 			targetstatus = _ShipStatusOffBoard
+		elseif targetstatus = _ShipStatusRemoved then
+			Board_ClearSpecial(&quot;Thirty-Three&quot;)
+			targetstatus = _ShipStatusDestroyed
 		end if
 	end if
 		
