@@ -508,7 +508,15 @@ sub DiscardCurrentMission
 		exit sub
 	end if
 	
-	CrisisSheet.getCellByPosition(refcol, refrow + crisisID).string = &quot;X&quot;
+	if CrisisSheet.getCellByPosition(_MissionStatusCol, refrow + crisisID).string = &quot;Passed&quot; then
+		CrisisSheet.getCellByPosition(refcol, refrow + crisisID).string = &quot;X&quot;
+	else
+		CrisisSheet.getCellByPosition(_MissionStatusCol, refrow + crisisID).string = &quot;&quot;
+		CrisisSheet.getCellByPosition(_MissionCol, refrow + crisisID).string = CrisisSheet.getCellByPosition(_MissionCol+1, refrow + crisisID).string
+		CrisisSheet.getCellByPosition(_MissionCol, refrow + crisisID).CharColor = CrisisSheet.getCellByPosition(_MissionCol+1, refrow + crisisID).CharColor
+		CrisisSheet.getCellByPosition(_MissionCol+1, refrow + crisisID).string = &quot;&quot;
+		ShuffleMissionDeck FALSE
+	end if
 	SetMissionBtns TRUE
 end sub
 
