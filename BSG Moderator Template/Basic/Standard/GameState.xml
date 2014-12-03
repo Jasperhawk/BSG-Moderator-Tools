@@ -2528,7 +2528,7 @@ sub Execute (playerID as integer)
 			if GameTypeIsDaybreak() then
 				MsgBox &quot;Mutiny Discarded.&quot;
 				DiscardAllMutiny(playerID)
-				SetOPG(playerID)
+				SetOPG(playerID, 0)
 			end if
 		
 			if IsRevealed(playerID) then	&apos;infiltrating cylon or we&apos;re on NC

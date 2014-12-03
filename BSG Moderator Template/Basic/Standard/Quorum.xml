@@ -20,6 +20,7 @@ const _QrmInPlayCol = _QrmDeckCol + 2
 const _QrmAssignCol = _QrmDeckCol + 3
 const _QrmDiscardCol = _QrmDeckCol + 4
 const _QrmRemoveCol = _QrmDeckCol + 5
+const _QrmDescCol = _QrmDeckCol + 6
 const _QrmGameTypeCol = _QrmTypeCol + 8
 
 const _QrmDeckCntCol = 6
@@ -32,6 +33,9 @@ const _SortModeConfigure = 4
 
 const _QrmMaxDeckCol = 1
 const _QrmMaxDeckRow = 4
+
+const _QrmHandSizeRow = 3
+const _QrmHandSizeCol = 6
 
 sub GetQRM
 	if QrmSheet &lt;&gt; NULL then
@@ -66,7 +70,10 @@ function QrmCnt as integer
 	QrmCnt = curcnt
 end function &apos;QrmCnt
 
-
+function QrmHandSize as integer
+	GetQrm
+	QrmHandSize = QrmSheet.getCellByPosition(_QrmHandSizeCol, _QrmHandSizeRow).value
+end function &apos;QrmHandSize
 
 function CheckQrmHandLimit as boolean
 	dim currow, QrmHandLimit as integer
@@ -91,6 +98,7 @@ end function
 &apos; get the first card from the deck and put it into the president&apos;s hand
 sub DealQrmCard
 	DealQrmToPres TRUE
+	SortQrmHand
 end sub
 
 
@@ -162,6 +170,37 @@ function GetPresident as string
 	end if
 end function
 
+sub SortQrmHand
+	&apos; Sort the President Quorum Hand (whenever a new Quorum card is dealt
+	dim card1no, card2no, i, tmpi as integer
+	dim card1, card2, tmp as string
+	GetQrm
+	
+	for card1no = 1 to QrmHandSize
+		for card2no = card1no + 1 to QrmHandSize
+			card1 = QrmSheet.GetCellByPosition(_QrmHandCol, _QrmRow + card1no).string
+			card2 = QrmSheet.GetCellByPosition(_QrmHandCol, _QrmRow + card2no).string
+
+			if card1 &gt; card2 then
+				tmp = QrmSheet.GetCellByPosition(_QrmHandCol, _QrmRow + card1no).string
+				QrmSheet.getCellByPosition(_QrmHandCol, _QrmRow + card1no).string = QrmSheet.getCellByPosition(_QrmHandCol, _QrmRow + card2no).string
+				QrmSheet.getCellByPosition(_QrmHandCol, _QrmRow + card2no).string = tmp
+				
+				tmp = QrmSheet.GetCellByPosition(_QrmTypeCol, _QrmRow + card1no).string
+				QrmSheet.getCellByPosition(_QrmTypeCol, _QrmRow + card1no).string = QrmSheet.getCellByPosition(_QrmTypeCol, _QrmRow + card2no).string
+				QrmSheet.getCellByPosition(_QrmTypeCol, _QrmRow + card2no).string = tmp
+
+				tmp = QrmSheet.GetCellByPosition(_QrmDescCol, _QrmRow + card1no).string
+				QrmSheet.getCellByPosition(_QrmDescCol, _QrmRow + card1no).string = QrmSheet.getCellByPosition(_QrmDescCol, _QrmRow + card2no).string
+				QrmSheet.getCellByPosition(_QrmDescCol, _QrmRow + card2no).string = tmp
+
+				tmp = QrmSheet.GetCellByPosition(_QrmGameTypeCol, _QrmRow + card1no).string
+				QrmSheet.getCellByPosition(_QrmGameTypeCol, _QrmRow + card1no).string = QrmSheet.getCellByPosition(_QrmGameTypeCol, _QrmRow + card2no).string
+				QrmSheet.getCellByPosition(_QrmGameTypeCol, _QrmRow + card2no).string = tmp
+			end if
+		next card2no
+	next card1no
+end sub
 
 sub ShuffleQrm 
 	&apos;move cards from discard back to deck and then reshuffle
@@ -273,6 +312,7 @@ sub SortQrm (sortmode as integer, Optional holdback as integer)
 end sub		&apos;SortQrm
 
 function QrmStatus (rowid as integer) as integer
+	GetQrm
 	if QrmSheet.GetCellByPosition(_QrmHandCol,_QrmRow + rowid).String &lt;&gt; &quot;&quot; then
 		QrmStatus = 1
 	elseif QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowid).String &lt;&gt; &quot;&quot; then

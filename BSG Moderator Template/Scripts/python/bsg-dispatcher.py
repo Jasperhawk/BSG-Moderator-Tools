@@ -81,11 +81,14 @@ class GeekMail(object):
             raise Exception('Invalid user or password! Please check')
     
     def dispatch(self, bgguser, filename):
-        with open(filename, 'r') as f:
-            # first line is our subject
-            subject = f.readline().strip()
-            # the rest is the body
-            body = f.read().strip()
+        f = clean_file(open(filename, 'r').read())
+        subject, body = f.split('\n', 1)
+        
+        #with open(filename, 'r') as f:
+        #    # first line is our subject
+        #    subject = f.readline().strip()
+        #    # the rest is the body
+        #    body = f.read().strip()
         # For now, I'll use my bgguser and append the correct one to the subject. Just remove the lines below for "production"
         #subject = bgguser + ' ' + subject
         #bgguser = 'mawkee'
@@ -108,11 +111,14 @@ class GeekMail(object):
         content = response.read()
         
 
+def clean_file(fs):
+    return fs.decode('iso8859-1').encode('ascii', 'ignore').replace('\r\n', '\n').strip()
+
 def get_md5(playerfile):
     # Calculate the MD5 so we don't re-send a file if nothing has changed
     pmd5 = md5.md5()
     with open(playerfile, 'r') as fsock:
-        subject, body = fsock.read().split('\n', 1)
+        subject, body = clean_file(fsock.read()).split('\n', 1)
         pmd5.update(body)
     return pmd5.hexdigest()
 
