@@ -40,6 +40,9 @@ const _PostHandLimitCol = 28
 const _PostBenevRow		= 29
 const _PostAntRow		= 30
 
+const _GameThreadRow	= 20
+const _GameThreadCol	= 0
+
 function GetSelected (listid as integer) as integer
 	dim tmplst() as string
 	
@@ -97,26 +100,26 @@ function GetSelected (listid as integer) as integer
 end function
 
 sub SaveVersion
-rem ----------------------------------------------------------------------
-rem define variables
-dim document   as object
-dim dispatcher as object
-rem ----------------------------------------------------------------------
-rem get access to the document
-document   = ThisComponent.CurrentController.Frame
-dispatcher = createUnoService(&quot;com.sun.star.frame.DispatchHelper&quot;)
-
-rem ----------------------------------------------------------------------
-dim args1(0) as new com.sun.star.beans.PropertyValue
-args1(0).Name = &quot;VersionComment&quot;
-args1(0).Value = &quot;Turn &quot; &amp; GetCurTurn()
-
-dispatcher.executeDispatch(document, &quot;.uno:Save&quot;, &quot;&quot;, 0, args1())
+	rem ----------------------------------------------------------------------
+	rem define variables
+	dim document   as object
+	dim dispatcher as object
+	rem ----------------------------------------------------------------------
+	rem get access to the document
+	document   = ThisComponent.CurrentController.Frame
+	dispatcher = createUnoService(&quot;com.sun.star.frame.DispatchHelper&quot;)
+	
+	rem ----------------------------------------------------------------------
+	dim args1(0) as new com.sun.star.beans.PropertyValue
+	args1(0).Name = &quot;VersionComment&quot;
+	args1(0).Value = &quot;Turn &quot; &amp; GetCurTurn()
+	
+	dispatcher.executeDispatch(document, &quot;.uno:Save&quot;, &quot;&quot;, 0, args1())
 end sub
 
 sub GenerateHandLists
 	dim playerID, cardID, cardcnt, fileno as integer
-	dim player, card, handlimit, filename as string
+	dim player, card, handlimit, filename, gamethread as string
 	dim PostSheet, LoyaltySheet, CrisisSheet as object		&apos; This is the only function that uses the Posting Template tab, so we can leave it local.
 	
 	PostSheet		= ThisComponent.Sheets.getByName(&quot;Posting Templates&quot;)
@@ -235,6 +238,34 @@ sub GenerateHandLists
 			print #fileno, PostSheet.getCellByPosition(_PostCardCol + playerID, _PostBenevRow).string
 			print #fileno, PostSheet.getCellByPosition(_PostCardCol + playerID, _PostAntRow).string
 		end if
+		
+		&apos; Ask for a CO if player is next player and has a variable draw somehow
+		if GetCurrentPlayer() = playerID - 1 or (playerID = 1 and GetCurrentPlayer() = playercnt()) then
+			if isRevealed(playerID) or InStr( GetPlyrDrawDisplay(playerID), &quot;-&quot; ) then
+				&apos; Yes, I am ashamed of this approach! TODO: Fix this ugly thing
+				print #fileno, &quot;&quot;
+				print #fileno, &quot;[b]You are the next player and have a variable draw.[/b]&quot;
+				print #fileno, &quot;Please remember to leave a CO for your draw if necessary&quot;
+			elseif IsSick(playerID) and GetPlayerName(playerID) &lt;&gt; &quot;Athena&quot; then
+				print #fileno, &quot;&quot;
+				print #fileno, &quot;[b]You are the next player and may have a variable draw.[/b]&quot;
+				print #fileno, &quot;You are currently on a hazardous location that limits draw and will only draw 1 skill card if you don&apos;t move to another location.&quot;
+				print #fileno, &quot;Please remember to leave a CO for your draw if necessary&quot;
+			elseif GetPlayerName(playerID) = &quot;Karl&quot; and not IsGalacticaLoc(GetPlayerLoc(playerID)) then
+				print #fileno, &quot;&quot;
+				print #fileno, &quot;[b]You are the next player and may have a variable draw.[/b]&quot;
+				print #fileno, &quot;You are currently on a space location and may only draw 4 cards on the next turn if you don&apos;t return to Galactica.&quot;
+				print #fileno, &quot;Please remember to leave a CO for your draw if necessary&quot;
+			end if
+		end if
+		
+		&apos; Link to the game thread
+		gamethread = PostSheet.getCellByPosition(_GameThreadCol, _GameThreadRow).string
+		if gamethread &lt;&gt; &quot;&quot; then
+			print #fileno, &quot;&quot;
+			print #fileno, &quot;Game link: [url=http://boardgamegeek.com/thread/&quot; + gamethread + &quot;][/url]&quot;
+		end if
+		
 		&apos; Close File
 		close #fileno
 		

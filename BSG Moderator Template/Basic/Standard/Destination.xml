@@ -556,6 +556,39 @@ sub BuryDestination
 	LogBuryCard _CardTypeDest, destnstr
 end sub
 
+sub SwapDestination
+	dim destID, startrow, rtncd, destndist as integer
+	dim i as integer
+	dim destnstr, destndesc, destngame, tmpdestn(6) as string
+	GetDestn
+
+	&apos;get the first available destination	
+	for destID = 1 to GetDestnCnt()
+		if DestnSheet.GetCellByPosition(_DestnDeckCol,_DestnRow + destID).String  &lt;&gt; &quot;&quot; then
+			for i = 0 to 6
+				tmpdestn(i) = DestnSheet.GetCellByPosition(_DestnGameCol+i,_DestnRow + destID).String
+			next i
+			destnstr = DestnSheet.GetCellByPosition(_DestnDeckCol,_DestnRow + destID).String
+			startrow = destID
+			exit for
+		end if
+	next destID
+	
+	rtncd = MsgBox (&quot;Swap position for destinations &quot; &amp; destnstr &amp; &quot; and &quot; &amp; DestnSheet.GetCellByPosition(_DestnDeckCol, _DestnRow + startrow + 1).String &amp; &quot;?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	for i = 0 to 6
+		DestnSheet.GetCellByPosition(_DestnGameCol+i, _DestnRow + startrow).String = DestnSheet.GetCellByPosition(_DestnGameCol+i, _DestnRow + startrow + 1).String 
+	next i
+	for i = 0 to 6
+		DestnSheet.GetCellByPosition(_DestnGameCol+i, _DestnRow + startrow + 1).String = tmpdestn(i)
+	next i
+	
+	LogThis &quot;Swapped top 2 cards of the destination deck.&quot;
+end sub
+
 function Legendary as integer
 	dim destID, startrow, rtncd, destndist as integer
 	dim destnstr, destndesc as string

@@ -31,9 +31,10 @@ sub GetMutinySheet
 end sub
 
 sub DrawMutiny (playerID as integer, optional zarek as boolean)
-	dim cardID, zarekID as integer
+	dim cardID, zarekID, mutinycnt, i as integer
 	GetMutinySheet
 	
+	mutinycnt = 1	
 	if GetPlayerName(playerID) = &quot;Tom&quot; then
 		zarek	= false
 	elseif IsMissing(zarek) then
@@ -43,34 +44,37 @@ sub DrawMutiny (playerID as integer, optional zarek as boolean)
 	&apos; Check for Zarek
 	if zarek then
 		for zarekID = 1 to PlayerCnt()
-			if GetPlayerName(zarekID) = &quot;Tom&quot; then
-				MsgBox(&quot;Don&apos;t forget to use Necessary Steps.&quot;)
+			if GetPlayerName(zarekID) = &quot;Tom&quot; and not isRevealed(zarekID) then
+				MsgBox(&quot;Two Mutinies were dealt. Don&apos;t forget to use Necessary Steps.&quot;)
+				mutinycnt = 2
 			end if
 		next zarekID
 	end if
 	
-	cardID = 1
-	do until MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string = &quot;&quot;
-		cardID	= cardID + 1
-	loop
-	MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string	= GetPlayerName(playerID)
-	LogThis(GetPlayerName(playerID) &amp; &quot; draws Mutiny Card: &quot; &amp; MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string)
-	&apos; If we&apos;re going to do any post-draw checking, like throwing someone in the Brig, do it here.
-	
-	&apos; Is the deck empty? If so, move the discards to the deck and shuffle it.
-	cardID	= cardID + 1
-	if MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string = &quot;&quot; then
-		MsgBox &quot;Mutiny deck empty, reshuffling it.&quot;
-			
-		&apos; Discards are on top of the removed pile.
-		do until cardID &gt; _MutinyCount or MutinySheet.getCellByPosition(_MutinyDiscardCol, _MutinyRow + cardID).string = &quot;&quot;
-			MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string = MutinySheet.getCellByPosition(_MutinyDiscardCol, _MutinyRow + cardID).string
-			MutinySheet.getCellByPosition(_MutinyDiscardCol, _MutinyRow + cardID).string = &quot;&quot;
+	for i = 1 to mutinycnt
+		cardID = 1
+		do until MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string = &quot;&quot;
 			cardID	= cardID + 1
 		loop
-		SetBuriedMutiny(true)
-		ShuffleMutinyDeck
-	end if
+		MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string	= GetPlayerName(playerID)
+		LogThis(GetPlayerName(playerID) &amp; &quot; draws Mutiny Card: &quot; &amp; MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string)
+		&apos; If we&apos;re going to do any post-draw checking, like throwing someone in the Brig, do it here.
+		
+		&apos; Is the deck empty? If so, move the discards to the deck and shuffle it.
+		cardID	= cardID + 1
+		if MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string = &quot;&quot; then
+			MsgBox &quot;Mutiny deck empty, reshuffling it.&quot;
+				
+			&apos; Discards are on top of the removed pile.
+			do until cardID &gt; _MutinyCount or MutinySheet.getCellByPosition(_MutinyDiscardCol, _MutinyRow + cardID).string = &quot;&quot;
+				MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string = MutinySheet.getCellByPosition(_MutinyDiscardCol, _MutinyRow + cardID).string
+				MutinySheet.getCellByPosition(_MutinyDiscardCol, _MutinyRow + cardID).string = &quot;&quot;
+				cardID	= cardID + 1
+			loop
+			SetBuriedMutiny(true)
+			ShuffleMutinyDeck
+		end if
+	next i
 	
 	if GetPlayerName(playerID) = &quot;Lee&quot; then
 		MsgBox &quot;Remember that Lee has to discard 2 cards after drawing a Mutiny card&quot;

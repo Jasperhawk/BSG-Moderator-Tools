@@ -337,6 +337,8 @@ function GetPlayerName (playerID as integer) as string
 	GetGS
 	if playerID = 0 or playerID = _DestinyPlayerID then
 		GetPlayerName = &quot;Destiny&quot;
+	elseif playerID = _SkillCheckPlayerID then
+		GetPlayerName = &quot;Skill Check&quot;
 	else
 		GetPlayerName = GameSheet.GetCellByPosition(_PlayerNameCol,_PlayerStartRow + playerID).String
 	end if

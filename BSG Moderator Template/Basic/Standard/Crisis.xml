@@ -451,6 +451,7 @@ sub PlayCrisisCard
 	dim refrow, refcol as integer
 	
 	GetCrisisSheet
+	GetSF
 	
 	if OnNewCaprica() then
 		refrow = _CapricaRow
@@ -461,7 +462,14 @@ sub PlayCrisisCard
 		refcol = _CrisisCol
 		crisisID = TopofCrisisDeck()
 	end if
-		
+
+	if LeePlayedXO then
+		rtncd = MsgBox(&quot;Did you remember to activate Lee&apos;s Forward Thinker?&quot;, 4)
+		if rtncd &lt;&gt; 6 then
+			exit sub
+		end if
+	end if
+			
 	if CrisisSheet.getCellByPosition(_MissionFlagCol, _MissionFlagRow).string = &quot;X&quot; then
 		rtncd = MsgBox(&quot;A Mission was played on this turn. Are you sure you want to play a Crisis card?&quot;, 4)
 		if rtncd &lt;&gt; 6 then
@@ -831,6 +839,53 @@ sub SetCrisisStartButton(difficulty as string, optional crisistype as integer)
 end sub	&apos;SetStartButtons
 
 
+sub SwapTopCrisisCards
+	dim rtncd, crisisID, i, topofdeck as integer
+	dim refcol, refrow as integer
+	dim skillsincheck(6) as string
+	dim crisisData(_CrisisColCnt) as variant
+	GetCrisisSheet
+
+	SetCrisisBtns FALSE
+
+	if OnNewCaprica() then
+		refcol = _CapricaCol
+		refrow = _CapricaRow
+		topofdeck = TopOfCapricaDeck()
+	else
+		refcol = _CrisisCol
+		refrow = _CrisisRow
+		topofdeck = TopOfCrisisDeck()
+	end if
+
+	rtncd = MsgBox (&quot;Swap position of &quot;&quot;&quot; &amp; CrisisSheet.getCellByPosition(refcol, refrow + topofdeck).string &amp; &quot;&quot;&quot; and &quot;&quot;&quot; &amp; CrisisSheet.getCellByPosition(refcol, refrow + topofdeck + 1).string &amp; &quot;&quot;&quot;?&quot;,4,&quot;Swap Top Crisis&quot;)
+	if rtncd &lt;&gt; 6 then
+		SetCrisisBtns TRUE
+		exit sub
+	end if
+
+	crisisData(0) = CrisisSheet.getCellByPosition(refcol, refrow + topofdeck).string
+	crisisData(1) = CrisisSheet.getCellByPosition(refcol, refrow + topofdeck).CharColor
+	for i = 2 to _CrisisColCnt
+		crisisData(i) = CrisisSheet.getCellByPosition(refcol + i, refrow + topofdeck).string
+	next i
+
+	CrisisSheet.getCellByPosition(refcol, refrow + topofdeck).string = CrisisSheet.getCellByPosition(refcol, refrow + topofdeck + 1).string
+	CrisisSheet.getCellByPosition(refcol, refrow + topofdeck).CharColor = CrisisSheet.getCellByPosition(refcol, refrow + topofdeck + 1).CharColor
+	for i = 2 to _CrisisColCnt
+		CrisisSheet.getCellByPosition(refcol + i, refrow + topofdeck).string = CrisisSheet.getCellByPosition(refcol + i, refrow + topofdeck + 1).string
+	next i
+
+	CrisisSheet.getCellByPosition(refcol, refrow + topofdeck + 1).string = crisisData(0)
+	CrisisSheet.getCellByPosition(refcol, refrow + topofdeck + 1).CharColor = crisisData(1)
+	for i = 2 to _CrisisColCnt
+		CrisisSheet.getCellByPosition(refcol + i, refrow + topofdeck + 1).string = crisisData(i)
+	next i
+
+	LogThis &quot;Swapped 2 top cards of the Crisis Deck.&quot;
+
+	SetCrisisBtns TRUE
+end sub &apos;SwapTopCrisisCards
 
 sub BuryCrisisCard
 	dim rtncd, crisisID, i, topofdeck, endofdeck, buryDeck as integer
@@ -1637,6 +1692,7 @@ end sub
 sub SetCrisisBtns (enflag as boolean)
 	GetCrisisSheet
 	CrisisForm.getByName(&quot;btnPlayCrisis&quot;).enabled = enflag
+	CrisisForm.getByName(&quot;btnSwapCrisis&quot;).enabled = enflag
 	CrisisForm.getByName(&quot;btnBuryCrisis&quot;).enabled = enflag
 	CrisisForm.getByName(&quot;btnReshuffle&quot;).enabled = enflag
 end sub

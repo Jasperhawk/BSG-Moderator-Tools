@@ -99,6 +99,7 @@ end function
 sub DealQrmCard
 	DealQrmToPres TRUE
 	SortQrmHand
+	UpdateQrmCardLst
 end sub
 
 
@@ -484,7 +485,7 @@ end sub		&apos;DiscardQrmCard
 
 
 sub PlayQrmCard
-	dim rowID, rtncd as integer
+	dim rowID, rtncd, toryID as integer
 	dim curcard, targetplyr as string
 	GetQRM
 	
@@ -552,6 +553,12 @@ sub PlayQrmCard
 	UpdateQrmCardLst
 	Board_RefreshPlayerAssignments		
 
+	&apos; Check for Tory&apos;s Adaptable
+	for toryID = 1 to PlayerCnt()
+		if GetPlayerName(toryID) = &quot;Tory&quot; and not isRevealed(toryID) then
+			MsgBox(&quot;Don&apos;t forget about Tory&apos;s Adaptable Ability (draw 2 skill cards)&quot;)
+		end if
+	next toryID
 end sub &apos;PlayQrmCard
 
 sub MoveSPUp
