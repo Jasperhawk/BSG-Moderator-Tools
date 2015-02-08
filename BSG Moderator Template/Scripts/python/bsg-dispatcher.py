@@ -1,4 +1,4 @@
-# /usr/bin/env python2.7
+# /usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # BSG Moderator Tools (JasperHawk) Dispatcher
@@ -7,13 +7,19 @@
 
 import os
 import sys
-import urllib
-import urllib2
-import md5
-reload(sys)
-sys.setdefaultencoding("UTF-8")
+if sys.version_info.major >= 3:
+    import urllib.request as urllib2
+    from urllib.parse import urlencode
+    import hashlib as md5  # may be just define md5 function here?
+    from http.cookiejar import CookieJar
+else:  # python2
+    import urllib2
+    import md5
+    from cookielib import CookieJar
+    from urllib import urlencode
+    reload(sys)
+    sys.setdefaultencoding("UTF-8")
 
-from cookielib import CookieJar
 from pprint import pprint as pp
 
 from com.sun.star.awt import Rectangle
@@ -75,8 +81,8 @@ class GeekMail(object):
         self.authenticate()
     
     def authenticate(self):
-        data = urllib.urlencode({'username': self.username, 'password': self.password})
-        response = self.opener.open(self.loginurl, data)
+        data = urlencode({'username': self.username, 'password': self.password})
+        response = self.opener.open(self.loginurl, data.encode())
         # We don't actually need to get te response... But meh
         content = response.read()
         if 'bggusername' not in response.headers['set-cookie']: # invalid user
@@ -85,7 +91,7 @@ class GeekMail(object):
     def dispatch_text(self, bgguser, subject, body):
         subject = clean_str(subject)
         body = clean_str(body)
-        data = urllib.urlencode({
+        data = urlencode({
             'action': 'save',
             'B1': "Send",
             'savecopy': '1',
@@ -99,7 +105,7 @@ class GeekMail(object):
             'subject': subject,
             'body': body })
 
-        response = self.opener.open(self.msgurl, data)
+        response = self.opener.open(self.msgurl, data.encode())
         content = response.read()
     
     def dispatch_file(self, bgguser, filename):
@@ -139,7 +145,7 @@ def dispatch_selected(*args):
     document = XSCRIPTCONTEXT.getDocument()
     maindir = urllib2.url2pathname(os.path.dirname(document.Location.replace("file://","")))
     logfile = os.path.join(maindir, 'bsg-dispatcher-debug.log')
-    sys.stdout = open(logfile, "a", 0) # unbuffered
+    sys.stdout = open(logfile, "ab", 0) # unbuffered
 
     # Useful variables so we don't need to do a lot of typing
     worksheet = document.getSheets().getByName('Game State')
@@ -184,7 +190,7 @@ def dispatch_selected(*args):
         # Set the current MD5 on the spreadsheet (so that we only send it again after something is changed)
         dispatcherinfo.getCellByPosition(player_id+4, 31).setString(current_md5)
     except Exception as e:
-        MessageBox(document, e.message, "Alert!", "warningbox")
+        MessageBox(document, str(e), "Alert!", "warningbox")
         return False
     
     MessageBox(document, "Successfully sent file to %s" % selected_player, "Success!", "infobox")
@@ -196,7 +202,7 @@ def dispatch_all(*args):
     document = XSCRIPTCONTEXT.getDocument()
     maindir = urllib2.url2pathname(os.path.dirname(document.Location.replace("file://","")))
     logfile = os.path.join(maindir, 'bsg-dispatcher-debug.log')
-    sys.stdout = open(logfile, "a", 0) # unbuffered
+    sys.stdout = open(logfile, "ab", 0) # unbuffered
 
     # Useful variables so we don't need to do a lot of typing
     worksheet = document.getSheets().getByName('Game State')
