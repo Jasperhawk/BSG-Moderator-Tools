@@ -7,10 +7,16 @@
 
 import os
 import sys
-import urllib
-import urllib2
-import md5
-from cookielib import CookieJar
+if sys.version_info.major >= 3:
+    import urllib.request as urllib2
+    from urllib.parse import urlencode
+    import hashlib as md5  # may be just define md5 function here?
+    from http.cookiejar import CookieJar
+else:  # python2
+     import urllib2
+     import md5
+     from cookielib import CookieJar
+     from urllib import urlencode
 from pprint import pprint as pp
 
 from com.sun.star.awt import Rectangle
@@ -73,8 +79,8 @@ class GeekMail(object):
         self.authenticate()
     
     def authenticate(self):
-        data = urllib.urlencode({'username': self.username, 'password': self.password})
-        response = self.opener.open(self.loginurl, data)
+        data = urlencode({'username': self.username, 'password': self.password})
+        response = self.opener.open(self.loginurl, data.encode())
         # We don't actually need to get te response... But meh
         content = response.read()
         if 'bggusername' not in response.headers['set-cookie']: # invalid user
@@ -82,7 +88,7 @@ class GeekMail(object):
     
     def dispatch(self, bgguser, filename):
         f = clean_file(open(filename, 'r').read())
-        subject, body = f.split('\n', 1)
+        subject, body = f.split(b'\n', 1)
         
         #with open(filename, 'r') as f:
         #    # first line is our subject
@@ -93,7 +99,7 @@ class GeekMail(object):
         #subject = bgguser + ' ' + subject
         #bgguser = 'mawkee'
         
-        data = urllib.urlencode({
+        data = urlencode({
             'action': 'save',
             'B1': "Send",
             'savecopy': '1',
@@ -107,18 +113,20 @@ class GeekMail(object):
             'subject': subject,
             'body': body })
 
-        response = self.opener.open(self.msgurl, data)
+        response = self.opener.open(self.msgurl, data.encode())
         content = response.read()
         
 
 def clean_file(fs):
-    return fs.decode('iso8859-1').encode('ascii', 'ignore').replace('\r\n', '\n').strip()
+    if sys.version_info.major == 2:
+        fs = fs.decode('ifo8859-1')
+    return fs.replace('\r\n', '\n').strip().encode('ascii', 'ignore')
 
 def get_md5(playerfile):
     # Calculate the MD5 so we don't re-send a file if nothing has changed
     pmd5 = md5.md5()
     with open(playerfile, 'r') as fsock:
-        subject, body = clean_file(fsock.read()).split('\n', 1)
+        subject, body = clean_file(fsock.read()).split(b'\n', 1)
         pmd5.update(body)
     return pmd5.hexdigest()
 
@@ -128,7 +136,7 @@ def dispatch_selected(*args):
     document = XSCRIPTCONTEXT.getDocument()
     maindir = urllib2.url2pathname(os.path.dirname(document.Location.replace("file://","")))
     logfile = os.path.join(maindir, 'bsg-dispatcher-debug.log')
-    sys.stdout = open(logfile, "w", 0) # unbuffered
+    sys.stdout = open(logfile, "wb", 0) # unbuffered
 
     # Useful variables so we don't need to do a lot of typing
     worksheet = document.getSheets().getByName('Game State')
@@ -173,8 +181,10 @@ def dispatch_selected(*args):
         # Set the current MD5 on the spreadsheet (so that we only send it again after something is changed)
         dispatcherinfo.getCellByPosition(player_id+4, 31).setString(current_md5)
     except Exception as e:
-        MessageBox(document, e.message, "Alert!", "warningbox")
-        return False
+        if hasattr(e, 'message'):
+            MessageBox(document, e.message, "Alert!", "warningbox")
+            return False
+        raise e
     
     MessageBox(document, "Successfully sent file to %s" % selected_player, "Success!", "infobox")
     
@@ -185,7 +195,7 @@ def dispatch_all(*args):
     document = XSCRIPTCONTEXT.getDocument()
     maindir = urllib2.url2pathname(os.path.dirname(document.Location.replace("file://","")))
     logfile = os.path.join(maindir, 'bsg-dispatcher-debug.log')
-    sys.stdout = open(logfile, "w", 0) # unbuffered
+    sys.stdout = open(logfile, "wb", 0) # unbuffered
 
     # Useful variables so we don't need to do a lot of typing
     worksheet = document.getSheets().getByName('Game State')
