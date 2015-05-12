@@ -27,6 +27,8 @@ const _InitTrackRow = 22
 const _InitFlagCol = 1
 const _InitFlagRow = 20
 
+const _InitTaskCol = 2
+const _InitTaskRow = 36
 
 sub GetSetup
 	if SetupSheet &lt;&gt; NULL then
@@ -35,6 +37,11 @@ sub GetSetup
 	
 	SetupSheet= ThisComponent.Sheets.getByName(&quot;Setup&quot;)
 	SetupForm = SetupSheet.DrawPage.Forms.GetByName(&quot;formSetup&quot;)
+end sub
+
+sub SetCurrentTask (taskstr as string)
+	GetSetup
+	SetupSheet.getCellByPosition(_InitTaskCol, _InitTaskRow).string = taskstr
 end sub
 
 sub SetInitFlag (initflag as boolean)
@@ -134,6 +141,12 @@ function VariantFlaws as boolean
 	GetSetup
 	
 	VariantFlaws = (SetupForm.GetByName(&quot;chkFlaws&quot;).state = 1)
+end function
+
+function VariantAltTrauma as boolean
+	GetSetup
+	
+	VariantAltTrauma = (SetupForm.GetByName(&quot;chkAltTrauma&quot;).state = 1)
 end function
 
 function GetQuorumHandLimit as integer
@@ -268,6 +281,7 @@ sub EnableStep (whichstep as integer, enableflag as boolean)
 			SetupForm.getByName(&quot;chkManualLoyalty&quot;).enabled = enableflag
 			SetupForm.getByName(&quot;chkCustomLoyalty&quot;).enabled = enableflag
 			SetupForm.getByName(&quot;chkFlaws&quot;).enabled = enableflag
+			SetupForm.getByName(&quot;chkAltTrauma&quot;).enabled = enableflag
 			
 		case 2
 			SetupForm.getGroupByName(&quot;txtPlyr&quot;, grpTxt)
@@ -373,6 +387,17 @@ sub PegasusCheckbox
 	SetupForm.getByName(&quot;chkRevelations&quot;).state = 0
 	SetupForm.getByName(&quot;chkTreacherousDestiny&quot;).enabled = enableflag
 	SetupForm.getByName(&quot;chkTreacherousDestiny&quot;).state = 0
+	
+	PopulatePlayerCnts()
+end sub
+
+sub ExodusCheckbox
+	dim enableflag as boolean
+	GetSetup
+	
+	enableflag = GameTypeIsExodus()
+	SetupForm.getByName(&quot;chkAltTrauma&quot;).enabled = enableflag
+	SetupForm.getByName(&quot;chkAltTrauma&quot;).state = 0
 	
 	PopulatePlayerCnts()
 end sub
@@ -654,7 +679,7 @@ sub SetInitTrack (taskID as integer, completed as boolean)
 	dim tasklist as variant
 	GetSetup
 		
-	tasklist=Array(,&quot;Initialize&quot;,&quot;Ships&quot;,&quot;Game State&quot;,&quot;Loyalty Cards&quot;,&quot;Skill Cards &amp; Destiny&quot;,&quot;Crisis Cards&quot;,&quot;Super Crisis Cards&quot;,&quot;Quorum Cards&quot;,&quot;Destination Cards&quot;,&quot;Game Log&quot;)
+	tasklist=Array(,&quot;Initialize&quot;,&quot;Ships&quot;,&quot;Game State&quot;,&quot;Trauma Tokens&quot;,&quot;Mutiny Cards&quot;,&quot;Loyalty Cards&quot;,&quot;Skill Cards &amp; Destiny&quot;,&quot;Crisis Cards&quot;,&quot;Super Crisis Cards&quot;,&quot;Quorum Cards&quot;,&quot;Destination Cards&quot;,&quot;Game Log&quot;,&quot;Board State&quot;)
 	
 	if completed then
 		SetupSheet.getCellByPosition(_InitTrackCol, _InitTrackRow + TaskID).string		= &quot;&quot;
@@ -685,7 +710,7 @@ sub Initialize_Game
 	
 	SetInitFlag TRUE
 	
-	for taskID = 1 to 10
+	for taskID = 1 to 13
 		SetInitTrack taskid, FALSE
 	next taskID		
 	
@@ -693,8 +718,8 @@ sub Initialize_Game
 	&apos; This is just to show that we&apos;re doing something...
 	SetInitTrack 1, TRUE
 
-
 	&apos; put the Players&apos; names &amp; Characters on the Game State tab.
+	SetCurrentTask(&quot;Populating Player Names and Characters&quot;)
 	SetupForm.getGroupByName(&quot;txtPlyr&quot;, grpTxt)
 	SetupForm.getGroupByName(&quot;lstSelectChar&quot;, grpLst)
 	for playerID = 0 to 6
@@ -720,52 +745,62 @@ sub Initialize_Game
 	&apos; clear any damage and shuffle the Galactia Damage tokens
 	&apos; reset the turn to 1.1
 	Initialize_GameState
-	Initialize_IonianNebula
 	SetInitTrack 3, TRUE
 	
+	&apos; Reshuffle trauma tokens, allies and crossroad cards
+	Initialize_IonianNebula
+	SetInitTrack 4, TRUE
 	
+	&apos; Reshuffle Mutiny cards and deal them accordingly
+	Initialize_Mutiny
+	SetInitTrack 5, TRUE
+
 	&apos; Create the appropriate size loyalty deck
 	&apos; Shuffle Loyalty and deal the first round of cards, set the initial loyalty on GameState
-	Initialize_Mutiny	
 	Initialize_Loyalty
-	SetInitTrack 4, TRUE
+	SetInitTrack 6, TRUE
 	
 	&apos; set default hand description for each player 
 	&apos; put all the cards back in the skill decks and shuffle them all.
 	&apos; deal the destiny deck
 	Initialize_SkillCards
-	SetInitTrack 5, TRUE	
+	SetInitTrack 7, TRUE	
 	
 	&apos; Shuffle the Crisis Card deck
 	Initialize_CrisisCards
-	SetInitTrack 6, TRUE
+	SetInitTrack 8, TRUE
 		
 	&apos; Shuffle the Super-Crisis cards
 	Initialize_Super
-	SetInitTrack 7, TRUE
+	SetInitTrack 9, TRUE
 
 	&apos; Shuffle the Quorum Deck
 	Initialize_Quorum
-	SetInitTrack 8, TRUE
+	SetInitTrack 10, TRUE
 	
 	&apos; Shuffle the Destination cards
 	Initialize_Destination
-	SetInitTrack 9, TRUE
+	SetInitTrack 11, TRUE
 		
 	&apos; Clear the game log of everything we just did
 	Initialize_GameLog
-	SetInitTrack 10, TRUE
+	SetInitTrack 12, TRUE
 	
 	SetInitFlag FALSE
 	
+	&apos; Clearing up board info
 	Initialize_Board
+	SetInitTrack 13, TRUE
+	
+	&apos; A small easter egg..
+	SetCurrentTask(&quot;Shooting A Llama On the Head&quot;)
 	
 	EnableStep 4, FALSE
 	if Not FileExists(GetGimpPath()) then
 		MsgBox &quot;Please make sure you select the proper GIMP executable file if you want to generate image files.&quot;,0,&quot;COMPLETE SETUP&quot;
 	end if
-
 	
+	SetCurrentTask(&quot;The Game is Ready to Start!&quot;)
 	MsgBox &quot;The Game is ready to start.&quot;,0,&quot;COMPLETE SETUP&quot;
 	
 end sub

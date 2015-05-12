@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Dispatcher" script:language="StarBasic">Option Explicit
+dim DispatcherSheet as object
+
+const _DispatcherCol = 2
+const _DispatcherPlayerRow = 1
+const _DispatcherCharRow = 2
+const _DispatcherSubjectRow = 3
+const _DispatcherBodyRow = 4
+const _DispatcherLastSentHashRow = 5
+
+sub GetDisp
+	if DispatcherSheet &lt;&gt; NULL then
+		exit sub
+	end if 
+	
+	DispatcherSheet = ThisComponent.Sheets.getByName(&quot;Dispatcher&quot;)
+end sub
+
+Sub DispatchContents 
+	dim oFactory, oProvider, oScript, oDocScriptProvider as object
+	&apos;oFactory = createUnoService(&quot;com.sun.star.script.provider.MasterScriptProviderFactory&quot;) 
+	&apos;oProvider = oFactory.createScriptProvider(&quot;&quot;)
+	&apos;oScript = oProvider.getScript(&quot;vnd.sun.star.script:bsg-dispatcher.py$dispatcher_call?language=Python&amp;location=user&quot;) 
+	
+	oDocScriptProvider = ThisComponent.getScriptProvider() 
+	oScript = oDocScriptProvider.getScript(&quot;vnd.sun.star.script:bsg-dispatcher.py$dispatcher_call?language=Python&amp;location=document&quot;)
+	oScript.Invoke(Array(), Array(), Array()) 
+end sub
+
+function DispTargetPlayer (playerID as integer)
+	dim plyr, username as string
+	GetDisp
+	
+	plyr = GetPlayerName(playerID)
+	username = GetPlayerUserName(playerID)
+	DispatcherSheet.GetCellByPosition(_DispatcherCol, _DispatcherPlayerRow).string = username
+	DispatcherSheet.GetCellByPosition(_DispatcherCol, _DispatcherCharRow).string = plyr
+end function
+
+function GetDispChar as string
+	GetDisp
+	
+	GetDispChar = DispatcherSheet.GetCellByPosition(_DispatcherCol, _DispatcherCharRow).string
+end function
+
+&apos; Should ALWAYS be called after setting the destination player, since we&apos;re using it on the subject line
+function DispSubject (subject as string)
+	dim prefix as string
+	dim PostSheet as object	
+	GetDisp
+	
+	PostSheet = ThisComponent.Sheets.getByName(&quot;Posting Templates&quot;)
+	
+	prefix = &quot;BSG &quot; &amp; GetGameName &amp; &quot; (&quot; &amp; GetDispChar &amp; &quot;) - Turn &quot; &amp; GetGameTurn &amp; &quot; &quot;
+	
+	DispatcherSheet.GetCellByPosition(_DispatcherCol, _DispatcherSubjectRow).string = prefix &amp; subject
+end function
+
+function DispBody (body as string)
+	GetDisp
+	
+	DispatcherSheet.GetCellByPosition(_DispatcherCol, _DispatcherBodyRow).string = body
+end function
+
+function DispBodyAdd (body as string)
+	GetDisp
+	
+	DispatcherSheet.GetCellByPosition(_DispatcherCol, _DispatcherBodyRow).string = DispatcherSheet.GetCellByPosition(_DispatcherCol, _DispatcherBodyRow).string &amp; body &amp; chr(13)
+end function
+
+function DispBodyFooter as string
+	dim PostSheet
+	GetDisp
+	PostSheet		= ThisComponent.Sheets.getByName(&quot;Posting Templates&quot;)
+	
+	&apos; Link to the game thread
+	gamethread = PostSheet.getCellByPosition(_GameThreadCol, _GameThreadRow).string
+	if gamethread &lt;&gt; &quot;&quot; then
+		DispBodyAdd chr(13) &amp; &quot;Game link: [url=http://boardgamegeek.com/thread/&quot; + gamethread + &quot;/new][/url]&quot;
+	end if
+
+end function
+
+</script:module>

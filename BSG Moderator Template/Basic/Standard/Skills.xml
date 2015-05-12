@@ -24,6 +24,7 @@ const _DestinyCol = 6
 const _DestinyRow = 2
 global const _DestinyPlayerID = 8
 global const _SkillCheckPlayerID = 9
+global const _RecklessPlayerID = 10
 
 const _SkillCheckCol = 7
 const _SkillCheckRow = 2
@@ -61,6 +62,9 @@ const _SkillCheckTriggeredRow 			= 25
 const _SkillCheckTriggerConsequenceCol	= 14
 const _SkillCheckTriggerRecklessCol		= 11
 
+const _DaybreakRecklessRow	= 27
+const _DaybreakRecklessCol	= 7 
+
 const _SkillColorTagRow = 143
 
 global const _SkillSetHand = 0
@@ -68,6 +72,7 @@ const _SkillSetDeck = 1
 const _SkillSetDiscard = 2
 const _SkillSetDestiny = 3
 const _SkillSetSkillCheck = 4
+const _SkillSetReckless	= 5
 
 const _PlayerDrawnRow		= 147
 const _SkillCheckNeedsRow 	= 154
@@ -101,6 +106,11 @@ sub GetSF
 	SkillName= Array(&quot;&quot;,&quot;Politics&quot;,&quot;Leadership&quot;,&quot;Tactics&quot;,&quot;Piloting&quot;,&quot;Engineering&quot;,&quot;Treachery&quot;,&quot;Faith&quot;,&quot;Destiny&quot;)
 	Randomize
 end sub	&apos;GetSF
+
+function AreManipulateButtonsClear as boolean
+	AreManipulateButtonsClear = (SkillForm.getByName(&quot;btnManipulateDestiny&quot;).label = &quot;Manipulate Destiny&quot; and _
+								 SkillForm.getByName(&quot;btnManipulateSkillCheck&quot;).label = &quot;Manipulate Skill Check&quot;)
+end function
 
 sub LeePlayedXO as boolean
 	if SkillSheet.getCellByPosition(_LeePlayedXOCol, _LeePlayedXORow).string = &quot;X&quot; then
@@ -144,6 +154,9 @@ function GetSkillSetCol (whichset as integer, setID as integer)
 		
 		case _SkillSetSkillCheck
 			GetSkillSetCol = _SkillCheckCol
+		
+		case _SkillSetReckless
+			GetSkillSetCol = _DaybreakRecklessCol
 			
 	end select
 	
@@ -166,6 +179,9 @@ function GetSkillSetRow (whichset as integer, setID as integer)
 		
 		case _SkillSetSkillCheck
 			GetSkillSetRow = _SkillCheckRow
+
+		case _SkillSetReckless
+			GetSkillSetRow = _DaybreakRecklessRow
 
 	end select
 end function	&apos;GetSkillSetRow
@@ -198,9 +214,11 @@ sub Configure_SkillCards
 	GetSF
 
 	&apos;First clear all the skill cards
+	SetCurrentTask(&quot;Clearing All Skill Check Cards&quot;)
 	DiscardSkillCheckCards
 
 	&apos; Clear Player hands.
+	SetCurrentTask(&quot;Clearing Player Hands&quot;)
 	for playerid = 1 to 7
 		do while GetSkillCardFrom(_SkillSetHand,playerID) &lt;&gt; &quot;&quot;
 		loop
@@ -213,6 +231,7 @@ sub Configure_SkillCards
 	next playerid
 	
 	&apos; Clear decks and discards.
+	SetCurrentTask(&quot;Clearing Skill Card Decks And Discards&quot;)
 	for skillID = _SkillIDMin to _SkillIDMax
 		do while GetSkillCardFrom(_SkillSetDiscard, skillID) &lt;&gt; &quot;&quot;
 		loop
@@ -221,10 +240,12 @@ sub Configure_SkillCards
 	next skillID
 	
 	&apos; Clear Destiny
+	SetCurrentTask(&quot;Clearing Destiny&quot;)
 	do while GetSkillCardFrom(_SkillSetDestiny,0) &lt;&gt; &quot;&quot;
 	loop
 
 	&apos; now repopulate from reference
+	SetCurrentTask(&quot;Repopulating Skill Cards&quot;)
 	maxcards = 0
 	for skillID = _SkillIDMin to _SkillIDMax
 		curcol	= GetSkillCol(skillID)
@@ -243,6 +264,7 @@ sub Configure_SkillCards
 	curcol= GetSkillCol(_SkillIDTreachery)
 	for currow = _SkillCardRow to _SkillCardRow + _MaxSkillCnt - 1
 		if GameTypeIsPegasus() or GameTypeIsDaybreak() then
+			SetCurrentTask(&quot;Enabling Treachery Deck&quot;)
 			SkillSheet.getCellByPosition(curcol,currow).CellBackColor = _white
 			SkillSheet.getCellByPosition(curcol,currow+(_SkillDiscardRow -_SkillCardRow )).CellBackColor = _ltgrey
 		else
@@ -255,6 +277,7 @@ sub Configure_SkillCards
 	curcol= GetSkillCol(_SkillIDFaith)
 	for currow = _SkillCardRow to _SkillCardRow + _MaxSkillCnt - 1
 		if GameTypeIsRevelations() then
+			SetCurrentTask(&quot;Enabling Faith Deck&quot;)
 			SkillSheet.getCellByPosition(curcol,currow).CellBackColor = _white
 			SkillSheet.getCellByPosition(curcol,currow+(_SkillDiscardRow -_SkillCardRow )).CellBackColor = _ltgrey
 		else
@@ -263,7 +286,18 @@ sub Configure_SkillCards
 		end if
 	next currow
 	
+	&apos; If we&apos;re not using Daybreak, blank out Daybreak Resolve
+	SetCurrentTask(&quot;Setting Up Daybreak Resolve&quot;)
+	if GameTypeIsDaybreak() then
+		SkillSheet.getCellByPosition(_DaybreakRecklessCol, _DaybreakRecklessRow).CellBackColor = _white
+		SkillSheet.getCellByPosition(_DaybreakRecklessCol, _DaybreakRecklessRow+1).CellBackColor = _white
+	else
+		SkillSheet.getCellByPosition(_DaybreakRecklessCol, _DaybreakRecklessRow).CellBackColor = _grey
+		SkillSheet.getCellByPosition(_DaybreakRecklessCol, _DaybreakRecklessRow+1).CellBackColor = _grey
+	end if
+	
 	&apos; Hide any rows we don&apos;t need
+	SetCurrentTask(&quot;Hiding Unused Rows&quot;)
 	for currow = 1 to _MaxSkillCnt 
 		if currow &lt;= maxcards then
 			SkillSheet.Rows(_SkillCardRow + currow).IsVisible = TRUE
@@ -324,6 +358,8 @@ function GetPlayerCol (playerID as integer) as integer
 		GetPlayerCol = _DestinyCol
 	elseif playerID = _SkillCheckPlayerID then
 		GetPlayerCol = _SkillCheckCol
+	elseif playerID = _RecklessPlayerID then
+		GetPlayerCol = _DaybreakRecklessCol
 	end if
 end function
 
@@ -445,6 +481,8 @@ function CardInHand (playerID as integer, cardNo as integer, optional stripped) 
 		handrow = _DestinyRow
 	elseif playerID = _SkillCheckPlayerID then
 		handrow = _SkillCheckRow
+	elseif playerID = _RecklessPlayerID then
+		handrow = _DaybreakRecklessRow
 	else
 		handrow = _PlayerHandRow
 	end if
@@ -528,13 +566,22 @@ Sub DealSelectedCardToAll
 		dealtocylons = FALSE
 	end if
 	GetSF
+	
+	DealToAll(srcskill, dealtocylons)
+end sub &apos;DealSelectedCardToAll
+
+sub DealToAll (srcskill as integer, optional dealtocylons as boolean)
+	dim playerID as integer
+	if IsMissing(dealtocylons) then
+		dealtocylons = FALSE
+	end if
 
 	for playerID = 1 to playercnt()
 		if dealtocylons = TRUE or not isRevealed(playerID) or (isCylonLeader(playerID) and IsInfiltrating(playerID) ) then
 			DealCard(playerID, srcskill)
 		end if
-	next playerID
-end sub &apos;DealSelectedCardToAll
+	next playerID	
+end sub &apos;DealToAll
 
 Sub DealCard(destplayer as integer, srcskill as integer)
 	dim srccol,srcrow,destcol,destrow as integer
@@ -557,19 +604,22 @@ Sub DealCard(destplayer as integer, srcskill as integer)
 	
 	SkillForm.getByName(&quot;btnDeal&quot;).enabled = FALSE
 	cardtxt = GetSkillCardFrom( _SkillSetDeck, srcskill)
-
-	if IsPlayerDestiny(destplayer) then
+	
+	if (destplayer = _DestinyPlayerID or IsPlayerDestiny(destplayer)) then
 		&apos;we&apos;re manipulating destiny, so the rules change a bit. +==
 		AddSkillCardTo _SkillSetDestiny, cardtxt
+		LogThis &quot;Destiny receives &quot; &amp; cardtxt
 	elseif IsPlayerSkillCheck(destplayer) then
-		Msgbox &quot;Can&apos;t draw cards directly into Skill Checks!&quot;
-		exit sub
+		AddSkillCardTo _SkillSetSkillCheck, cardtxt
+		LogThis cardtxt &amp; &quot; placed on skill check&quot;
+	elseif IsPlayerReckless(destplayer) then
+		AddSkillCardTo _SkillSetReckless, cardtxt
+		LogThis cardtxt &amp; &quot; placed on Daybreak Reckless Resolve&quot;
 	else
 		AddSkillCardTo _SkillSetHand, cardtxt, destplayer
 		Skillsheet.getCellByPosition(GetPlayerCol(destPlayer), _PlayerDrawnRow + srcskill).string = &quot;X&quot;
+		LogThis GetPlayerName(Destplayer) &amp; &quot; receives &quot; &amp; cardtxt
 	end if
-
-	LogThis GetPlayerName(Destplayer) &amp; &quot; receives &quot; &amp; cardtxt
 
 	if SkillCardCnt(srcskill) = 0 then
 		Msgbox &quot;Time to reshuffle the &quot; &amp; skillname(srcskill) &amp; &quot; deck!&quot;
@@ -708,11 +758,31 @@ sub ShuffleSkill
 end sub		&apos;ShuffleSkill
 
 function IsPlayerDestiny (playerID as integer) as BOOLEAN
-	IsPlayerDestiny = (SkillForm.getByName(&quot;lstPlayers&quot;).StringItemList(playerID) = &quot;*** DESTINY ***&quot;)
+	if playerID = _DestinyPlayerID then
+		IsPlayerDestiny = TRUE
+	elseif playerID &lt; _DestinyPlayerID then
+		IsPlayerDestiny = (SkillForm.getByName(&quot;lstPlayers&quot;).StringItemList(playerID) = &quot;*** DESTINY ***&quot;)
+	else
+		IsPlayerDestiny = FALSE
+	end if
 end function
 
 function IsPlayerSkillCheck (playerID as integer) as BOOLEAN
-	IsPlayerSkillCheck = (SkillForm.getByName(&quot;lstPlayers&quot;).StringItemList(playerID) = &quot;*** SKILL CHECK ***&quot;)
+	if playerID = _SkillCheckPlayerID then
+		IsPlayerSkillCheck = TRUE
+	elseif playerid &lt; _DestinyPlayerID then
+		IsPlayerSkillCheck = (SkillForm.getByName(&quot;lstPlayers&quot;).StringItemList(playerID) = &quot;*** SKILL CHECK ***&quot;)
+	else
+		IsPlayerSkillCheck = FALSE
+	end if
+end function
+
+function IsPlayerReckless (playerID as integer) as BOOLEAN
+	if playerID = _RecklessPlayerID then
+		IsPlayerReckless = TRUE
+	else
+		IsPlayerReckless = FALSE
+	end if
 end function
 
 sub Populate_HandList
@@ -1130,10 +1200,16 @@ sub StartSkillCheck(crisisname as string, crisisskills() as variant, difficulty 
 		SetSkillFlag &quot;Inspirational&quot;
 		MsgBox &quot;Adama is an Inspirational Leader!&quot;
 	end if
+
+	SkillForm.getByName(&quot;btnResolveSkillCheck&quot;).enabled = TRUE
 end sub
 
 
 sub ClearSkillCheck
+	dim reckless as boolean
+	dim recklesstxt as string
+	GetSF
+	
 	&apos; this will discard all cards in the crisis
 	dim rtncd as integer
 	rtncd	= MsgBox(&quot;Discard all cards from the Skill Check?&quot;,4)
@@ -1142,13 +1218,237 @@ sub ClearSkillCheck
 		exit sub
 	end if
 	
-	if GameTypeIsDaybreak and GetSkillFlag(&quot;Reckless&quot;) then
-		MsgBox &quot;Remember to resolve the Reckless Skill Check&quot;
-	end if
+	reckless = (GameTypeIsDaybreak and GetSkillFlag(&quot;Reckless&quot;))
 	
-	DiscardSkillCheckCards
+	if reckless then &apos; We have to account for Daybreak Reckless skill check
+		recklesstxt = SkillCardFromText(SkillSheet.getCellByPosition(_DaybreakRecklessCol,_DaybreakRecklessRow).string
+		if recklesstxt = &quot;&quot; then   &apos; Didn&apos;t resolve Reckless automatically
+			rtncd	= MsgBox(&quot;Do you want to automatically resolve the Reckless Skill Check?&quot;, 4)
+			if rtncd = 6 then
+				ResolveDayBreakReckless
+			end if
+		else
+			DiscardRecklessCards
+			DiscardSkillCheckCards
+		end if
+	else &apos; Skill check is not reckless, so we proceed normally
+		DiscardSkillCheckCards
+	end if
 end sub
 
+sub ResolveDayBreakReckless
+	dim CP as integer
+	dim card1txt, card2txt as string
+	GetSF
+	
+	&apos;SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckHeaderRow).string = &quot;Reckless Skill Check&quot;
+	SkillForm.getByName(&quot;btnSkillCheckClear&quot;).enabled = TRUE
+	DealCard _RecklessPlayerID, _SkillIDTreachery
+	
+	card1txt = SkillCardFromText(SkillSheet.getCellByPosition(_DaybreakRecklessCol,_DaybreakRecklessRow).string
+	if card1txt = &quot;Bait&quot; or card1txt = &quot;Dradis Contact&quot; then
+		MsgBox &quot;First card is &quot; &amp; card1txt &amp; &quot; -- Drawing a second one and resolving both&quot;
+		DealCard _RecklessPlayerID, _SkillIDTreachery
+		card2txt = SkillCardFromText(SkillSheet.getCellByPosition(_DaybreakRecklessCol,_DaybreakRecklessRow + 1).string
+		ProcessSkillCheckAbilities(card1txt)
+		ProcessSkillCheckAbilities(card2txt)
+	else
+		MsgBox &quot;First card is &quot; &amp; card1txt &amp; &quot; -- Reckless won&apos;t trigger effects&quot;
+	end if
+	
+	MsgBox &quot;Remember to clear the Skill Check again&quot;
+end sub
+
+sub ResolveSkillCheckAbilities
+	&apos; Only for most of the Treachery cards for now
+	dim srcrow, srccol, cardno, tmpid, rtncd as integer
+	dim cardname, tmpstr as string
+	dim resolved(20) as string
+	dim tmpbool as boolean
+
+	GetSF
+	SkillForm.getByName(&quot;btnResolveSkillCheck&quot;).enabled = FALSE
+	
+	if not ((GameTypeIsPegasus and GetSkillFlag(&quot;Reckless&quot;)) or GameTypeIsDaybreak) then
+		MsgBox &quot;Nothing to resolve&quot;
+		exit sub
+	end if
+	
+	rtncd	= MsgBox(&quot;ATTENTION: Please be sure that the abilities can be resolved before proceeding. You have to resolve all the non-treachery Skill Check Abilities and Character Abilities before using this button (use the Manipulate Skill Check, below). Are you sure you want to continue?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+
+	for cardno = 0 to 19
+		if SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckrow + cardno).string = &quot;&quot; then
+			exit for
+		end if
+		
+		srccol	= _SkillCheckCol
+		srcrow	= _SkillCheckRow + cardno
+		
+		cardname = SkillCardFromText(SkillSheet.getCellByPosition(srccol, srcrow).string)
+		
+		&apos; Horrible, but no other way to do this
+		tmpbool = TRUE
+		for tmpid = 0 to cardno
+			if resolved(tmpid) = cardname then
+				msgbox &quot;We already resolved a &quot; &amp; cardname &amp; &quot;, so it will be skipped&quot;
+				tmpbool = FALSE
+				exit for
+			end if
+		next tmpid
+		if tmpbool then
+			resolved(cardno) = ProcessSkillCheckAbilities(cardname)
+		end if 
+	next cardno
+end sub
+
+sub ProcessSkillCheckAbilities (cardname as string) as string
+	dim tmpID, viperID, viperType as integer
+	dim tmpstr as string
+	
+	ProcessSkillCheckAbilities = cardname
+	
+	select case cardname
+	case &quot;Bait&quot;
+		&apos; Place 1 civilian on sector 4
+		if GetAvailableShipCnt(_ShipCivilian) &gt;= 1 then
+			tmpID = GetAvailableShip(_ShipCivilian)
+			LogThis &quot;Civilian deployed in Sector 4 (Bait)&quot;
+			MsgBox &quot;Civilian deployed in Sector 4 (Bait)&quot;
+			SetShipStatus _ShipCivilian, tmpID, 4
+		else
+			MsgBox &quot;No Civilian Ships available to deploy (for Bait)&quot;
+		end if
+	case &quot;Dradis Contact&quot;
+		&apos; Place 2 raiders on sector 1
+		if GetAvailableShipCnt(_ShipRaider) &gt;= 2 then
+			tmpID = GetAvailableShip(_ShipRaider)
+			SetShipStatus _ShipRaider, tmpID, 1
+			tmpID = GetAvailableShip(_ShipRaider)
+			SetShipStatus _ShipRaider, tmpID, 1
+			LogThis &quot;2 Raiders deployed on sector 1 (Dradis Contact)&quot;
+			MsgBox &quot;2 Raiders deployed on sector 1 (Dradis Contact)&quot;
+		else
+			if UseCylonFleet then
+				MsgBox &quot;There are not enough Raiders in the reserves (for Dradis Contact). Deploy the remaining reserves first, then pull from the CFB, starting with the lowest-numbered CFB sector. Do not advance the Pursuit Track, do not warp in the whole Sector.&quot;
+			else
+				MsgBox &quot;There are not enough Raiders in the reserves (for Dradis Contact).&quot;
+			end if
+		end if
+	case &quot;Personal Vices&quot;
+		&apos; Draw 1 Treachery for each non-revealed-cylon player. If current player is human, also draw 1 Mutiny (2 in case Tom is present)
+		DealToAll(_SkillIDTreachery, FALSE)
+		tmpid = GetCurrentPlayer()
+		if not IsRevealed(tmpid) then
+			DrawMutiny(tmpid)
+			MsgBox &quot;1 Treachery Card dealt to each human and 1 Mutiny dealt to &quot; &amp; GetPlayerName(tmpid) &amp; &quot; (Personal Vices)&quot;
+		else
+			MsgBox &quot;1 Treachery Card dealt to each human. Current player is a revealed Cylon and does not receive a Mutiny card&quot;
+		end if
+	case &quot;A Better Machine&quot;
+		&apos; Draw 2 Treachery cards for the Destiny and reshuffle it
+		DealCard(_DestinyPlayerID, _SkillIDTreachery)
+		DealCard(_DestinyPlayerID, _SkillIDTreachery)
+		ShuffleDestiny FALSE
+		MsgBox &quot;2 Treachery Cards shuffled on the Destiny (A Better Machine)&quot;
+	case &quot;Violent Outbursts&quot;
+		&apos; Send the current player to Sickbay
+		&apos; Ignored if the Current Player is a revealed Cylon
+		tmpid = GetCurrentPlayer()
+		if not IsRevealed(tmpid) or IsInfiltrating(tmpid) then
+			if IsGamePhase(_PhaseOnNewCaprica) then
+				tmpstr = &quot;Medical Center&quot;
+			else
+				tmpstr = &quot;Sickbay&quot;
+			end if
+			
+			if IsBrigged(tmpid) then
+				MsgBox GetPlayerName(tmpid) &amp; &quot; is on &quot; &amp; GetPlayerLoc (tmpid) &amp; &quot; and can&apos;t be sent to &quot; &amp; tmpstr &amp; &quot; (Violent Outbursts)&quot;
+			else
+				MsgBox GetPlayerName(tmpid) &amp; &quot; moved to &quot; &amp; tmpstr &amp; &quot; (Violent Outbursts)&quot;
+				&apos; If player is a pilot and is on space, we need to move his ship back to the reserves manually
+				if IsSpaceLoc(GetPlayerLoc(tmpid)) then
+					viperID = GetPlayerViper(tmpid)
+					SetPlayerViper tmpid, 0
+					if viperID &gt; 20 then
+						viperType	= _ShipAssaultRaptor
+						viperID		= viperID - 20
+					elseif viperID &gt; 10 then
+						viperType	= _ShipMarkVII
+						viperID		= viperID - 10
+					else
+						viperType	= _ShipViper
+					end if
+					
+					SetViperPilot 0, ViperID, viperType
+					SetShipStatus viperType, ViperID, 0
+					LogThis GetPlayerName(tmpid) &amp; &quot; moves to &quot; &amp; tmpstr &amp; &quot; and returns &quot; &amp; GetShipTypeName(ViperType) &amp; &quot; &quot; &amp; ViperID &amp; &quot; to the Reserves (Violent Outbursts)&quot;
+					UpdateShips
+				end if
+				SetPlayerLoc (tmpid, tmpstr)
+				SetDrawCards tmpid
+			end if
+		else
+			MsgBox GetPlayerName(tmpid) &amp; &quot; is a revealed Cylon and can&apos;t go to Sickbay (Violent Outbursts)&quot;
+		end if
+	case &quot;Exploit Weakness&quot;
+		&apos; Can&apos;t do it automatically, sorry. No Crystal Balls here!
+		MsgBox &quot;Select a human player to receive a Mutiny card (Exploit Weakness)&quot;
+	
+	case &quot;Broadcast Location&quot;
+		&apos; 1 Basestar on sector 1 and 1 Civilian on sector 4
+		if GetAvailableShipCnt(_ShipCivilian) &gt;= 1 then
+			tmpID = GetAvailableShip(_ShipCivilian)
+			LogThis &quot;Civilian deployed in Sector 4 (Broadcast Location)&quot;
+			MsgBox &quot;Civilian deployed in Sector 4 (Broadcast Location)&quot;
+			SetShipStatus _ShipCivilian, tmpID, 4
+		else
+			MsgBox &quot;No Civilian Ships available to deploy (for Broadcast Location)&quot;
+		end if
+		if GetAvailableShipCnt(_ShipBasestar) &gt;= 1 then
+			tmpID = GetAvailableShip(_ShipBasestar)
+			LogThis &quot;Basestar deployed in Sector 1 (Broadcast Location)&quot;
+			MsgBox &quot;A Basestar was deployed on Sector 1 (Broadcast Location)&quot;
+			SetShipStatus _ShipBasestar, tmpID, 1
+		else
+			if UseCylonFleet then
+				MsgBox &quot;There are not enough Basestars in the reserves (for Broadcast Location). Pull one of them from the CFB, starting with the lowest-numbered CFB sector. Do not advance the Pursuit Track, do not warp in the whole Sector.&quot;
+			else 
+				MsgBox &quot;No Basestars available to deploy (for Broadcast Location)&quot;
+			end if
+		end if
+	
+	case &quot;By Your Command&quot;
+		&apos; Warn to activate all raiders, heavy raiders and occupation forces (but not centurions)
+		MsgBox &quot;Please manually activate all Raiders, Heavy Raiders and Occupation Forces (By Your Command)&quot;
+		
+	case &quot;Special Destiny&quot;
+		&apos; Draw 1 treachery to each player (including revealed cylon players)
+		DealToAll(_SkillIDTreachery, TRUE)
+		msgbox &quot;1 Treachery Card deal to each player (Special Destiny)&quot;
+	
+	case else
+		ProcessSkillCheckAbilities = &quot;&quot;
+	
+	end select
+
+end sub
+
+sub DiscardRecklessCards
+	GetSF
+	
+	&apos; Discard first card
+	AddSkillCardTo _SkillSetDiscard, SkillSheet.getCellByPosition(_DaybreakRecklessCol,_DaybreakRecklessRow).string	
+	SkillSheet.getCellByPosition(_DaybreakRecklessCol, _DaybreakRecklessRow).string = &quot;&quot;
+	
+	&apos; Discard second card, IF there is one
+	if SkillSheet.getCellByPosition(_DaybreakRecklessCol,_DaybreakRecklessRow + 1).string &lt;&gt; &quot;&quot; then
+		AddSkillCardTo _SkillSetDiscard, SkillSheet.getCellByPosition(_DaybreakRecklessCol,_DaybreakRecklessRow + 1).string	
+		SkillSheet.getCellByPosition(_DaybreakRecklessCol, _DaybreakRecklessRow + 1).string = &quot;&quot;
+	end if
+end sub
 
 sub DiscardSkillCheckCards	
 	dim srcrow, srccol, cardno as integer
@@ -1200,6 +1500,8 @@ sub SortSkillCheckCards
 	dim swap as boolean
 	GetSF
 	
+	SkillForm.getByName(&quot;btnAutoSort&quot;).enabled = FALSE
+	
 	for card1no = 0 to 19
 		for card2no = card1no + 1 to 20
 			card1 = SkillSheet.getCellByPosition(_SkillCheckCol,_SkillCheckrow + card1no).string
@@ -1241,6 +1543,7 @@ sub SortSkillCheckCards
 			end if
 		next card2no
 	next card1no
+	SkillForm.getByName(&quot;btnAutoSort&quot;).enabled = TRUE
 
 end sub	&apos;SortSkillCheckCards
 
@@ -1259,6 +1562,9 @@ end sub
 &apos; Resort all the hands, and should be called at the end of each turn
 sub SortHands
 	GetSF	
+	
+	SkillForm.getByName(&quot;btnSortSkillHands&quot;).enabled = FALSE
+
 	dim playerID, srccol, cardcnt, i,j, tmpval as integer
 	dim sortlst(20) as integer
 	dim stringlst(20), tmpstring as string
@@ -1300,15 +1606,23 @@ sub SortHands
 		end if
 	next playerID
 
+	SkillForm.getByName(&quot;btnSortSkillHands&quot;).enabled = TRUE
+
 	Populate_Handlist
 end sub	&apos;SortHands
 
-sub ShuffleDestiny
+sub ReshuffleDestiny
+	ShuffleDestiny TRUE
+end sub
+
+sub ShuffleDestiny (withconfirm as boolean)
 	dim rtncd as integer
 	
-	rtncd	= MsgBox(&quot;Reshuffle the Destiny Deck?&quot;, 4)
-	if rtncd &lt;&gt; 6 then
-		exit sub
+	if withconfirm then
+		rtncd	= MsgBox(&quot;Reshuffle the Destiny Deck?&quot;, 4)
+		if rtncd &lt;&gt; 6 then
+			exit sub
+		end if
 	end if
 
 	&apos; We have to compress the deck first, THEN shuffle
@@ -1527,7 +1841,14 @@ sub Initialize_SkillCards
 
 	GetSF
 	SkillForm.getByName(&quot;btnDrawCurrentPlayerHand&quot;).enabled = TRUE
-
+	
+	SetCurrentTask(&quot;Setting Up Buttons For Player&apos;s Powers&quot;)
+	if (GameTypeIsPegasus() or GameTypeIsDaybreak()) then
+		SkillForm.getByName(&quot;btnResolveSkillCheck&quot;).EnableVisible = TRUE
+	else
+		SkillForm.getByName(&quot;btnResolveSkillCheck&quot;).EnableVisible = FALSE
+	end if
+	
 	for playerid = 1 to 7
 		SetDrawCards(playerid)
 		if GetPlayerName(playerID) = &quot;Adama&quot; then
@@ -1537,17 +1858,21 @@ sub Initialize_SkillCards
 		end if
 	next playerid
 
+	SetCurrentTask(&quot;Creating a Deck for each Skill Color&quot;)
 	Configure_SkillCards	&apos; all the cards are in the decks, now clean them out and put the right cards back in.
 
 	for skillid = _SkillIDMin to _SkillIDMax
+		SetCurrentTask(&quot;Shuffling &quot; &amp; &quot;&quot; &amp; &quot; Skill Cards&quot;)
 		ShuffleASkillDeck skillID
 	next skillid
 	
 	&apos; Clear &quot;Lee Played an XO&quot; marker
 	SkillSheet.getCellByPosition(_LeePlayedXOCol, _LeePlayedXORow).string = &quot;&quot;
 	
+	SetCurrentTask(&quot;Dealing Destiny&quot;)
 	DealDestiny
-	Popluate_SkillCheckList
+	SetCurrentTask(&quot;Populating Skill Check Lists&quot;)
+	Populate_SkillCheckList
 end sub	&apos;Initialize_SkillCards
 
 function GetPlyrDrawDisplay (playerID as integer) as string
@@ -1702,6 +2027,15 @@ sub VerifySkillCards
 		cardcnt = cardcnt + 1
 		cardno	= cardno + 1
 	loop
+	
+	&apos; reckless skill check
+	cardno = 0
+	do until SkillSheet.getCellByPosition(_DaybreakRecklessCol,_DaybreakRecklessRow + cardno).string = &quot;&quot;
+		cardlst(cardcnt) = stripcolor(SkillSheet.getCellByPosition(_DaybreakRecklessCol,_DaybreakRecklessRow + cardno).string)
+		cardcnt = cardcnt + 1
+		cardno	= cardno + 1
+	loop
+	
 
 	MsgBox &quot;CardCnt: &quot; &amp; Cardcnt &amp; chr(13) &amp; &quot;MasterCnt: &quot; &amp; mastercnt
 
@@ -1863,7 +2197,7 @@ sub EnableCryptic (onFlag as boolean)
 	SkillForm.getByName(&quot;btnCryptic&quot;).enabled = onFlag
 end sub
 
-sub Popluate_SkillCheckList
+sub Populate_SkillCheckList
 	dim checklist(5) as string
 	dim sel(1) as integer
 	GetSF
@@ -2102,7 +2436,7 @@ end sub	&apos;GiveCard
 
 
 sub PopulateGiveCardPlayers (fromplayer as integer)
-	dim playerlst(8) as string
+	dim playerlst(9) as string
 	dim i, cntr as integer
 	
 	cntr	= 1
@@ -2254,9 +2588,9 @@ sub CompressSkillCards (whichset as integer, setID as integer)
 			&apos; Dealing with Skill Check skillset, we need to also move all the values up... sigh
 			if whichset = _SkillSetSkillCheck then
 				for idcnt = 1 to _SkillIDMax
-					SkillSheet.getCellByPosition(srccol + idcnt,firstempty).string = SkillSheet.getCellByPosition(srccol + idcnt, srcrow + i).string
+					SkillSheet.getCellByPosition(srccol + idcnt,firstempty).value = SkillSheet.getCellByPosition(srccol + idcnt, srcrow + i).value
 					SkillSheet.getCellByPosition(srccol + idcnt,firstempty).CharColor = SkillSheet.getCellByPosition(srccol + idcnt, srcrow + i).CharColor
-					SkillSheet.getCellByPosition(srccol + idcnt,srcrow + i).string = &quot;&quot; 
+					SkillSheet.getCellByPosition(srccol + idcnt,srcrow + i).value = 0
 				next idcnt
 			end if
 			firstempty = firstempty + 1

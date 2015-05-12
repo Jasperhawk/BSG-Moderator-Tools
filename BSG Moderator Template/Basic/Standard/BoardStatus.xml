@@ -634,14 +634,23 @@ end sub
 
 sub Initialize_Board
 
+	SetCurrentTask(&quot;Refreshing Location Damage&quot;)
 	Board_RefreshLocationDamage
+	SetCurrentTask(&quot;Refreshing Player Assignments&quot;)
 	Board_RefreshPlayerAssignments
+	SetCurrentTask(&quot;Refreshing Player Locations&quot;)
 	Board_RefreshPlayerLoc
+	SetCurrentTask(&quot;Refreshing Player Titles&quot;)
 	Board_RefreshPlayerTitles
+	SetCurrentTask(&quot;Refreshing Vipers&quot;)
 	Board_RefreshVipers
+	SetCurrentTask(&quot;Refreshing Civilians&quot;)
 	Board_RefreshCivilians
+	SetCurrentTask(&quot;Clearing All Special Attributes&quot;)
 	Board_ClearSpecial(&quot;All&quot;)
+	SetCurrentTask(&quot;Emptying the Graveyard&quot;)
 	Board_EmptyGraves
 	
 end sub
+
 </script:module>

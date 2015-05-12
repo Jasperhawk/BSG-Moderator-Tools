@@ -138,6 +138,7 @@
 			(set! nexttok (cadr data))
 			(case (string->symbol setname)
 				((Characters) (bsgp-Characters image myvalues) (set! mylayers (cadr (gimp-image-get-layers image))))
+				((EliminatedCharacters) (bsgp-EliminatedCharacters myvalues))
 				((Reserves) 
 					(when (= (length myvalues) 4)
 						(bsgp-DeadVipers (car (reverse myvalues)))
@@ -159,7 +160,7 @@
 				((BoardingParty) (bsgp-BoardingParty myvalues 1))
 				((OccForce) (bsgp-BoardingParty myvalues 0))
 				((Distance) (bsgp-Distance  myvalues))
-				((GamePhase) (bsgp-Phase myvalues))
+				((GamePhase) (bsgp-Phase myvalues useCF))
 				((OPG) (bsgp-1PG  myvalues))
 				((Damage) (bsgp-Damage  myvalues))
 				((BoardSpecial) (bsgp-BoardSpecial  myvalues))
@@ -260,7 +261,7 @@
 	(
 		(offsets #(0 6 1 6 4 
 				1 3 1 7 7 
-				7 1 7 7 7 4 2 8 2 8 
+				7 1 7 7 7 7 4 2 8 2 8 
 				5 4 9 
 				10 38 12 12 12 1 8 9
 				2 4 30 6 1 
@@ -273,7 +274,7 @@
 		)
 		(names #("Filter" "Turn" "Reserves" "FuelCntr" "Distance" 
 			"CivCntr" "Destiny" "CrisisCntr" "PoliticsCntr" "PlayerCardCntr"	
-			"QuorumCntr" "LoyaltyCntr" "TraumaCntr" "MutinyCntr" "FuelDial" "ResourceDamage" "DamagedCivs" "DestroyedBasestar" "DeadViper" "JumpTrack" 
+			"QuorumCntr" "LoyaltyCntr" "TraumaCntr" "MutinyCntr" "Eliminated" "FuelDial" "ResourceDamage" "DamagedCivs" "DestroyedBasestar" "DeadViper" "JumpTrack" 
 			"PursuitTrack" "Current" "DamageToken" 
 			"PlayerToken" "Pilot" "PilotMkVII" "PilotAR" "Scar" "Special" "CurrentMission" "CurrentMissionStatus"
 			"FinalDest" "JumpDistance" "ReserveToken" "CivToken" "Cylon" 
@@ -458,6 +459,21 @@
 ) ;define
 
 
+(define (bsgp-EliminatedCharacters myvalues)
+(let*
+	(
+		(c_elimpos (p_getlayerpos "Eliminated"))
+		(playerid 0)
+	)
+	(while (not (null? myvalues))
+		(set! playerid (- (car myvalues) 1))
+		(logit playerid)
+		(gimp-layer-set-visible (vector-ref mylayers (+ c_elimpos playerid)) TRUE)
+		(gimp-layer-translate (vector-ref mylayers (+ c_elimpos playerid)) 0 (* cardoffsetY playerid))
+		(set! myvalues (cdr myvalues))
+	)
+) ; let
+) ; define
 
 (define (bsgp-Characters image myvalues)
 ;bsgp-Characters is for the initial setup.
@@ -903,7 +919,7 @@
 			'("Quorum Chamber" 95 210) '("Hub Destroyed" 1140 220)
 			'("Bridge" 55 110) '("Tactical Plot" 245 110) '("Captain's Cabin" 425 110)
 			'("Hybrid Tank" 95 110) '("Datastream" 345 140) '("Raider Bay" 590 110)
-			'("Stranded on Caprica")
+			'("Stranded on Caprica") '("Eliminated")
 			'("Sector 1") '("Sector 2") '("Sector 3") '("Sector 4") '("Sector 5") '("Sector 6") )
 		)
 
@@ -930,7 +946,8 @@
 		(c_demetriusstart 30)	; Demetrius moves all the time
 		(c_rbbstart 33)			; Rebel Basestar moves all the time too
 		(c_stranded 36)
-		(c_sectorstart 37)		; 37 not-Space Locations
+		(c_eliminated 37)
+		(c_sectorstart 38)		; 38 not-Space Locations
 		(pilotloc #( ((155 1090) (155 800) (250 750)) ((655 515) (655 595) (655 675))
 			((965 515) (965 595) (965 675)) (  (1230 730) (1315 960) (1250 1150))
 			((965 1280) (965 1360) (965 1440)) ((655 1280) (655 1360) (655 1440) )))
@@ -1044,44 +1061,48 @@
 					(gimp-drawable-set-visible (vector-ref mylayers (p_getlayerpos "Stranded")) TRUE)
 					(gimp-layer-translate (vector-ref mylayers (p_getlayerpos "Stranded")) 0 (* (- plyrpos c_playerpos) cardoffsetY))
 				)
-				; pilot in space
-				(begin
-					; get the name of the pilot so we can find the right pilot token
-					(if (= (car vipertype) 0)
-						(begin
-							(set! pilotname (string-append "Pilot " (car (gimp-layer-get-name (vector-ref mylayers plyrpos)))))
-							(set! c_pilotpos (p_getlayerpos "Pilot"))
-						)
-						(if	(= (car vipertype) 1)
+				(if (= locid c_eliminated)
+					; Eliminated Player (Exodus Ionian Nebula only)
+					()
+					; pilot in space
+					(begin
+						; get the name of the pilot so we can find the right pilot token
+						(if (= (car vipertype) 0)
 							(begin
-								(set! pilotname (string-append "Pilot2 " (car (gimp-layer-get-name (vector-ref mylayers plyrpos)))))
-								(set! c_pilotpos (p_getlayerpos "PilotMkVII"))
+								(set! pilotname (string-append "Pilot " (car (gimp-layer-get-name (vector-ref mylayers plyrpos)))))
+								(set! c_pilotpos (p_getlayerpos "Pilot"))
 							)
-							(begin
-								(set! pilotname (string-append "Pilot3 " (car (gimp-layer-get-name (vector-ref mylayers plyrpos)))))
-								(set! c_pilotpos (p_getlayerpos "PilotAR"))
+							(if	(= (car vipertype) 1)
+								(begin
+									(set! pilotname (string-append "Pilot2 " (car (gimp-layer-get-name (vector-ref mylayers plyrpos)))))
+									(set! c_pilotpos (p_getlayerpos "PilotMkVII"))
+								)
+								(begin
+									(set! pilotname (string-append "Pilot3 " (car (gimp-layer-get-name (vector-ref mylayers plyrpos)))))
+									(set! c_pilotpos (p_getlayerpos "PilotAR"))
+								)
 							)
 						)
-					)
-					(set! vipertype (cdr vipertype))
-					(set! plyrfnd -1)
-					(set! pilotpos c_pilotpos)
-					(while (< pilotpos (+ c_pilotpos 13))
-						(when (string=5? pilotname (car (gimp-layer-get-name (vector-ref mylayers pilotpos))))
-							(set! plyrfnd pilotpos)
-							(set! pilotpos (+ c_pilotpos 13))
-						) ;when
-						(set! pilotpos (++ pilotpos))
-					) ;while
-					; so now we have the token for the pilot...show it and position it appropriately with a viper
-					(set! sector (- locid c_sectorstart))  ;technically, this is sector-1.
-					(set! myloc (car (vector-ref pilotloc sector)))
-					(vector-set! pilotloc sector (cdr (vector-ref pilotloc sector)))
-					(gimp-drawable-set-visible (vector-ref mylayers plyrfnd) TRUE)
-					(gimp-layer-set-offsets (vector-ref mylayers plyrfnd) (+ (car myloc) boardoffsetX) (+ (cadr myloc) boardoffsetY))
+						(set! vipertype (cdr vipertype))
+						(set! plyrfnd -1)
+						(set! pilotpos c_pilotpos)
+						(while (< pilotpos (+ c_pilotpos 13))
+							(when (string=5? pilotname (car (gimp-layer-get-name (vector-ref mylayers pilotpos))))
+								(set! plyrfnd pilotpos)
+								(set! pilotpos (+ c_pilotpos 13))
+							) ;when
+							(set! pilotpos (++ pilotpos))
+						) ;while
+						; so now we have the token for the pilot...show it and position it appropriately with a viper
+						(set! sector (- locid c_sectorstart))  ;technically, this is sector-1.
+						(set! myloc (car (vector-ref pilotloc sector)))
+						(vector-set! pilotloc sector (cdr (vector-ref pilotloc sector)))
+						(gimp-drawable-set-visible (vector-ref mylayers plyrfnd) TRUE)
+						(gimp-layer-set-offsets (vector-ref mylayers plyrfnd) (+ (car myloc) boardoffsetX) (+ (cadr myloc) boardoffsetY))
 					
-;					(set! pilotcnt (++ pilotcnt))
-				) ;begin
+;						(set! pilotcnt (++ pilotcnt))
+					) ;begin
+				); if
 			) ;if
 		) ;if
 		(set! locid (++ locid))
@@ -2217,7 +2238,7 @@
 ); define
 
 ;
-(define (bsgp-Phase myvalues)
+(define (bsgp-Phase myvalues useCF)
 ; we should only be calling this for New Caprica games
 ; GamePhase values:
 ;1) Early game...Show NC Filter, show Crisis deck & count, hide NC crisis & cnt, Show CivCnt, hide Prepared & Locked
@@ -2242,7 +2263,7 @@
 	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "Filter") 1)) (cadr myflags))
 	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "Filter") 2)) (caddr myflags))
 	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "Filter") 3)) (cadddr myflags))
-	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "Filter") 4)) (car (cddddr myflags)))
+	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "Filter") 4)) (btoint (and useCF (car (cddddr myflags)))))
 
 	; next is crisis decks
 	(set! myflags (cdr (cddddr myflags)))

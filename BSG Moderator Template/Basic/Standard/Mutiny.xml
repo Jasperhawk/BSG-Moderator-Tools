@@ -30,25 +30,81 @@ sub GetMutinySheet
 	MutinyForm	= MutinySheet.DrawPage.Forms.GetByName(&quot;formMutiny&quot;)
 end sub
 
-sub DrawMutiny (playerID as integer, optional zarek as boolean)
-	dim cardID, zarekID, mutinycnt, i as integer
+&apos; Basic function to check if we have the new Zarek on game, and if we need to use necessary steps
+sub NecessarySteps as boolean
+	dim zarekID as integer
 	GetMutinySheet
 	
-	mutinycnt = 1	
-	if GetPlayerName(playerID) = &quot;Tom&quot; then
-		zarek	= false
-	elseif IsMissing(zarek) then
+	for zarekID = 1 to PlayerCnt()
+		if GetPlayerName(zarekID) = &quot;Tom&quot; and not isRevealed(zarekID) then
+			NecessarySteps = true
+			exit sub
+		end if
+	next zarekID
+	NecessarySteps = false
+end sub
+
+&apos; Returns true if this card is marked as a &quot;Necessary Steps&quot; card (should be sent to Tom Zarek instead of the player)
+sub NecessaryStepsCard (cardname as string) as boolean
+	dim cardID, numcard as integer
+	GetMutinySheet
+	
+	NecessaryStepsCard = false
+	
+	for cardID = 1 to _MutinyCount
+		if MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string = cardname then
+			if InStr(MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string, &quot;Necessary Steps&quot;) then
+				NecessaryStepsCard = true
+			end if
+			exit sub
+		end if
+	next cardID
+end sub
+
+&apos; Clear all &quot;Necessary Steps&quot; text from the other cards of this player (to be used after burying one)
+sub ClearNecessarySteps (playername as string)
+	GetMutinySheet
+	
+	for cardID = 1 to _MutinyCount
+		if InStr(MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string, playername) then
+			MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string = playername
+		end if
+	next cardID
+end sub
+
+sub GetNecessaryStepsCards (playername as string) as string &apos; I know I should return an array, but I&apos;m too lazy for that
+	dim cards, cardinfo as string
+	GetMutinySheet
+	
+	cards = &quot;&quot;
+	for cardID = 1 to _MutinyCount
+		cardinfo = MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string
+		if InStr(cardinfo, playername) and InStr(cardinfo, &quot;Necessary Steps&quot;) then
+			cards = cards &amp; MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string &amp; chr(13)
+		end if
+	next cardID
+	
+	GetNecessaryStepsCards = cards
+end sub
+
+sub DrawMutiny (playerID as integer, optional zarek as boolean)
+	dim cardID, zarekID, mutinycnt, i as integer
+	dim necessary as string
+	GetMutinySheet
+	
+	mutinycnt = 1
+	necessary = &quot;&quot;
+	
+	if IsMissing(zarek) then
 		zarek	= true
 	end if	
 	
-	&apos; Check for Zarek
-	if zarek then
-		for zarekID = 1 to PlayerCnt()
-			if GetPlayerName(zarekID) = &quot;Tom&quot; and not isRevealed(zarekID) then
-				MsgBox(&quot;Two Mutinies were dealt. Don&apos;t forget to use Necessary Steps.&quot;)
-				mutinycnt = 2
-			end if
-		next zarekID
+	&apos; If we have a Zarek on board, we&apos;ll have to use Necessary Steps
+	&apos; Except for Zarek&apos;s initial draw (let&apos;s make it simpler to send an initial hand update
+	if zarek and NecessarySteps then
+		MsgBox(&quot;Two Mutinies were dealt. Don&apos;t forget to use Necessary Steps.&quot;)
+		mutinycnt = 2
+		necessary = &quot;Necessary Steps - &quot;
 	end if
 	
 	for i = 1 to mutinycnt
@@ -56,7 +112,7 @@ sub DrawMutiny (playerID as integer, optional zarek as boolean)
 		do until MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string = &quot;&quot;
 			cardID	= cardID + 1
 		loop
-		MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string	= GetPlayerName(playerID)
+		MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string = necessary &amp; GetPlayerName(playerID)
 		LogThis(GetPlayerName(playerID) &amp; &quot; draws Mutiny Card: &quot; &amp; MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string)
 		&apos; If we&apos;re going to do any post-draw checking, like throwing someone in the Brig, do it here.
 		
@@ -103,7 +159,8 @@ end sub
 function GetMutinyHand (playerID as integer) as variant
 	dim cardID, numcards as integer
 	dim cardlst() as string
-	dim playername as string
+	dim cardname, playername as string
+	dim necessary as boolean
 	GetMutinySheet
 	
 	if playerID &lt; 1 then
@@ -113,34 +170,72 @@ function GetMutinyHand (playerID as integer) as variant
 	
 	playername	= GetPlayerName(playerID)
 	numcards	= 0
+	necessary = false
 	for cardID = 1 to _MutinyCount
-		if MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string = playername then
+		cardname = MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string
+		if InStr(cardname, playername) then
+			if InStr(cardname, &quot;Necessary Steps&quot;) then
+				necessary = true
+			end if
 			numcards	= numcards + 1
 			redim preserve cardlst(numcards) as string
 			cardlst(numcards)	= MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string
 		end if
 	next cardID
 	GetMutinyHand	= cardlst()
+	EnableNSDispatcher(necessary)
 end function
+
+sub EnableNSDispatcher (state as boolean)
+	GetMutinySheet
+	MutinyForm.getByName(&quot;btnDispatchNecessary&quot;).EnableVisible = state	
+end sub
+
+sub EnableMutinyButtons (state as boolean, optional allcards as boolean)
+	GetMutinySheet
+	if IsMissing(allcards) then
+		allcards = true
+	end if
+	
+	if allcards then
+		MutinyForm.getByName(&quot;btnPlayMutiny&quot;).enabled			= state
+		MutinyForm.getByName(&quot;btnDiscardMutiny&quot;).enabled		= state
+	else
+		MutinyForm.getByName(&quot;btnPlayMutiny&quot;).enabled			= false
+		MutinyForm.getByName(&quot;btnDiscardMutiny&quot;).enabled		= false
+	end if
+	MutinyForm.getByName(&quot;btnBuryMutiny&quot;).enabled			= state	
+end sub
 
 sub UpdateMutinyCardList
 	dim playerID as integer
 	GetMutinySheet
 	
 	MutinyForm.getByName(&quot;lstMutinyCards&quot;).StringItemList	= GetMutinyHand(GetSelected(_ListMutinyPlayers))
-	MutinyForm.getByName(&quot;btnPlayMutiny&quot;).enabled			= false
-	MutinyForm.getByName(&quot;btnDiscardMutiny&quot;).enabled		= false
-	MutinyForm.getByName(&quot;btnBuryMutiny&quot;).enabled			= false
+	EnableMutinyButtons(false)
 end sub
 
 sub SelectedMutinyCardChanged
-	dim cardID as integer
+	dim handID, cardID, playerID as integer
+	dim cardtext as string
 	GetMutinySheet
 	
-	cardID	= GetSelected(_ListMutinyCards)
-	MutinyForm.getByName(&quot;btnPlayMutiny&quot;).enabled			= (cardID &gt; 0)
-	MutinyForm.getByName(&quot;btnDiscardMutiny&quot;).enabled		= (cardID &gt; 0)
-	MutinyForm.getByName(&quot;btnBuryMutiny&quot;).enabled			= (cardID &gt; 0)
+	handID	= GetSelected(_ListMutinyCards)
+	&apos; If we&apos;re using Necessary Steps, we need to take some other things into account
+	if NecessarySteps and handID &gt; 0 then
+		playerID = GetSelected(_ListMutinyPlayers)
+		handID = GetSelected(_ListMutinyCards)
+		cardID = GetCardIDFromHandID(playerID, handID)
+		cardtext = MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string
+		&apos; We have a card marked as Necessary Steps. So we have to only enable the &quot;Bury&quot; button
+		if NecessaryStepsCard(cardtext) then
+			EnableMutinyButtons(true, false)
+		else
+			EnableMutinyButtons(handID &gt; 0)
+		end if
+	else
+		EnableMutinyButtons(handID &gt; 0)
+	end if
 end sub
 
 function GetMutinyHandCount(playerID as integer) as integer
@@ -155,7 +250,7 @@ function GetCardIDFromHandID (playerID as integer, handID as integer) as integer
 	match	= 0
 	player	= GetPlayerName(playerID)
 	for cardID = 1 to _MutinyCount
-		if MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string = player then
+		if InStr(MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string, player) then
 			match	= match + 1
 			if match = handID then
 				GetCardIDFromHandID = cardID
@@ -164,6 +259,13 @@ function GetCardIDFromHandID (playerID as integer, handID as integer) as integer
 		end if
 	next cardID	
 	GetCardIDFromHandID	= -1
+end function
+
+function MutinyCardName (cardID) as string
+	dim cardname as string
+	GetMutinySheet
+	
+	MutinyCardName = MutinySheet.getCellByPosition(_MutinyDeckCol, _MutinyRow + cardID).string	
 end function
 
 sub PlayMutinyButton
@@ -301,7 +403,7 @@ sub BuryMutiny (cardID as integer)
 end sub
 
 sub BuryMutinyButton
-	dim playerID, handID as integer
+	dim playerID, handID, cardID as integer
 
 	playerID = GetSelected(_ListMutinyPlayers)
 	if playerID &lt; 1 then
@@ -315,7 +417,16 @@ sub BuryMutinyButton
 		exit sub
 	end if
 	
-	BuryMutiny(GetCardIDFromHandID(playerID, handID))
+	cardID = GetCardIDFromHandID(playerID, handID)
+	if NecessarySteps then
+		if NecessaryStepsCard(MutinyCardName(cardID)) then
+			&apos; We bury this card then we enable the other one
+			ClearNecessarySteps(GetPlayerName(playerID))
+		end if
+		BuryMutiny(cardID)
+	else
+		BuryMutiny(cardID)
+	end if
 end sub
 
 sub Initialize_Mutiny
@@ -323,6 +434,7 @@ sub Initialize_Mutiny
 	GetMutinySheet
 	
 	&apos; Put everything back in the deck.
+	SetCurrentTask(&quot;Packing Up Mutiny Deck&quot;)
 	for cardID = 1 to _MutinyCount
 		MutinySheet.getCellByPosition(_MutinyHandCol, _MutinyRow + cardID).string	= &quot;&quot;
 		if MutinySheet.getCellByPosition(_MutinyDiscardCol, _MutinyRow + cardID).string &lt;&gt; &quot;&quot; then
@@ -335,16 +447,19 @@ sub Initialize_Mutiny
 	next cardID
 	
 	&apos; Now shuffle the deck.
+	SetCurrentTask(&quot;Shuffling Mutiny Deck&quot;)
 	SetBuriedMutiny(true)
 	ShuffleMutinyDeck
 	
 	for playerID = 1 to PlayerCnt()
 		if GetPlayerName(playerID) = &quot;Tom&quot; then
+			SetCurrentTask(&quot;Dealing Tom Zarek&apos;s Mutiny&quot;)
 			MsgBox &quot;Dealing two Mutiny Cards to Tom Zarek, don&apos;t forget to bury one.&quot;
 			DrawMutiny(playerID, false)
 			DrawMutiny(playerID, false)
 		end if
 	next playerID
+	SetCurrentTask(&quot;Setting Up Mutinies Form&quot;)
 	UpdateMutinyCardList
 end sub
 
@@ -404,6 +519,33 @@ end sub
 
 sub ShuffleMutinyButton
 
+end sub
+
+sub ButtonDispatchNecessarySteps
+	dim zarekID, playerID as integer
+	dim player as string
+	GetMutinySheet
+
+	playerID = GetSelected(_ListMutinyPlayers)
+	if playerID &lt; 1 then
+		MsgBox &quot;Please select a player.&quot;
+		exit sub
+	end if
+	player = GetPlayerName(playerID)
+
+	&apos; This is a special case. We will ALWAYS send the Necessary Steps to Tom. So there we go
+	for zarekID = 1 to PlayerCnt()
+		if GetPlayerName(zarekID) = &quot;Tom&quot; and not isRevealed(zarekID) then
+			DispTargetPlayer(zarekID)
+		end if
+	next zarekID
+	
+	DispSubject &quot;Necessary Steps for &quot; &amp; player
+	&apos; Clear Body, so we can add things as we need them
+	DispBody &quot;&quot;
+	DispBodyAdd &quot;[b]Tom[/b], please choose one mutiny to bury and one to keep for &quot; &amp; player &amp; &quot;:&quot; &amp; chr(13)
+	DispBodyAdd GetNecessaryStepsCards(player)
+	DispatchContents
 end sub
 
 </script:module>

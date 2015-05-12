@@ -39,6 +39,10 @@ const _BaseDamageRow	= 40
 
 global const _ShipStatusOffboard	= 0
 global const _ShipStatusSector1		= 1
+global const _ShipStatusSector2		= 2
+global const _ShipStatusSector3		= 3
+global const _ShipStatusSector4		= 4
+global const _ShipStatusSector5		= 5
 global const _ShipStatusSector6		= 6
 global const _ShipStatusDamaged		= 7
 global const _ShipStatusDestroyed	= 8
@@ -240,6 +244,31 @@ function GetShipName (ShipType as integer, ShipID as integer) as string
 	end if
 end function 	&apos;GetShipName
 
+function GetShipTypeName (ShipType as integer)
+	if shiptype = _ShipAssaultRaptor then
+		GetShipTypeName = &quot;Assault Raptor&quot;
+	elseif shiptype = _ShipViper then
+		GetShipTypeName = &quot;Viper&quot;
+	elseif shiptype = _ShipMarkVII then
+		GetShipTypeName = &quot;Viper Mark VII&quot;
+	elseif shiptype = _ShipRaptor then
+		GetShipTypeName = &quot;Raptor&quot;
+	elseif shiptype = _ShipCivilian then
+		GetShipTypeName = &quot;Civilian&quot;
+	elseif shiptype = _ShipBasestar then
+		GetShipTypeName = &quot;Basestar&quot;
+	elseif shiptype = _ShipRaider then
+		GetShipTypeName = &quot;Raider&quot;
+	elseif shiptype = _ShipHeavy then
+		GetShipTypeName = &quot;Heavy Raider&quot;
+	elseif shiptype = _ShipCenturion then
+		GetShipTypeName = &quot;Centurion&quot;
+	elseif shiptype = _ShipOccForces then
+		GetShipTypeName = &quot;Occupation Force&quot;
+	else
+		GetShipTypeName = &quot;UNDEFINED&quot;
+	end if
+end function &apos;GetShipTypeName
 
 function GetSelectedShipType as integer
 	dim tmplst(), tmpname as string
@@ -471,10 +500,11 @@ end sub		&apos;Updateships
 
 sub UpdateShipActions
 	dim ctl_shipActions as object
-	dim shiptype, shipid, shipstatus, actioncnt, i as integer
+	dim shiptype, shipid, shipstatus, actioncnt, i, cntr as integer
 	dim shipactions(13) as string
 	dim tmpstr as string
 	dim shipIDs() as integer
+	dim dmglst
 
 	GetShipSheet
 	
@@ -540,7 +570,18 @@ sub UpdateShipActions
 				case _ShipBasestar 
 					if GetBasestarDamage(shipid) &lt; 2 then
 						shipactions(1)	= &quot;Damage Ship&quot;
-						shipactions(2)	= &quot;Destroy Ship&quot; 
+						cntr = 1
+						if ubound(shipids) = 0 then &apos; Only one basestar selected; In this case, the user can select a damage
+							dmglst = BasestarDamageList
+							for i = 0 to 5
+								&apos; Ugly...
+								if &quot;&quot; &amp; dmglst(i) &lt;&gt; &quot;&quot; then
+									cntr = cntr + 1
+									shipactions(cntr)	= &quot;Damage: &quot; &amp; dmglst(i)
+								end if
+							next i
+						end if
+						shipactions(cntr+1)	= &quot;Destroy Ship&quot; 
 					else
 						shipactions(1)	= &quot;Destroy Ship&quot;
 					end if
@@ -620,12 +661,13 @@ end sub		&apos;UpdateShipActions
 sub ShipAction
 	dim targetaction, rtncd, i as integer
 	dim shiptype, shipIDs(), shipstatus, msgoff as integer
-	dim actionstr, tmpstr, logstr as string
+	dim actionstr, tmpstr, logstr, seldamage as string
 	dim tmplst() as string
 	dim shipnamestr, divstr as string
 	
 	GetShipSheet
 	
+	seldamage	= &quot;&quot;
 	shiptype	= GetSelectedShipType()
 	shipIDs		= GetSelectedShipIDs()
 	shipstatus	= GetShipStatus(shiptype, shipIDs(0))
@@ -681,6 +723,11 @@ sub ShipAction
 		case &quot;Damage&quot;
 			targetaction	= _ShipStatusDamaged
 			if shiptype = _ShipBasestar then
+				tmplst = Split(actionStr, &quot;: &quot;)
+				if ubound(tmplst) = 1 then
+					&apos; In this case, the user selected the damage
+					seldamage = tmplst(1)
+				end if
 				logstr = &quot;&quot;
 			else
 				logstr	= shipnamestr &amp; &quot; DAMAGED&quot;	
@@ -749,7 +796,7 @@ sub ShipAction
 		
 	LogThis logstr
 	for i = 0 to ubound(shipIDs)
-		SetShipStatus shiptype, shipIDs(i), targetaction
+		SetShipStatus shiptype, shipIDs(i), targetaction, seldamage
 	next i
 	&apos;special case here to check
 	if shiptype = _ShipCivilian and targetaction = 0 then
@@ -781,14 +828,17 @@ sub DestroyACivilian
 end sub
 
 
-sub SetShipStatus (shiptype, shipid, ByVal targetstatus)
+sub SetShipStatus (shiptype, shipid, ByVal targetstatus, optional seldamage as string)
 	dim centID, civID, rtncd as integer
 	GetShipSheet
 	
 	if shiptype = _ShipBasestar then
 		if targetstatus=_ShipStatusDamaged then
+			if IsMissing(seldamage) then
+				seldamage = &quot;&quot;
+			end if
 			&apos; Damage the basestar, then don&apos;t change any other status
-			DamageBasestar shipid
+			DamageBasestar shipid, seldamage
 			exit sub
 		elseif targetstatus = _ShipStatusDestroyed then
 			Board_ClearSpecial(&quot;Thirty-Three&quot;)
@@ -798,7 +848,12 @@ sub SetShipStatus (shiptype, shipid, ByVal targetstatus)
 			targetstatus = _ShipStatusDestroyed
 		end if
 	end if
-		
+	
+	if shiptype = _ShipCenturion and targetstatus &gt; 4 then
+		MsgBox &quot;Centurion &quot; &amp; shipid &amp; &quot; advanced - The CYLONS win the game&quot;
+		exit sub
+	end if
+	
 	if targetstatus	=_ShipStatusActivate then
 		if shiptype = _ShipHeavy then
 			&apos; Centurion Boards Galactica
@@ -928,15 +983,39 @@ function GetViperPilot (viperid as integer, shiptype as integer) as string
 	end if
 end function
 
-sub DamageBasestar (baseID as integer)
+sub BasestarDamageList as Variable
+	dim i, cntr, lastdmg as integer
+	dim dmglst(6), dmgtxt as string
+	GetShipSheet
+	
+	lastdmg = 4
+	if ObjectiveIsIonianNebula then
+		lastdmg = 6
+	end if
+	
+	cntr = 0
+	for i = 1 to lastdmg
+		if ShipSheet.GetCellByPosition(_BaseDamageCol + 1, _BaseDamageRow + i).string = &quot;&quot; then
+			dmglst(cntr) = ShipSheet.GetCellByPosition(_BaseDamageCol, _BaseDamageRow + i).string
+			cntr = cntr + 1
+		end if
+	next i
+	BasestarDamageList = dmglst
+end sub
+
+sub DamageBasestar (baseID as integer, optional seldamage as string)
 	dim dmgname as string
 	dim tmpdmg as string
 	dim i as integer
+	if IsMissing(seldamage) then
+		seldamage = &quot;&quot;
+	end if
 	
 	&apos;get the first unused damage token
-	for i = 1 to 4
-		if ShipSheet.GetCellByPosition(_BaseDamageCol + 1, _BaseDamageRow + i).string = &quot;&quot; then
-			dmgname	= ShipSheet.GetCellByPosition(_BaseDamageCol, _BaseDamageRow + i).string
+	for i = 1 to 6
+		dmgname	= ShipSheet.GetCellByPosition(_BaseDamageCol, _BaseDamageRow + i).string
+		if ShipSheet.GetCellByPosition(_BaseDamageCol + 1, _BaseDamageRow + i).string = &quot;&quot; _
+			and (seldamage = &quot;&quot; or dmgname = seldamage) then
 			ShipSheet.GetCellByPosition(_BaseDamageCol + 1, _BaseDamageRow + i).string = baseID
 			tmpdmg	= ShipSheet.GetCellByPosition(ShipCol(_ShipBasestar, _ShipColSpecial), ShipRow(_ShipBasestar) + baseID).string
 			if tmpdmg = &quot;&quot; then
@@ -1073,6 +1152,21 @@ function GetBasestarDamage (shipid as integer)
 	GetBasestarDamage	= dmgcnt
 end function
 
+function BasestarHasDamage (baseid as integer, dmgtext as string)
+	dim damaged as boolean
+	dim i as integer
+	GetShipSheet
+
+	damaged = FALSE
+	for i = 1 to 6
+		if ShipSheet.GetCellByPosition(_BaseDamageCol + 1, _BaseDamageRow + i).string = baseid _
+			and ShipSheet.GetCellByPosition(_BaseDamageCol, _BaseDamageRow + i).string = dmgtext then
+			damaged = TRUE
+		end if
+	next i
+	BasestarHasDamage = damaged
+end function
+
 function GetCivilianBySector (sectorID as integer, lastID as integer) as integer
 	&apos;get the next civilian ship in the sector and return it&apos;s ID, return 0 if there are none.
 	dim i as integer
@@ -1131,9 +1225,373 @@ function SweepShips (shipType as integer, sweepAll as boolean) as integer
 	SweepShips = sweepcnt
 end function	&apos;SweepShips
 
+sub ClearSector
+	&apos; Only used for CFB when nuking a sector and rolling an 8
+	dim rtncd, sector, shiptype, shipID, shipstatus, targetaction, playerID, viperID, viperType as integer
+	dim tmplst(), plyrname as string
+	GetShipSheet
+
+	tmplst = ShipForm.getByName(&quot;lstSectors&quot;).SelectedItems()
+	if ubound(tmplst) = -1 then
+		MsgBox(&quot;Select a Sector to clear!&quot;, 0, &quot;Error&quot;)
+		exit sub
+	end if
+	sector = tmplst(0)+1
+	rtncd = MsgBox(&quot;Destroy all ships (including Vipers and Civilians) from Sector &quot;+sector+&quot;?&quot;, 4, &quot;Clear Sector&quot;)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	for shiptype = _ShipViper to _ShipHeavy
+		for shipID = 1 to ShipCnt(shiptype)
+			shipstatus = GetShipStatus(shiptype, shipID)
+			if shipstatus = sector then
+				&apos; Found a ship for us to destroy!!!
+				select case shiptype
+				case _ShipViper, _ShipMarkVII, _ShipRaptor, _ShipAssaultRaptor, _ShipCivilian, _ShipBasestar 
+					targetaction = _ShipStatusDestroyed
+				case else	&apos;cylon ships
+					targetaction = _ShipStatusOffBoard
+				end select 	&apos;shiptype
+				SetShipStatus shiptype, shipID, targetaction
+				LogThis GetShipName(shiptype, shipID) + &quot; DESTROYED&quot;
+			end if
+		next shipID
+	next shiptype
+	
+	&apos; Now we&apos;ll check for any players on that space area
+	for playerID = 1 to PlayerCnt()
+		if GetPlayerLoc(playerID) = &quot;Sector &quot; + sector then
+			viperID = GetPlayerViper(playerID)
+			plyrname = GetPlayerName(playerID)
+			if not viperID &gt;= 1 then
+				msgbox &quot;Error - Invalid Viper ID for player &quot; + plyrname
+			end if
+			SetPlayerViper PlayerID, 0
+			if viperID &gt; 20 then
+				viperType	= _ShipAssaultRaptor
+				viperID		= viperID - 20
+			elseif viperID &gt; 10 then
+				viperType	= _ShipMarkVII
+				viperID		= viperID - 10
+			else
+				viperType	= _ShipViper
+			end if
+			
+			SetViperPilot 0, ViperID, viperType
+
+			SetShipStatus viperType, ViperID, _ShipStatusDestroyed
+			LogThis &quot;Viper &quot; &amp; ViperID &amp; &quot; is Destroyed.  &quot; &amp; plyrname &amp; &quot; moves to Sickbay&quot;
+			SetPlayerLoc playerID, &quot;Sickbay&quot;
+			SetDrawCards playerID
+		end if
+	next playerID
+	UpdateShips
+end sub &apos;ClearSector
+
+sub LaunchRaiders
+	&apos; Launch 3 Raiders from each basestar on the mainboard
+	dim rtncd, bscount, shipID, shipstatus, raidersavail, rcount, i, raiderID as integer
+	GetShipSheet
+	
+	rtncd = MsgBox(&quot;Launch 3 Raiders from each Basestar on the Main Board?&quot;, 4, &quot;Launch Raiders&quot;)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	rcount = 0
+	bscount = 0
+	&apos; We have to count the total number of basestars on the main board before, since if we don&apos;t have enough raiders we&apos;ll have to warn the user and abort
+	for shipID = 1 to ShipCnt(_ShipBasestar)
+		shipstatus = GetShipStatus(_ShipBasestar, shipID)
+		if shipstatus &gt;= 1 and shipstatus &lt;= 6 then
+			&apos; We have a ship on the main board
+			bscount = bscount + 1
+			if not basestarhasdamage(shipid, &quot;Hangar Disabled&quot;) then
+				&apos; We ignore the raider counting for basestars with hangar disabled, but we still count them towards the basestar total (for CFB purposes)
+				rcount = rcount + 3
+			end if
+		end if
+	next shipID
+	raidersavail = GetAvailableShipCnt(_ShipRaider)
+	if bscount = 0 then
+		if UseCylonFleet then
+			&apos; TODO: Manually move all ships from the lowest-numbered sector on the CFB to the main board
+			MsgBox &quot;No Basestars on the Main Game Board. Please manually roll the die and deploy the Basestar on the CFB accordingly.&quot;
+		else
+			MsgBox &quot;No Basestars on the Main Game Board. No effect.&quot;
+		end if
+	end if
+	if rcount &gt; raidersavail then
+		&apos; We don&apos;t have enough raiders to place on the main game board
+		if UseCylonFleet then
+			MsgBox &quot;There are not enough Raiders in the reserves. Deploy the remaining reserves first, then pull from the CFB, starting with the lowest-numbered CFB sector. Do not advance the Pursuit Track, do not warp in the whole Sector.&quot;
+		else
+			MsgBox &quot;There are not enough Raiders to Deploy. Please select manually&quot;
+		end if
+		exit sub
+	end if
+	
+	for shipID = 1 to ShipCnt(_ShipBasestar)
+		shipstatus = GetShipStatus(_ShipBasestar, shipID)
+		if shipstatus &gt;= 1 and shipstatus &lt;= 6 then
+			if basestarhasdamage(shipid, &quot;Hangar Disabled&quot;) then
+				MsgBox &quot;Basestar 1 has Hangar Disabled damage token, and cannot launch raiders&quot;
+			else
+				for i = 1 to 3
+					raiderID = GetAvailableShip(_ShipRaider)
+					SetShipStatus _ShipRaider, raiderID, shipstatus
+				next i
+				LogThis &quot;3 Raiders deployed in Sector &quot; &amp; shipstatus
+			end if
+		end if
+	next shipID
+	SetCrisisFlag(FALSE, TRUE)
+	UpdateShips
+end sub &apos; LaunchRaiders
+
+sub RaiderActivation
+	&apos; Activate all Raiders on the Main Board
+	&apos; This should NOT work if there is ANY decision that should be made by the player
+	dim tmpbool as boolean
+	dim rtncd, shipid, shipstatus, shiptype, playerid, i, target as integer
+	dim civsectors(6) as boolean
+	dim vipersectors(6) as boolean
+	dim raidersectors(6) as boolean
+	GetShipSheet
+	
+	rtncd = MsgBox(&quot;Activate all Raiders on the Main Board?&quot;, 4, &quot;Activate Raiders&quot;)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	&apos; First of all, it automatically fails if there are no civilians on the main board
+	tmpbool = FALSE
+	for shipid = 1 to ShipCnt(_ShipCivilian)
+		shipstatus = GetShipStatus(_ShipCivilian, shipid)
+		if shipstatus &gt;= _ShipStatusSector1 and shipstatus &lt;= _ShipStatusSector6 then
+			tmpbool = TRUE
+			civsectors(shipstatus) = TRUE
+		endif
+	next shipid
+	if not tmpbool then
+		MsgBox &quot;No Civilian Ships on the Main Game Board. Please activate Raiders manually&quot;
+		exit sub
+	end if
+	&apos; Also fails if there is a raider in the same sector as any viper (Mark II, Mark VII and Assault Raptors)
+	for shiptype = _ShipViper to _ShipAssaultRaptor
+		for shipid = 1 to ShipCnt(shiptype)
+			shipstatus = GetShipStatus(shiptype, shipid)
+			if shipstatus &gt;= _ShipStatusSector1 and shipstatus &lt;= _ShipStatusSector6 then
+				vipersectors(shipstatus) = TRUE
+			end if
+		next shipid
+	next shiptype
+	for playerid = 1 to playercnt
+		if IsPilot(getplayername(playerid)) then
+			vipersectors(val(right(GetPlayerLoc(playerID), 2))) = TRUE
+		end if
+	next playerid
+	
+	&apos; Actual verification for Raider ships
+	for shipid = 1 to ShipCnt(_ShipRaider)
+		shipstatus = GetShipStatus(_ShipRaider, shipid)
+		if shipstatus &gt;= _ShipStatusSector1 and shipstatus &lt;= _ShipStatusSector6 then
+			raidersectors(shipstatus) = TRUE
+		end if
+	next shipid
+	
+	&apos; Now we iterate over all the sectors with raiders and abort if we have a civilian or viper on the same sector
+	for i = 1 to 6
+		if raidersectors(i) and vipersectors(i) then
+			MsgBox &quot;Aborting Automatic Raider Activation - there are both Raiders and Vipers on Sector &quot; &amp; i
+			exit sub
+		elseif raidersectors(i) and civsectors(i) then
+			MsgBox &quot;Aborting Automatic Raider Activation - there are both Raiders and Civilians on Sector &quot; &amp; i
+			exit sub
+		end if
+	next i
+	
+	&apos; It seems we&apos;re good to go. So we iterate over all the available raiders and move them accordingly
+	for shipid = 1 to ShipCnt(_ShipRaider)
+		shipstatus = GetShipStatus(_ShipRaider, shipid)
+		if shipstatus &gt;= _ShipStatusSector1 and shipstatus &lt;= _ShipStatusSector6 then
+			&apos; Now we have to check for the nearest civilian. BRUTE FORCE MODE ON!
+			if civsectors(MoveUp(shipstatus)) then
+				target = MoveUp(shipstatus)
+			elseif civsectors(MoveDown(shipstatus)) then
+				target = MoveDown(shipstatus)
+			elseif civsectors(MoveUp(MoveUp(shipstatus))) then
+				target = MoveUp(shipstatus)
+			elseif civsectors(MoveDown(MoveDown(shipstatus))) then
+				target = MoveDown(shipstatus)
+			else &apos; Only one option left
+				target = MoveUp(shipstatus)
+			end if
+			SetShipStatus _ShipRaider, shipid, target
+			LogThis &quot;Raider moved from sector &quot; &amp; shipstatus &amp; &quot; to sector &quot; &amp; target
+		end if
+	next shipid
+	SetCrisisFlag(FALSE, TRUE)
+	UpdateShips
+
+end sub &apos; RaiderActivation
+
+sub HeavyActivation
+	&apos; Activate all Heavy Raiders and Centurions on the MB.
+	&apos; TODO: Add Occupation Forces Activation
+	dim rtncd, shiptype, shipID, heavyID, heavylaunchcnt, activations, hrboarding, shipstatus, targetsector as integer
+	dim heavymoved as boolean
+	GetShipSheet
+	
+	heavymoved = FALSE
+	
+	rtncd = MsgBox(&quot;Activate all Heavy Raiders and Centurions on the Main Board?&quot;, 4, &quot;Activate Heavy Raiders&quot;)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	activations = 0
+	hrboarding = 0
+	heavylaunchcnt = 0
+	&apos; First of all, let&apos;s see if there will be any activation
+	for shiptype = _ShipHeavy to _ShipCenturion
+		for shipID = 1 to ShipCnt(shiptype)
+			shipstatus = GetShipStatus(shiptype, shipID)
+			if (shiptype = _ShipHeavy and shipstatus &gt;= _ShipStatusSector1 and shipstatus &lt;= _ShipStatusSector4) _
+				or (shiptype = _ShipCenturion and shipstatus &gt;= _ShipStatusSector1) then
+				activations = activations + 1
+			elseif (shiptype = _ShipHeavy and shipstatus &gt;= _ShipStatusSector5 and shipstatus &lt;= _ShipStatusSector6) then
+				activations = activations + 1
+				hrboarding = hrboarding + 1
+			end if
+		next shipID
+	next shiptype
+	
+	if activations = 0 then
+		&apos; If there&apos;s no ships to be activated, we&apos;ll count the basestars on the main board only
+		shiptype = _ShipBasestar
+		for shipID = 1 to ShipCnt(shiptype)
+			shipstatus = GetShipStatus(shiptype, shipID)
+			if shipstatus &gt;= _ShipStatusSector1 and shipstatus &lt;= _ShipStatusSector6 then
+				heavylaunchcnt = heavylaunchcnt + 1
+			end if
+		next shipID
+		
+		&apos; If we STILL have no activations, well, though luck!
+		if heavylaunchcnt = 0 then
+			if UseCylonFleet then
+				MsgBox &quot;No Heavy Raiders, Centurions or Basestars on the Main Game Board. Please deploy manually on the CFB&quot;
+			else
+				MsgBox &quot;No Heavy Raiders, Centurions or Basestars on the Main Game Board. No effect&quot;
+			end if
+			exit sub
+		end if
+	end if
+	
+	if hrboarding &gt; GetAvailableShipCnt(_ShipCenturion) then
+		MsgBox &quot;Not enough Centurions to Board Galactica. Please proceed manually&quot;
+		exit sub
+	end if
+	
+	&apos; First, advance all Centurions
+	for shipID = 1 to ShipCnt(_ShipCenturion)
+		shipstatus = GetShipStatus(_ShipCenturion, shipID)
+		if shipstatus &gt;= 1 then
+			SetShipStatus(_ShipCenturion, shipID, shipstatus + 1)
+			LogThis &quot;Centurion &quot; &amp; shipID &amp; &quot; ADVANCES&quot;
+		end if
+	next shipID
+	
+	&apos; Then, advance Heavy Raiders
+	for shipID = 1 to ShipCnt(_ShipHeavy)
+		shipstatus = GetShipStatus(_ShipHeavy, shipID)
+		targetsector = 0
+		select case shipstatus
+		case _ShipStatusSector1
+			targetsector = _ShipStatusSector6
+		case _ShipStatusSector2
+			targetsector = _ShipStatusSector1
+		case _ShipStatusSector3
+			targetsector = _ShipStatusSector4
+		case _ShipStatusSector4
+			targetsector = _ShipStatusSector5
+		case _ShipStatusSector5
+			targetsector = _ShipStatusActivate
+		case _ShipStatusSector6
+			targetsector = _ShipStatusActivate
+		end select
+		if targetsector &lt;&gt; 0 then
+			SetShipStatus(_ShipHeavy, shipID, targetsector)
+			if targetsector = _ShipStatusActivate then
+				LogThis &quot;Heavy Raider from sector &quot; &amp; shipstatus &amp; &quot; BOARDED GALACTICA&quot;
+			else
+				LogThis &quot;Heavy Raider moved from sector &quot; &amp; shipstatus &amp; &quot; to sector &quot; &amp; targetsector
+			end if
+			heavymoved = TRUE
+		end if
+	next shipID
+	
+	&apos; If no Heavy Raider advanced, we&apos;ll launch 1 from each basestar if possible
+	if not heavymoved then
+		heavylaunchcnt = 0
+		shiptype = _ShipBasestar
+		for shipID = 1 to ShipCnt(shiptype)
+			shipstatus = GetShipStatus(shiptype, shipID)
+			if shipstatus &gt;= _ShipStatusSector1 and shipstatus &lt;= _ShipStatusSector6 then
+				heavylaunchcnt = heavylaunchcnt + 1
+			end if
+		next shipID
+
+		if heavylaunchcnt &gt; GetAvailableShipCnt(_ShipHeavy) then
+			if UseCylonFleet then
+				MSGBox &quot;Not enough heavy raiders to deploy. Please deploy manually from the Cylon Fleet&quot;
+			else
+				MSGBox &quot;Not enough heavy raiders to deploy.&quot;
+			end if
+		else
+			for shipID = 1 to ShipCnt(_ShipBasestar)
+				shipstatus = GetShipStatus(_ShipBasestar,shipID)
+				if shipstatus &gt;= _ShipStatusSector1 and shipstatus &lt;= _ShipStatusSector6 then
+					if basestarhasdamage(shipid, &quot;Hangar Disabled&quot;) then
+						MSGBox &quot;Basestar on sector &quot; &amp; shipstatus &amp; &quot; has Hangar Disabled damage. Skipping.&quot;
+					else
+						heavyID = GetAvailableShip(_ShipHeavy)
+						SetShipStatus _ShipHeavy, heavyID, shipstatus
+					end if
+				end if
+			next shipID			
+		end if
+	end if
+	
+	SetCrisisFlag(FALSE, TRUE)
+	UpdateShips
+end sub &apos; HeavyActivation
 
 sub CylonsAttack
 	AttackTheFleet TRUE
+end sub
+
+sub SectorAttack
+	dim rtncd, sector as integer
+	dim tmplst() as string
+	GetShipSheet
+	
+	tmplst = ShipForm.getByName(&quot;lstSectors&quot;).SelectedItems()
+	if ubound(tmplst) = -1 then
+		MsgBox(&quot;Select a Cylon Fleet Board Sector!&quot;, 0, &quot;Error&quot;)
+		exit sub
+	end if
+	sector = tmplst(0)+1
+	
+	rtncd = MsgBox(&quot;Move all ships from Cylon Fleet Sector &quot;+sector+&quot; to Main Board?&quot;, 4, &quot;Move Sector&quot;)
+	
+	if rtncd &lt;&gt; 6 then
+		MsgBox &quot;Attack aborted.&quot;, 0, &quot;Attack the Fleet&quot;
+		exit sub
+	end if
+	
+	JumpShips TRUE, sector
 end sub
 
 sub AttackTheFleet (withconfirm as boolean)
@@ -1162,8 +1620,13 @@ sub AttackTheFleet (withconfirm as boolean)
 
 end sub	&apos;AttackTheFleet
 
-sub JumpShips (attack as boolean) 
+sub JumpShips (attack as boolean, optional sector as integer)
 	dim idMod, shipID, shiptype, jumpCnt, logstr, shipstatus as integer
+	
+	if IsMissing(sector) then
+		sector = 0
+	end if
+	
 	&apos;moves all cylon ships of a type between the Cylon Fleet and Main boards
 	if attack then 
 		idMOD = -10
@@ -1172,15 +1635,20 @@ sub JumpShips (attack as boolean)
 		idMOD = 10
 		logstr = &quot; moved to the Cylon Fleet from the Main Board&quot;
 	end if
-
+	
 	for shiptype = _ShipBasestar to _ShipHeavy
 		jumpCnt = 0
 		for shipID = 1 to ShipCnt(shiptype)
 			shipstatus = GetShipStatus(shiptype, shipID)
-			if (attack and shipstatus &gt;= _ShipStatusCylonFleet1) OR _
-				(shipstatus &gt;= _ShipStatusSector1 and shipstatus &lt;= _ShipStatusSector6 and NOT Attack) _
+			if ((attack and shipstatus &gt;= _ShipStatusCylonFleet1) OR _
+				(shipstatus &gt;= _ShipStatusSector1 and shipstatus &lt;= _ShipStatusSector6 and NOT Attack)) AND _
+				(sector = 0 or (attack and shipstatus + idMOD = sector)) _
 			then
 				SetShipStatus shiptype, shipid, GetShipStatus(shiptype,shipID) + idMOD
+				&apos; Clear the damage token if they are going to the cylon fleet
+				if (not attack and shipType = _ShipBasestar) then
+					ClearSpecial(_ShipBasestar, shipID)
+				end if
 				jumpCnt = jumpCnt + 1
 			end if		
 		next shipID
@@ -1188,7 +1656,7 @@ sub JumpShips (attack as boolean)
 			LogThis jumpCnt &amp; &quot; &quot; &amp; ShipNames(shipType) &amp; iif(jumpCnt&gt;1,&quot;s&quot;,&quot;&quot;) &amp; logstr
 		end if
 	next shiptype
-
+	UpdateShips
 end sub	&apos;JumpShips
 
 
@@ -1320,15 +1788,20 @@ sub Initialize_Ships
 	&apos;clear everything from the board
 	GetShipSheet
 	
+	SetCurrentTask(&quot;Clearing up ship states&quot;)
 	for i = _ShipViper to _ShipOccForces
 		SweepShips i, TRUE
 	next i
+	SetCurrentTask(&quot;Shuffling civilians&quot;)
 	ShuffleCivilians
+	SetCurrentTask(&quot;Shuffling basestar damage&quot;)
 	ShuffleBasestarDamage
 	
+	SetCurrentTask(&quot;Configuring Ships&quot;)
 	Configure_Ships
 	
 	&apos;set out the initial ships
+	SetCurrentTask(&quot;Initial Ships Configuration&quot;)
 	SetShipStatus _ShipBasestar, 1, 1
 	SetShipStatus _ShipRaider, 1, 1
 	SetShipStatus _ShipRaider, 2, 1
@@ -1339,22 +1812,35 @@ sub Initialize_Ships
 	SetShipStatus _ShipViper, 2, 6
 
 	if UseCylonFleet() then
+		SetCurrentTask(&quot;Placing Mark VII on Damaged and initializing CFB&quot;)
 		for i = 1 to 4
 			SetShipStatus _ShipMarkVII, i, _ShipStatusDamaged
 		next i
+		&apos; Make the &quot;CFB Sector Attack&quot; components visible
+		MakeCFBSectorsVisible TRUE
+	else
+		MakeCFBSectorsVisible FALSE
 	end if
 	
 	if GameTypeIsDaybreak() then
+		SetCurrentTask(&quot;Enabling Assault Raptors&quot;)
 		for i = 2 to 4
 			SetShipStatus _ShipAssaultRaptor, i, _ShipStatusDestroyed
 		next i
 	end if
-	
+		
 	SetJumpTheFleet TRUE
 	ShipForm.getByName(&quot;lstShipType&quot;).SelectedItems() = g_emptylst()
+	SetCurrentTask(&quot;Clearing Up Ships Setup&quot;)
 	UpdateShips
 end sub
 
+sub MakeCFBSectorsVisible (status as boolean)
+	ShipForm.getByName(&quot;lstSectors&quot;).EnableVisible = status
+	ShipForm.getByName(&quot;lblSector&quot;).EnableVisible = status
+	ShipForm.getByName(&quot;btnMoveMB&quot;).EnableVisible = status
+	ShipForm.getByName(&quot;btnClearSector&quot;).EnableVisible = status
+end sub
 
 sub Configure_Ships
 	dim i as integer
@@ -1505,5 +1991,76 @@ sub LandShips
 	loop
 	SetJumpTheFleet FALSE
 end sub
+
+&apos; Kinda useless method, but it really helps keeping things organized!
+sub SortRaiders
+	dim maxraiders, raidercnt, raiderID, tmpsect, i as integer
+	dim sector(6), cfsector(6) as integer
+	GetShipSheet
+	
+	ShipForm.getByName(&quot;btnSortRaiders&quot;).enabled = FALSE
+	
+	sector(1) = 0
+	sector(2) = 0
+	sector(3) = 0
+	sector(4) = 0
+	sector(5) = 0
+	sector(6) = 0
+	cfsector(1) = 0
+	cfsector(2) = 0
+	cfsector(3) = 0
+	cfsector(4) = 0
+	cfsector(5) = 0
+	cfsector(6) = 0
+	raidercnt = 0
+	
+	if UseCylonFleet() then
+		maxraiders = 20
+	else
+		maxraiders = 16
+	end if
+	
+	&apos; Count and mark all raiders on the game
+	for raiderID = 1 to maxraiders
+		tmpsect = getShipStatus(_ShipRaider, raiderID)
+		if tmpsect &gt;= _ShipStatusSector1 and tmpsect &lt;= _ShipStatusSector6 then
+			sector(tmpsect) = sector(tmpsect) + 1
+			raidercnt = raidercnt + 1
+		elseif tmpsect &gt;= _ShipStatusCylonFleet1 and tmpsect &lt;= _ShipStatusCylonFleet6 then
+			cfsector(tmpsect-10) = cfsector(tmpsect-10) + 1
+			raidercnt = raidercnt + 1
+		end if
+	next raiderID
+	
+	&apos; And now reorganize everything (GULP!)
+	raiderID = 1
+	&apos; First, on the main board
+	for tmpsect = _ShipStatusSector1 to _ShipStatusSector6
+		if sector(tmpsect) &gt; 0 then
+			for i = 1 to sector(tmpsect)
+				SetShipStatus(_ShipRaider, raiderID, tmpsect)
+				raiderID = raiderID + 1
+			next i
+		end if
+	next tmpsect
+	&apos; Then, cylon fleet
+	for tmpsect = _ShipStatusCylonFleet1 to _ShipStatusCylonFleet6
+		if cfsector(tmpsect-10) &gt; 0 then
+			for i = 1 to cfsector(tmpsect-10)
+				SetShipStatus(_ShipRaider, raiderID, tmpsect)
+				raiderID = raiderID + 1
+			next i
+		end if
+	next tmpsect
+	&apos; Then send everything else to the reserves
+	for i = raiderID to maxraiders
+		SetShipStatus(_ShipRaider, raiderID, 0)
+		raiderID = raiderID + 1
+	next i
+
+	ShipForm.getByName(&quot;btnSortRaiders&quot;).enabled = TRUE
+	UpdateShips
+end sub
+
 
 </script:module>

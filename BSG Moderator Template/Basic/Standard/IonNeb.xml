@@ -326,36 +326,44 @@ sub Initialize_IonianNebula
 	GetIonNeb
 	
 	&apos;first clear the Allies&apos; statuses
+	SetCurrentTask(&quot;Clearing Allies Status&quot;)
 	for allyID = 1 to _AllyMaxCnt
 		SetAllyStatus(allyID, _AllyStatusAvailable)
 	next allyID
 
 	&apos;reset the Trauma Token Pool
+	SetCurrentTask(&quot;Resetting Trauma Token Pool&quot;)
 	ResetTTPool
 	
 	&apos;Clear the players&apos; tokens
+	SetCurrentTask(&quot;Clearing Player Tokens&quot;)
 	for playerID = 1 to 7
 		IonNebSheet.getCellByPosition(_TT_DisCol, _TT_PlayerRow + playerID).CellBackColor = _white
 		IonNebSheet.getCellByPosition(_TT_BenCol, _TT_PlayerRow + playerID).value = 0
 		IonNebSheet.getCellByPosition(_TT_AntCol, _TT_PlayerRow + playerID).value = 0
 	next playerID
 
+	SetCurrentTask(&quot;Resetting Crossroads&quot;)
 	ResetCrossroads
 
 	&apos;we&apos;ve cleared everything, now do the actual setup if necessary.
 	if ObjectiveIsIonianNebula() then
+		SetCurrentTask(&quot;Shuffling Allies&quot;)
 		ShuffleAllies
 		
 		&apos;remove any allies who are also characters in play
+		SetCurrentTask(&quot;Deactivating Allies Who Are Characters&quot;)
 		for playerID = 1 to playerCnt()
 			InactivateAllyPlayer (playerID)
 		next playerID
 	
 		&apos;deal tokens to the locations
+		SetCurrentTask(&quot;Placing Brig and Sickbay Tokens&quot;)
 		SetLocationTT (&quot;Brig&quot;, GetTTFromPool())
 		SetLocationTT (&quot;Sickbay&quot;, GetTTFromPool()
 		
 		&apos;deal tokens to players
+		SetCurrentTask(&quot;Dealing Initial Tokens&quot;)
 		for playerID = 1 to PlayerCnt()
 			for i = 1 to 3
 				UpdatePlayerTTCnt(playerID, GetTTFromPool(TRUE), 1)	&apos;TRUE in the GetTTFromPool call for no disasters
@@ -363,11 +371,13 @@ sub Initialize_IonianNebula
 		next playerID
 		
 		&apos;activate 3 allies
+		SetCurrentTask(&quot;Activating Initial Allies&quot;)
 		SetAllyStatus(GetAvailableAlly(), GetTTFromPool())
 		SetAllyStatus(GetAvailableAlly(), GetTTFromPool())
 		SetAllyStatus(GetAvailableAlly(), GetTTFromPool())
 		UpdateTTTargetList
 				
+		SetCurrentTask(&quot;Shuffling Crossroads&quot;)
 		ShuffleCrossroads
 	end if
 		
@@ -1124,4 +1134,5 @@ sub DealCrossroads
 	IonNebForm.GetByName(&quot;btnEncounterAlly&quot;).enabled = false
 	IonNebForm.GetByName(&quot;btnShuffleAllies&quot;).enabled = false
 end sub	&apos;DealCrossroads
+
 </script:module>

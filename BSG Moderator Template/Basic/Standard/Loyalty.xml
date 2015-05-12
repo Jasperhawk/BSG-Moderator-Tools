@@ -10,11 +10,10 @@ const _LoyaltySleeperCol = 3
 const _LoyaltySleeperDataCol = 6
 
 global const _LoyaltyRow = 2
-
-const _LoyaltyRefRow = 230
+const _LoyaltyRefRow = 231
 const _GoalsRefOffset = 1
 const _FinalFiveRefOffset = 1
-const _FlawRefRow = 261
+const _FlawRefRow = 262
 
 const _NumFlaws = 9
 
@@ -267,6 +266,7 @@ sub BuildLoyaltyDecks
 	do while CylonCards(cylon1) = &quot;&quot;
 		cylon1 = Int(RND() * cyloncardcnt) + 1	
 	loop
+	
 	AddToLoyaltyDeck _DeckLoyalty, CylonCards(cylon1)
 	if PlayerCnt() &gt; 5 or (PlayerCnt() = 5 and Not HasLeader()) then
 		cylon2 = Int(RND() * cyloncardcnt) + 1 
@@ -410,6 +410,7 @@ sub Initialize_Loyalty
 	GetSF
 
 	&apos;clear any previous loyalty and blank the fields
+	SetCurrentTask(&quot;Clearing Up Old Loyalty Fields&quot;)
 	for playerID = 1 to 7
 		&apos; Reset all the rows to blue.
 		for i = 0 to _MaxLoyaltyInHand
@@ -431,8 +432,10 @@ sub Initialize_Loyalty
 	
 	SetMutineer(0)
 
+	SetCurrentTask(&quot;Building Loyalty Decks&quot;)
 	BuildLoyaltyDecks
 	
+	SetCurrentTask(&quot;Dealing Initial Loyalty, Agenda and Motives&quot;)
 	for playerID = 1 to PlayerCnt()
 		SetLoyaltyHuman playerID
 		if IsCylonLeader(playerID) then
@@ -462,6 +465,7 @@ sub Initialize_Loyalty
 
 &apos;	display the loyalty/Sleeper deck.
 	if OptionIsSympathizer() or OptionIsSympatheticCylon() then
+		SetCurrentTask(&quot;Adding Sympathizer Card&quot;)
 		AddSympathizerCard
 	end if
 	
@@ -477,6 +481,7 @@ sub Initialize_Loyalty
 	
 &apos;	button = LoyaltyForm.getByName(&quot;btnPersonalGoal&quot;)
 	
+	SetCurrentTask(&quot;Enabling Buttons and Populating Form&quot;)
 	LoyaltyForm.getByName(&quot;btnPersonalGoal&quot;).EnableVisible = UsePersonalGoals or (GameTypeIsDaybreak() and HasLeader)
 	LoyaltyForm.getByName(&quot;lstPersonalGoal&quot;).EnableVisible = UsePersonalGoals or (GameTypeIsDaybreak() and HasLeader)
 	

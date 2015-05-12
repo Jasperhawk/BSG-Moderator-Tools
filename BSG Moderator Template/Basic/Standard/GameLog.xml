@@ -120,6 +120,7 @@ sub Initialize_GameLog
 	GetAuditSheet
 	
 	&apos;clear preexisting index information
+	SetCurrentTask(&quot;Clearing Up Existing Index Information&quot;)
 	idxrow = 1
 	do until AuditSheet.GetCellByPosition(_TurnIDCol, idxrow).string = &quot;&quot;
 		AuditSheet.GetCellByPosition(_TurnIDCol, idxrow).string = &quot;&quot;
@@ -128,6 +129,7 @@ sub Initialize_GameLog
 	loop
 	
 	&apos; clear the bury log, also
+	SetCurrentTask(&quot;Clearing Bury Log&quot;)
 	currow = _BuryRow + 1
 	do until AuditSheet.GetCellByPosition( _BuryDestCol, currow).string = &quot;&quot;
 		AuditSheet.GetCellByPosition( _BuryDestCol, currow).string = &quot;&quot;
@@ -142,6 +144,7 @@ sub Initialize_GameLog
 	loop
 		
 	&apos;clear all log messages
+	SetCurrentTask(&quot;Clearing Log Messages&quot;)
 	idxrow = 1
 	do until AuditSheet.GetCellByPosition(0,idxrow).string = &quot;&quot;
 		AuditSheet.GetCellByPosition(0,idxrow).string=&quot;&quot;
@@ -150,6 +153,7 @@ sub Initialize_GameLog
 	loop
 	
 	&apos;set initial index and log message
+	SetCurrentTask(&quot;Setting Up Initial Log Message and Index&quot;)
 	AuditSheet.GetCellByPosition(_TurnIDCol, 1).string= &quot;1.1&quot;
 	AuditSheet.GetCellByPosition(_TurnIdxCol,1).value= 1
 
@@ -158,6 +162,7 @@ sub Initialize_GameLog
 	AuditSheet.GetCellByPosition(0,2).string=&quot;1.1&quot;
 	AuditSheet.GetCellByPosition(1,2).string=&quot;Game Commences: Turn 1.1&quot;
 
+	SetCurrentTask(&quot;Refreshing View Log&quot;)
 	RefreshViewLog
 end sub
 

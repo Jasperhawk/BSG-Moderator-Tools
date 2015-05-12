@@ -32,6 +32,8 @@ global const _ListSkillDecks 		= 7
 global const _ListQuorumHand 		= 8
 global const _ListMutinyPlayers		= 9
 global const _ListMutinyCards		= 10
+global const _ListDestnPlayers 		= 11
+global const _ListCrisisPlayers		= 12
 
 const _PostCardRow		= 4		&apos; cardID starts at 0, but we want the preamble anyway.
 const _PostCardCol		= 3		&apos; playerID starts at 1
@@ -86,7 +88,15 @@ function GetSelected (listid as integer) as integer
 		case _ListMutinyCards
 			GetMutinySheet
 			tmplst	= MutinyForm.getByName(&quot;lstMutinyCards&quot;).SelectedItems()
-
+		
+		case _ListDestnPlayers
+			GetDestn
+			tmplst	= DestnForm.getByName(&quot;lstPlayers&quot;).SelectedItems()
+		
+		case _ListCrisisPlayers
+			GetCrisisSheet
+			tmplst	= CrisisForm.getByName(&quot;lstPlayers&quot;).SelectedItems()
+					
 		case else
 			GetSelected = -1
 			exit function
@@ -119,7 +129,7 @@ end sub
 
 sub GenerateHandLists
 	dim playerID, cardID, cardcnt, fileno as integer
-	dim player, card, handlimit, filename, gamethread as string
+	dim player, card, handlimit, filename, gamethread, cardcolor as string
 	dim PostSheet, LoyaltySheet, CrisisSheet as object		&apos; This is the only function that uses the Posting Template tab, so we can leave it local.
 	
 	PostSheet		= ThisComponent.Sheets.getByName(&quot;Posting Templates&quot;)
@@ -172,7 +182,7 @@ sub GenerateHandLists
 		if GameTypeIsDaybreak() then
 			if ubound(GetMutinyHand(playerID)) &gt;= 0 then
 				print #fileno, &quot;&quot;
-				print #fileno, &quot;Your Mutiny Hand is:&quot;
+				print #fileno, &quot;[b]Your Mutiny Hand is:[/b]&quot;
 				for each card in GetMutinyHand(playerID)
 					if card &lt;&gt; &quot;&quot; then
 						print #fileno, card
@@ -185,25 +195,42 @@ sub GenerateHandLists
 		cardID	= 0
 		if IsCylonLeader(playerID) and not GameTypeIsDaybreak() then
 			print #fileno, &quot;&quot;
-			print #fileno, &quot;Your Agenda is: &quot; &amp;  LoyaltySheet.getCellByPosition(playerID, _LoyaltyAgendaRow).string
+			print #fileno, &quot;[b]Your Agenda is:[/b] &quot; &amp;  LoyaltySheet.getCellByPosition(playerID, _LoyaltyAgendaRow).string
 		elseif GetLoyaltyCount(playerID) &gt; 0 then
 			print #fileno, &quot;&quot;
 			Dim MaxLoyaltyToPrint as Integer
 			if IsCylonLeader(playerID) then
-				print #fileno, &quot;Your Motives are:&quot;
+				print #fileno, &quot;[b]Your Motives are:[/b]&quot;
 				if GetSleeperState() then
 					MaxLoyaltyToPrint = 4
 				else
 					MaxLoyaltyToPrint = 2
 				end if
 			else
-				print #fileno, &quot;Your Loyalty is:&quot;
+				print #fileno, &quot;[b]Your Loyalty Hand is:[/b]&quot;
 				MaxLoyaltyToPrint = _MaxLoyaltyInHand
 			end if
 			for cardID = 1 to MaxLoyaltyToPrint
-				card	= LoyaltySheet.getCellByPosition(playerID, _LoyaltyRow + cardID).string
+				card	= LoyaltySheet.getCellByPosition(playerID, _LoyaltyRow + cardID).string				
 				if card &lt;&gt; &quot;&quot; then
-					print #fileno, card
+					cardcolor = &quot;black&quot;
+					if InStr(card, &quot;You are a Cylon&quot;) then
+						cardcolor = &quot;red&quot;
+					elseif InStr(card, &quot;Personal Goal&quot;) then
+						cardcolor = &quot;green&quot;
+					elseif InStr(card, &quot;Final Five&quot;) then
+						cardcolor = &quot;darkgreen&quot;
+					elseif InStr(card, &quot;Human Allegiance&quot;) then
+						cardcolor = &quot;blue&quot;
+					elseif InStr(card, &quot;Cylon Allegiance&quot;) then
+						cardcolor = &quot;brown&quot;
+					end if
+				
+	                if LoyaltySheet.getCellByPosition(playerID, _LoyaltyRow + cardID).CellBackColor &lt;&gt; _white then
+	                    print #fileno, &quot;[-][color=&quot; &amp; cardcolor &amp; &quot;]&quot; &amp; card &amp; &quot;[/color][/-]&quot;
+	                else
+	                    print #fileno, &quot;[color=&quot; &amp; cardcolor &amp; &quot;]&quot; &amp; card &amp; &quot;[/color]&quot;
+	                end if
 				end if
 			next cardID
 		end if	
@@ -211,7 +238,7 @@ sub GenerateHandLists
 		&apos; Super Crisis Card(s) if Cylon.
 		if GetSuperCnt(playerID) &gt; 0 then
 			print #fileno, &quot;&quot;
-			print #fileno, &quot;Your Super Crisis is (are): &quot;
+			print #fileno, &quot;[b]Your Super Crisis Hand is:[/b]&quot;
 			
 			for cardID = 1 to SuperCrisisCnt
 				if CrisisSheet.getCellByPosition(_SuperNameCol, _SuperRow + cardID).string = player then
@@ -224,11 +251,11 @@ sub GenerateHandLists
 		if IsCylonLeader(playerID) or not IsRevealed(playerID) then
 		print #fileno, &quot;&quot;
 			if GameTypeIsDaybreak() then
-				print #fileno, &quot;You have &quot; &amp; GetMiracles(playerID) &amp; &quot; Miracle Token(s).&quot;
+				print #fileno, &quot;[b]You have &quot; &amp; GetMiracles(playerID) &amp; &quot; Miracle Token(s).[/b]&quot;
 			elseif OPGUsed(playerID) then
-				print #fileno, &quot;Your Once Per Game ability has been used.&quot;
+				print #fileno, &quot;[b]Your Once Per Game ability has been used.[/b]&quot;
 			else
-				print #fileno, &quot;Your Once Per Game ability is still available.&quot;
+				print #fileno, &quot;[b]Your Once Per Game ability is still available.[/b]&quot;
 			end if
 		end if
 		
@@ -263,7 +290,7 @@ sub GenerateHandLists
 		gamethread = PostSheet.getCellByPosition(_GameThreadCol, _GameThreadRow).string
 		if gamethread &lt;&gt; &quot;&quot; then
 			print #fileno, &quot;&quot;
-			print #fileno, &quot;Game link: [url=http://boardgamegeek.com/thread/&quot; + gamethread + &quot;][/url]&quot;
+			print #fileno, &quot;Game link: [url=http://boardgamegeek.com/thread/&quot; + gamethread + &quot;/new][/url]&quot;
 		end if
 		
 		&apos; Close File

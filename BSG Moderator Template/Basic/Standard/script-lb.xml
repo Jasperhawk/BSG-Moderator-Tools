@@ -18,4 +18,5 @@
  <library:element library:name="Setup"/>
  <library:element library:name="IonNeb"/>
  <library:element library:name="Mutiny"/>
+ <library:element library:name="Dispatcher"/>
 </library:library>

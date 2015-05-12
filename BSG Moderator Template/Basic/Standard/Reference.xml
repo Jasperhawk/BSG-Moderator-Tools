@@ -10,26 +10,26 @@ const _RefPlayerPresCol = _RefPlayerNameCol + 11
 const _RefPlayerAdmCol = _RefPlayerNameCol + 12
 const _RefPlayerCAGCol = _RefPlayerNameCol + 13
 const _RefPlayerLocCol = _RefPlayerNameCol + 9
-const _RefPlayerRow = 48
-const _RefMaxCharCnt = 38
+const _RefPlayerRow = 49
+const _RefMaxCharCnt = 39
 
 const _RefSkillNameCol = 0
 const _RefSkillCardNameCol = _RefSkillNameCol + 2
 const _RefSkillCardGameCol = _RefSkillNameCol + 10
 const _RefSkillCardDistCol = _RefSkillNameCol + 11
-const _RefSkillCardRow = 113
+const _RefSkillCardRow = 114
 
 const _RefLoyaltyGameCol	= 0
 const _RefLoyaltyNameCol	= 1
-const _RefAgendaRow			= 194
-const _RefMotiveRow			= 208
-const _RefCylonRow			= 229
-const _RefPersonalGoalRow	= 244
-const _RefFinalFiveRow		= 253
+const _RefAgendaRow			= 195
+const _RefMotiveRow			= 209
+const _RefCylonRow			= 230
+const _RefPersonalGoalRow	= 245
+const _RefFinalFiveRow		= 254
 
 const _RefFlawNameCol		= 0
 const _RefFlawGameCol		= 1
-const _RefFlawRow			= 260
+const _RefFlawRow			= 261
 
 global SkillCards(6,6) as string
 

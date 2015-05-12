@@ -483,6 +483,34 @@ sub DiscardQrmCard
 	end if
 end sub		&apos;DiscardQrmCard
 
+sub DiscardQrmSpecialist
+	dim rowID as integer
+	dim curcard as string
+	GetQRM
+	
+	for rowID = 1 to _MaxQrmCnt
+		curcard = QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String
+		if curcard = &quot;Assign Mission Specialist&quot; then
+			QrmSheet.GetCellByPosition(_QrmDiscardCol,_QrmRow + rowID).String = QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String
+			QrmSheet.GetCellByPosition(_QrmInPlayCol,_QrmRow + rowID).String = &quot;&quot;
+			QrmSheet.GetCellByPosition(_QrmAssignCol,_QrmRow + rowID).String = &quot;&quot;
+			Board_RefreshPlayerAssignments
+			exit for
+		end if
+	next rowID
+	
+	SortQrm _SortModeStd
+	UpdateQrmCardLst
+		
+&apos;	MsgBox &quot;Quorum card &apos;&quot; &amp; curcard &amp; &quot;&apos; DISCARDED&quot;
+	LogThis &quot;Quorum card &apos;&quot; &amp; curcard &amp; &quot;&apos; DISCARDED&quot;
+	
+	if IsQrmDeckEmpty() then
+		&apos; no cards left, we need to reshuffle
+		ShuffleQrm
+	end if
+end sub		&apos;DiscardQrmSpecialist
+
 
 sub PlayQrmCard
 	dim rowID, rtncd, toryID as integer
@@ -871,6 +899,7 @@ sub Initialize_Quorum
 	GetQrm
 
 	&apos;first move everything back into the deck
+	SetCurrentTask(&quot;Repacking Quorum Deck&quot;)
 	for rowid=1 to _MaxQrmCnt
 		select case QrmStatus(rowid)
 			case 1
@@ -894,6 +923,7 @@ sub Initialize_Quorum
 		end select
 	next rowid
 	
+	SetCurrentTask(&quot;Shuffling Quorum Deck&quot;)
 	SortQrm _SortModeConfigure
 	&apos; show all the rows we&apos;ll need, hide the others.
 	for rowid = 1 to _MaxQrmCnt
@@ -905,6 +935,7 @@ sub Initialize_Quorum
 	next rowid
 	SortQrm _SortModeShuffle
 
+	SetCurrentTask(&quot;Setting Up Quorum Forms&quot;)
 	UpdateQrmCardLst	
 		
 	EnableSP FALSE
@@ -914,6 +945,7 @@ sub Initialize_Quorum
 	
 	QrmSheet.GetCellByPosition(_QrmMaxDeckCol,_QrmMaxDeckRow).value = QrmCnt()
 
+	SetCurrentTask(&quot;Dealing Quorum to President&quot;)
 	DealQrmToPres FALSE
 end sub	&apos;Initialize_Quorum
 

@@ -33,6 +33,9 @@ const _PlayerInfiltrateCol = _PlayerNameCol - 1
 const _TurnRow = 0
 const _TurnCol = 11
 
+const _GameNameRow = 0
+const _GameNameCol = 2
+
 const _LogViewCol = 7
 const _LogViewRow = 23
 
@@ -91,16 +94,17 @@ sub GetGS
 	Randomize
 end sub
 
-
 sub PopulatePlayers
-	dim playerlst(8) as string
+	dim playerlst(PlayerCnt()) as string
 	dim i as integer
 	
 	GetGS
 	GetSF
 	GetIonNeb
 	GetMutinySheet
-
+	GetDestn
+	GetCrisisSheet
+	
 	for i = 1 to PlayerCnt()
 		playerlst(i)	= GetPlayerName(i)
 	next i
@@ -108,6 +112,8 @@ sub PopulatePlayers
 	SkillForm.getByName(&quot;lstPlayers&quot;).StringItemList	= playerlst()
 	IonNebForm.getByName(&quot;lstPlayers&quot;).StringItemList	= playerlst()
 	MutinyForm.getByName(&quot;lstPlayers&quot;).StringItemList	= playerlst()
+	DestnForm.getByName(&quot;lstPlayers&quot;).StringItemList	= playerlst()
+	CrisisForm.getByName(&quot;lstPlayers&quot;).StringItemList	= playerlst()
 	
 	SetPlayerSelect 1
 end sub
@@ -356,6 +362,12 @@ function GetPlayerID (playername as string) as integer
 	next playerID
 end function
 
+function GetPlayerUserName (playerID as integer) as string
+	GetGS
+	
+	GetPlayerUserName = GameSheet.GetCellByPosition(_PlayerCol, _PlayerStartRow + playerID).String
+end function
+
 function GetPlayerLoc (playerID as integer) as string
 	GetGS
 	GetPlayerLoc = GameSheet.GetCellByPosition(_PlayerLocCol,_PlayerStartRow + playerID).String
@@ -365,10 +377,24 @@ function IsSick (playerID as integer) as boolean
 	IsSick = (GetPlayerLoc(playerID) = &quot;Sickbay&quot; OR GetPlayerLoc(playerID) = &quot;Medical Center&quot;)
 end function
 
+function IsBrigged (playerID as integer) as boolean
+	IsBrigged = (GetPlayerLoc(playerID) = &quot;Brig&quot; or GetPlayerLoc(playerID) = &quot;Detention&quot;)
+end function
+
 &apos;IsRevealed applies to a revealed cylon, a Cylon Leader (infiltrating or not), or a Human Sympathizer
 function IsRevealed (playerID as integer) as boolean
 	GetGS
 	IsRevealed = (GameSheet.GetCellByPosition(_PlayerCylonCol,_PlayerStartRow + playerID).String &lt;&gt; &quot;&quot;)
+end function
+
+function GetGameTurn as string
+	GetGS
+	GetGameTurn = GameSheet.GetCellByPosition(_TurnCol,_TurnRow).value &amp; &quot;.&quot; &amp; GameSheet.GetCellByPosition(_TurnCol+1,_TurnRow).value
+end function
+
+function GetGameName as string
+	GetGS
+	GetGameName = GameSheet.GetCellByPosition(_GameNameCol,_GameNameRow).string
 end function
 
 sub SetRevealed (playerID as integer, optional clear as boolean)
@@ -474,8 +500,16 @@ sub SetPlayerLoc (playerid as integer, locstr as string)
 		end if
 	end if
 	
-	if ObjectiveIsIonianNebula and GetCurrentPlayer() = playerID then
-		EncounterLocationAllies(locstr)
+	if ObjectiveIsIonianNebula then
+		if VariantAltTrauma and locstr = &quot;Sickbay&quot; then
+			if MsgBox(GetPlayerName(playerid) &amp; &quot; is entering Sickbay, draw the Trauma token there?&quot;, 4, &quot;Trauma&quot;) = 6 then
+				DrawLocTrauma(playerid, &quot;Sickbay&quot;)
+			end if
+		end if
+
+		if GetCurrentPlayer() = playerID then
+			EncounterLocationAllies(locstr)
+		end if
 	end if
 	
 	Board_RefreshPlayerLoc
@@ -515,11 +549,26 @@ sub NextTurn
 		exit sub
 	end if
 	
+	if not AreManipulateButtonsClear() then
+		MsgBox &quot;Please restore default status on Manipulate Destiny / Manipulate Skill Check&quot;
+		exit sub
+	end if
+	
 	rtncd = MsgBox (&quot;Advance the Turn?&quot;,4)
 	if rtncd &lt;&gt; 6 then
 		exit sub
 	end if
 	
+	&apos; If we&apos;re using the Alternate Trauma Draw variant AND the current player is on the brig, we need to let the moderator know
+	if ObjectiveIsIonianNebula() and VariantAltTrauma() then
+		if GetPlayerLoc(GetCurrentPlayer()) = &quot;Brig&quot; then
+			rtncd = MsgBox (&quot;Did you remember to draw the trauma token from the Brig to &quot; &amp; GetPlayerName(GetCurrentPlayer()) &amp; &quot;?&quot;,4)
+			if rtncd &lt;&gt; 6 then
+				exit sub
+			end if
+		end if
+	end if
+
 	&apos; add in checks for hand size
 	for playerid = 1 to PlayerCnt()
 		if HandCardCnt(playerid) &gt; 10 or (HandCardCnt(playerID) &gt; 8 and GetPlayerName(PlayerID) = &quot;Chief&quot; and not IsRevealed(playerID)) then
@@ -617,7 +666,9 @@ sub NextTurn
 	Board_SetCurrentPlayer 
 	Skills_SetCurrentPlayer 
 	ConfigureButtons
-	SetSuperCrisisBtns
+	&apos; We run this each time we change the player list now, and the player list is automatically changed when turn advances (SetPlayerSelect, below)
+	&apos; SetSuperCrisisBtns
+	SetInitialSuperCrisisBtns
 	SetCrisisStartButton
 	ClearCrisisFlags
 	ClearMissionFlag
@@ -645,7 +696,8 @@ sub NextTurn
 		end if
 	end if
 	
-	if ObjectiveIsIonianNebula() then
+	&apos; If we&apos;re using the default rules, ask to draw a trauma at turn start
+	if ObjectiveIsIonianNebula() and not VariantAltTrauma() then
 		if GetPlayerLoc(GetCurrentPlayer()) = &quot;Brig&quot; or GetPlayerLoc(GetCurrentPlayer()) = &quot;Sickbay&quot; then
 			if MsgBox(GetPlayerName(GetCurrentPlayer()) &amp; &quot; is in &quot; &amp; GetPlayerLoc(GetCurrentPlayer()) &amp; &quot;, draw the Trauma token there?&quot;, 4, &quot;Trauma&quot;) = 6 then
 				DrawLocTrauma(GetCurrentPlayer(), GetPlayerLoc(GetCurrentPlayer()))
@@ -806,7 +858,7 @@ Sub MovePlayer
 				LogThis &quot;Viper &quot; &amp; ViperID &amp; &quot; is Destroyed.  &quot; &amp; plyrname &amp; &quot; moves to Sickbay&quot;
 			else
 				SetShipStatus viperType, ViperID, 0
-				LogThis plyrname &amp; &quot; moves to &quot; &amp; destname &amp; &quot; and returns Viper &quot; &amp; ViperID &amp; &quot; to the Reserves&quot;
+				LogThis plyrname &amp; &quot; moves to &quot; &amp; destname &amp; &quot; and returns &quot; &amp; GetShipTypeName(ViperType) &amp; &quot; &quot; &amp; ViperID &amp; &quot; to the Reserves&quot;
 			end if
 			UpdateShips
 		
@@ -1906,6 +1958,7 @@ sub Initialize_GameState
 	dim ResStart as variant
 
 	PopulatePlayers
+	SetCurrentTask(&quot;Populating Player Lists&quot;)
 	
 	for playerID = 1 to 7
 		SetPlayerViper playerID, 0
@@ -1921,6 +1974,7 @@ sub Initialize_GameState
 		end if
 	next playerID
 
+	SetCurrentTask(&quot;Setting Initial Titles (President, Admiral and CAG)&quot;)
 	&apos; set initial President, Admiral, and starting location
 	UpdateTitle GetNextTitle(_TitlePresident), _TitlePresident
 	UpdateTitle GetNextTitle(_TitleAdmiral), _TitleAdmiral
@@ -1930,6 +1984,7 @@ sub Initialize_GameState
 		UpdateTitle 0, _TitleCAG
 	end if
 
+	SetCurrentTask(&quot;Placing Players on Starting Locations&quot;)
 	for playerID = 1 to PlayerCnt()
 		refstart = RefStartLocation(GetPlayerName(playerID))
 		if instr(refStart,&quot;/&quot;) &gt; 0 then
@@ -1959,6 +2014,7 @@ sub Initialize_GameState
 	next playerID
 	
 	&apos; reset all resource counters
+	SetCurrentTask(&quot;Resetting Resources&quot;)
 	ResStart = Array (8,8,10,12)
 	for resID = 0 to 3
 		GameSheet.GetCellByPosition(_ResourceCol + resID, _ResTrackRow).value = ResStart(resID)
@@ -1966,10 +2022,12 @@ sub Initialize_GameState
 	UpdateResource
 	
 	&apos; reset Nukes
+	SetCurrentTask(&quot;Resetting Nukes&quot;)
 	GameSheet.GetCellByPosition(_NukeCol,_NukeRow).value = 2
 	GameForm.getByName(&quot;btnNuke&quot;).enabled = TRUE
 
 	&apos; reset Jump Track to the start
+	SetCurrentTask(&quot;Resetting Tracks&quot;)
 	GameForm.getByName(&quot;spinJumpPrep&quot;).enabled = TRUE
 	GameSheet.GetCellByPosition(_JumpPrepCol+2, _JumpPrepRow+2).value = 0
 	for jumpstate = 0 to 4
@@ -1983,6 +2041,7 @@ sub Initialize_GameState
 	SetPursuitTrack 0
 
 	&apos; clear any damage and shuffle the Galactia Damage tokens
+	SetCurrentTask(&quot;Clearing up Damage Tokens&quot;)
 	for resID = 1 to 8
 		GameSheet.GetCellByPosition(_GalDmgCol+1, _GalDmgRow+resID).string = &quot;&quot;
 		GameSheet.GetCellByPosition(_GalDmgCol+2, _GalDmgRow+resID).string = &quot;&quot;
@@ -1999,15 +2058,18 @@ sub Initialize_GameState
 	GameForm.getByName(&quot;btnDamagePegasus&quot;).enabled=TRUE
 	GameForm.getByName(&quot;btnRepairPegasus&quot;).enabled=FALSE
 
+	SetCurrentTask(&quot;Shuffling Damage Tokens&quot;)
 	ShuffleDamage
 	ShuffleDamagePeg
 
 	&apos; reset various buttons/controls
+	SetCurrentTask(&quot;Resetting Spreadsheet Buttons and Controls&quot;)
 	GameSheet.GetCellByPosition(_DieRollCol,_DieRollRow).value = 8
 
 	Configure_GameState	
 	
 	&apos; reset the turn to 1.1
+	SetCurrentTask(&quot;Resetting Turn to 1.1&quot;)
 	GameSheet.GetCellByPosition(_TurnCol,_TurnRow).value = 1
 	GameSheet.GetCellByPosition(_TurnCol+1,_TurnRow).value = 1
 	HighlightCurrentPlayer
@@ -2016,6 +2078,8 @@ sub Initialize_GameState
 	GameForm.getByName(&quot;spinLog&quot;).SpinValueMax=1
 	Board_SetCurrentPlayer 
 	Skills_SetCurrentPlayer 
+
+	SetCurrentTask(&quot;Configuring Board and Destination&quot;)
 	SetGamePhase _PhaseInSpace
 	if ObjectiveIsColony() then
 		GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow+3).string = &quot;Colony&quot;
@@ -2034,6 +2098,8 @@ sub Initialize_GameState
 		GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow+6).string = &quot;Standard&quot;
 	end if
 	SetInitFlag FALSE
+
+	SetCurrentTask(&quot;Updating Locations and Configuring Buttons&quot;)
 	UpdateLocations
 	ConfigureButtons
 	SetInitFlag TRUE
@@ -2186,12 +2252,17 @@ end sub
 sub SetPlayerSelect (playerID as integer)
 	&apos;selects the current player in both the player select boxes
 	dim tmplst(7) as string
+	GetDestn
+	GetCrisisSheet
+	
 &apos;	tmplst= GameForm.getByName(&quot;lstPlayers&quot;).SelectedItems()
 	tmplst(0) = playerID
 	GameForm.getByName(&quot;lstPlayers&quot;).SelectedItems=tmplst
 	UpdateLocations
 	SkillForm.getByName(&quot;lstPlayers&quot;).SelectedItems=tmplst
 	Populate_Handlist
+	DestnForm.getByName(&quot;lstPlayers&quot;).SelectedItems=tmplst
+	CrisisForm.getByName(&quot;lstPlayers&quot;).SelectedItems=tmplst
 end sub
 
 

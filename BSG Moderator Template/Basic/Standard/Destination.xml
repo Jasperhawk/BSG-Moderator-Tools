@@ -111,6 +111,7 @@ sub Initialize_Destination
 	SetDestnBuryCnt TRUE		&apos;reset the count so that nothing has been buried
 	
 	&apos; move all the jumped cards back into the deck
+	SetCurrentTask(&quot;Repacking Destination Deck&quot;)
 	for destid = 1 to _MaxDestnCnt + _MaxSpecialCnt
 		if DestnSheet.GetCellByPosition(_DestnDeckCol,_DestnRow + destid).String  = &quot;&quot; then
 			DestnSheet.GetCellByPosition(_DestnDeckCol,_DestnRow + destid).String = DestnSheet.GetCellByPosition(_DestnJumpCol,_DestnRow + destid).String
@@ -118,6 +119,7 @@ sub Initialize_Destination
 		end if
 	next destID
 	
+	SetCurrentTask(&quot;Ordering Destination Deck&quot;)
 	ShuffleDestination TRUE		&apos;this reorders things by gametype 
 	specials = _SpecialBaseCnt
 	if GameTypeIsDaybreak then
@@ -128,6 +130,7 @@ sub Initialize_Destination
 	end if
 	
 	&apos; now hide the rows we don&apos;t want
+	SetCurrentTask(&quot;Hiding Destinations That Won&apos;t Be Used&quot;)
 	for destID = 1 to _MaxDestnCnt + _MaxSpecialCnt
 		if destID &lt;= GetDestnCnt()+ specials then
 			DestnSheet.Rows(_DestnRow + destID).IsVisible = TRUE
@@ -135,8 +138,10 @@ sub Initialize_Destination
 			DestnSheet.Rows(_DestnRow + destID).IsVisible = FALSE
 		end if
 	next destID
+	SetCurrentTask(&quot;Shuffling Destination Deck&quot;)
 	ShuffleDestination FALSE
 		
+	SetCurrentTask(&quot;Resetting Destination Forms&quot;)
 	SetTotalDistance 0
 	DestnSheet.GetCellByPosition(_DistanceTriggerCol + _DistanceTriggerSleeper, _DistanceTriggerRow).String	= &quot;&quot;
 	DestnSheet.GetCellByPosition(_DistanceTriggerCol + _DistanceTriggerEndgame, _DistanceTriggerRow).String	= &quot;&quot;
@@ -688,7 +693,137 @@ sub GetSleeperState as boolean
 	GetSleeperState = (GetTotalDistance() &gt;= _SleeperDistance)
 end sub
 
+sub DispatchDestinationButton
+	dim destcnt, playerID, rtncd, destid, destrow, i as integer
+	dim cardtxt, tmpstr as string
+	GetDestn
+	
+	playerID = GetSelected(_ListDestnPlayers)
+	if playerID &lt; 1 then
+		MsgBox &quot;Please select a player.&quot;
+		exit sub
+	end if
+	player = GetPlayerName(playerID)
 
+	destcnt = 1
+	msg = &quot;Send top Destination card to &quot;
+	
+	&apos; Pilot Helo (Karl) gets 2 destinations when he&apos;s not revealed cylon
+	if player = &quot;Karl&quot; and not IsRevealed(playerID) then
+		destcnt = 2
+		msg = &quot;Send top 2 Destination cards to &quot;
+	end if
+	
+	rtncd = MsgBox(msg &amp; player &amp; &quot; ?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	DispTargetPlayer(playerID)	
+	DispSubject &quot;Destination(s) Card(s)&quot;
+	DispBody &quot;&quot;
+	if destcnt = 1 then
+		DispBodyAdd &quot;[b]&quot; &amp; player &amp; &quot;[/b], the top card of the Destination deck is:&quot; &amp; chr(13)
+	else
+		DispBodyAdd &quot;[b]&quot; &amp; player &amp; &quot;[/b], the top &quot; &amp; destcnt &amp; &quot; cards of the Destination deck are:&quot; &amp; chr(13)
+	end if
+	
+	&apos;get the first available destination
+	for destid = 1 to GetDestnCnt()
+		if DestnSheet.GetCellByPosition(_DestnDeckCol,_DestnRow + destID).String  &lt;&gt; &quot;&quot; then
+			&apos; Grab the next &apos;destcnt&apos; cards and format them
+			for i = 1 to destcnt
+				destrow = _DestnRow + destID + i - 1
+				DispBodyAdd &quot;[c][b]&quot; &amp; DestnSheet.GetCellByPosition(_DestnDeckCol, destrow).String &amp; &quot;[/b]&quot;
+				DispBodyAdd &quot;[b]Distance....: [/b]&quot; &amp; DestnSheet.GetCellByPosition(_DestnDistanceCol, destrow).String
+				DispBodyAdd &quot;[b]Fuel Cost...: [/b]&quot; &amp; DestnSheet.GetCellByPosition(_DestnFuelCol, destrow).String
+				
+				&apos; Other and Special only will be sent when needed
+				tmpstr = DestnSheet.GetCellByPosition(_DestnOtherCol, destrow).String
+				if tmpstr &lt;&gt; &quot;&quot; then
+					DispBodyAdd &quot;[b]Other.......: [/b]&quot; &amp; tmpstr
+				end if				
+				tmpstr = DestnSheet.GetCellByPosition(_DestnActionCol, destrow).String
+				if tmpstr &lt;&gt; &quot;&quot; then
+					DispBodyAdd &quot;[b]Special.....: [/b]&quot; &amp; tmpstr
+				end if
+				DispBodyAdd &quot;[/c]&quot; &amp; chr(13)
+			next i
+			exit for
+		end if
+	next destID
+
+	DispatchContents
+end sub
+
+sub DispatchDestinationForJumpButton
+	dim player, tmpstr, title as string
+	dim playerID, rntcd, destcnt as integer
+	GetDestn
+	
+	&apos; First check for Mission Specialist
+	player = GetAssigned(2)
+	if player &lt;&gt; &quot;&quot; then
+		tmpstr = &quot;Send top 3 Destination Cards to &quot; &amp; player &amp; &quot; (Mission Specialist)?&quot;
+		playerID = GetPlayerID(player)
+		title = &quot;[color=orange]Mission Specialist[/color] &quot;
+		destcnt = 3
+	else
+		&apos; Otherwise, we go with Admiral
+		playerID = GetTitle(_TitleAdmiral)
+		player = GetPlayerName(playerID)
+		destcnt = 2
+		tmpstr = &quot;Send top 2 Destination Cards to Admiral &quot; &amp; player &amp; &quot;?&quot;
+		title = &quot;[color=green]Admiral[/color] &quot;
+	end if
+	
+	rtncd = MsgBox(tmpstr, 4, &quot;Confirm Destination Dispatch&quot;)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	DispTargetPlayer(playerID)
+	DispSubject &quot;Destination for Jump&quot;
+	DispBody &quot;&quot;
+	DispBodyAdd &quot;[b]&quot; &amp; title &amp; player &amp; &quot;[/b], the top &quot; &amp; destcnt &amp; &quot; cards of the Destination deck are:&quot; &amp; chr(13)
+	
+	&apos;get the first available destination
+	for destid = 1 to GetDestnCnt()
+		if DestnSheet.GetCellByPosition(_DestnDeckCol,_DestnRow + destID).String  &lt;&gt; &quot;&quot; then
+			&apos; Grab the next 2 cards and format them
+			for i = 1 to destcnt
+				destrow = _DestnRow + destID + i - 1
+				DispBodyAdd &quot;[c][b]&quot; &amp; DestnSheet.GetCellByPosition(_DestnDeckCol, destrow).String &amp; &quot;[/b]&quot;
+				DispBodyAdd &quot;[b]Distance....: [/b]&quot; &amp; DestnSheet.GetCellByPosition(_DestnDistanceCol, destrow).String
+				DispBodyAdd &quot;[b]Fuel Cost...: [/b]&quot; &amp; DestnSheet.GetCellByPosition(_DestnFuelCol, destrow).String
+				
+				&apos; Other and Special only will be sent when needed
+				tmpstr = DestnSheet.GetCellByPosition(_DestnOtherCol, destrow).String
+				if tmpstr &lt;&gt; &quot;&quot; then
+					DispBodyAdd &quot;[b]Other.......: [/b]&quot; &amp; tmpstr
+				end if				
+				tmpstr = DestnSheet.GetCellByPosition(_DestnActionCol, destrow).String
+				if tmpstr &lt;&gt; &quot;&quot; then
+					DispBodyAdd &quot;[b]Special.....: [/b]&quot; &amp; tmpstr
+				end if
+				DispBodyAdd &quot;[/c]&quot; &amp; chr(13)
+			next i
+			exit for
+		end if
+	next destID
+	
+	DispatchContents
+	
+	&apos; Why not ask to remove the Mission Specialist assignment now, if needed?
+	if destcnt = 3 then
+		rtncd = MsgBox(&quot;Do you want to remove the assignment Mission Specialist from &quot; &amp; player &amp; &quot;?&quot;, 4, &quot;Remove Mission Specialist&quot;)
+		if rtncd &lt;&gt; 6 then
+			exit sub
+		end if
+		
+		DiscardQrmSpecialist
+	end if
+end sub
 
 
 </script:module>

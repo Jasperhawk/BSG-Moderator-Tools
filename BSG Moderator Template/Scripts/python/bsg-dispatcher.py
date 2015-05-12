@@ -10,6 +10,9 @@ import sys
 import urllib
 import urllib2
 import md5
+reload(sys)
+sys.setdefaultencoding("UTF-8")
+
 from cookielib import CookieJar
 from pprint import pprint as pp
 
@@ -17,7 +20,6 @@ from com.sun.star.awt import Rectangle
 from com.sun.star.awt import WindowDescriptor 
 from com.sun.star.awt.WindowClass import MODALTOP
 from com.sun.star.awt.VclWindowPeerAttribute import OK, OK_CANCEL, YES_NO, YES_NO_CANCEL, RETRY_CANCEL, DEF_OK, DEF_CANCEL, DEF_RETRY, DEF_YES, DEF_NO
-
 
 if sys.version_info < (2, 7):
     raise Exception('We need python 2.7, sorry')
@@ -80,19 +82,9 @@ class GeekMail(object):
         if 'bggusername' not in response.headers['set-cookie']: # invalid user
             raise Exception('Invalid user or password! Please check')
     
-    def dispatch(self, bgguser, filename):
-        f = clean_file(open(filename, 'r').read())
-        subject, body = f.split('\n', 1)
-        
-        #with open(filename, 'r') as f:
-        #    # first line is our subject
-        #    subject = f.readline().strip()
-        #    # the rest is the body
-        #    body = f.read().strip()
-        # For now, I'll use my bgguser and append the correct one to the subject. Just remove the lines below for "production"
-        #subject = bgguser + ' ' + subject
-        #bgguser = 'mawkee'
-        
+    def dispatch_text(self, bgguser, subject, body):
+        subject = clean_str(subject)
+        body = clean_str(body)
         data = urllib.urlencode({
             'action': 'save',
             'B1': "Send",
@@ -109,18 +101,37 @@ class GeekMail(object):
 
         response = self.opener.open(self.msgurl, data)
         content = response.read()
+    
+    def dispatch_file(self, bgguser, filename):
+        f = clean_str(open(filename, 'r').read())
+        subject, body = f.split('\n', 1)
         
+        #with open(filename, 'r') as f:
+        #    # first line is our subject
+        #    subject = f.readline().strip()
+        #    # the rest is the body
+        #    body = f.read().strip()
+        # For now, I'll use my bgguser and append the correct one to the subject. Just remove the lines below for "production"
+        #subject = bgguser + ' ' + subject
+        #bgguser = 'mawkee'
+        
+        self.dispatch_text(bgguser, subject, body)
 
-def clean_file(fs):
-    return fs.decode('iso8859-1').encode('ascii', 'ignore').replace('\r\n', '\n').strip()
+def clean_str(fs):
+    #fs = fs.replace('→', '->')
+    fs = fs.replace('\r\n', '\n').strip()
+    #fs = fs.decode('utf-8').encode('ascii', 'ignore')
+    return fs
+
+def calculate_md5(contents):
+    pmd5 = md5.md5()
+    pmd5.update(contents.encode('utf-8'))
+    return pmd5.hexdigest()
 
 def get_md5(playerfile):
     # Calculate the MD5 so we don't re-send a file if nothing has changed
-    pmd5 = md5.md5()
-    with open(playerfile, 'r') as fsock:
-        subject, body = clean_file(fsock.read()).split('\n', 1)
-        pmd5.update(body)
-    return pmd5.hexdigest()
+    subject, body = clean_file(open(playerfile, 'r').read()).split('\n', 1)
+    return calculate_md5(body)
 
 def dispatch_selected(*args):
     """BGG BSG Function to dispatch a single user hand"""
@@ -128,7 +139,7 @@ def dispatch_selected(*args):
     document = XSCRIPTCONTEXT.getDocument()
     maindir = urllib2.url2pathname(os.path.dirname(document.Location.replace("file://","")))
     logfile = os.path.join(maindir, 'bsg-dispatcher-debug.log')
-    sys.stdout = open(logfile, "w", 0) # unbuffered
+    sys.stdout = open(logfile, "a", 0) # unbuffered
 
     # Useful variables so we don't need to do a lot of typing
     worksheet = document.getSheets().getByName('Game State')
@@ -169,7 +180,7 @@ def dispatch_selected(*args):
     # Now we finally try to send our files
     try:
         gm = GeekMail(workdir=maindir)
-        gm.dispatch(selected_player, playerfile)
+        gm.dispatch_file(selected_player, playerfile)
         # Set the current MD5 on the spreadsheet (so that we only send it again after something is changed)
         dispatcherinfo.getCellByPosition(player_id+4, 31).setString(current_md5)
     except Exception as e:
@@ -185,7 +196,7 @@ def dispatch_all(*args):
     document = XSCRIPTCONTEXT.getDocument()
     maindir = urllib2.url2pathname(os.path.dirname(document.Location.replace("file://","")))
     logfile = os.path.join(maindir, 'bsg-dispatcher-debug.log')
-    sys.stdout = open(logfile, "w", 0) # unbuffered
+    sys.stdout = open(logfile, "a", 0) # unbuffered
 
     # Useful variables so we don't need to do a lot of typing
     worksheet = document.getSheets().getByName('Game State')
@@ -218,7 +229,7 @@ def dispatch_all(*args):
             # Now we finally try to send our files
             try:
                 gm = GeekMail(workdir=maindir)
-                gm.dispatch(p['player'], p['playerfile'])
+                gm.dispatch_file(p['player'], p['playerfile'])
                 # Set the current MD5 on the spreadsheet (so that we only send it again after something is changed)
                 dispatcherinfo.getCellByPosition(p['player_id']+4, 31).setString(p['md5'])
             except Exception as e:
@@ -226,4 +237,48 @@ def dispatch_all(*args):
             
         MessageBox(document, "Successfully sent the updated hands to: %s" % (", ".join([e['player'] for e in to_send])), "Success!", "infobox")
 
-g_exportedScripts = dispatch_all, dispatch_selected
+def dispatcher_call(*args):
+    """BGG BSG Function to dispatch a generic message via GeekMail"""
+    document = XSCRIPTCONTEXT.getDocument()
+    maindir = urllib2.url2pathname(os.path.dirname(document.Location.replace("file://","")))
+    logfile = os.path.join(maindir, 'bsg-dispatcher-debug.log')
+    sys.stdout = open(logfile, "a", 0) # unbuffered
+    
+    # Useful variables so we don't need to do a lot of typing
+    worksheet = document.getSheets().getByName('Game State')
+    dispatcherinfo = document.getSheets().getByName('Posting Templates')
+    dispatchersheet = document.getSheets().getByName('Dispatcher')
+    
+    playername = dispatchersheet.getCellByPosition(2, 1).getString()
+    subject = dispatchersheet.getCellByPosition(2, 3).getString()
+    body = dispatchersheet.getCellByPosition(2, 4).getString()
+    oldhash = dispatchersheet.getCellByPosition(2, 5).getString()
+    
+    if not playername:
+        MessageBox(document, "Error: Username can't be empty", "No username!", 'warningbox')
+        return False
+    if not subject:
+        MessageBox(document, "Error: Subject not defined", "Subject not defined!", 'warningbox')
+        return False
+    if not body:
+        MessageBox(document, "Error: Body is empty", "Empty body!", 'warningbox')
+        return False
+    
+    hashish = calculate_md5("%s%s%s" % (playername, subject, body))
+    if oldhash == hashish:
+        confirm = MessageBox(document, "It seems we've already sent this data. Send again?", "Data already sent", "querybox", YES_NO)
+        if confirm == 3:  # Pressed "No"
+            return False
+    
+    try:
+        gm = GeekMail(workdir=maindir)
+        gm.dispatch_text(playername, subject, body)
+        # Set the current MD5 on the spreadsheet (so that we only send it again after something is changed)
+        dispatchersheet.getCellByPosition(2, 5).setString(hashish)
+    except IOError:
+        MessageBox(document, e.message, "Alert!", "warningbox")
+        return False
+    
+    MessageBox(document, "Successfully sent the following message:\n\n%s" % (subject), "Success!", "infobox")
+    
+g_exportedScripts = dispatch_all, dispatch_selected, dispatcher_call

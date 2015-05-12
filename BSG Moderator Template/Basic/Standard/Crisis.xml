@@ -10,6 +10,7 @@ const _CrisisSkillCol = _CrisisCol + 6
 const _CrisisValueCol = _CrisisCol + 12
 const _CrisisActivateCol = _CrisisCol + 15
 const _CrisisJumpCol = _CrisisCol + 16
+const _CrisisDescCol = _CrisisCol + 17
 const _CrisisShipCol = _CrisisCol + 18
 const _CrisisRow = 2
 
@@ -46,7 +47,8 @@ const _MissionDiscardCol	= _MissionCol + 2
 const _MissionStatusCol		= _MissionCol + 5
 const _MissionSkillCol		= _CrisisSkillCol
 const _MissionValueCol		= _CrisisValueCol
-const _MissionDistanceCol	= 13
+const _MissionDistanceCol	= _MissionCol + 13
+const _MissionDescCol		= _MissionCol + 17
 const _MissionRow			= _CapricaRow + _CapricaCnt + 4
 const _MissionCnt			= 8
 const _MissionColCnt		= 23
@@ -235,7 +237,7 @@ function TopOfMissionDeck as integer
 	dim topofdeck as integer
 	
 	topofdeck	= 1
-	do while CrisisSheet.getCellByPosition(_MissionCol, _MissionRow + topofdeck).string = &quot;&quot; and topofdeck &lt;= 8&apos;and CrisisSheet.getCellByPosition(_MissionActiveCol, _MissionRow + topofdeck).string = &quot;&quot;
+	do while CrisisSheet.getCellByPosition(_MissionCol, _MissionRow + topofdeck).string = &quot;&quot; and topofdeck &lt;= 8 &apos;and CrisisSheet.getCellByPosition(_MissionActiveCol, _MissionRow + topofdeck).string = &quot;&quot;
 		topofdeck	= topofdeck + 1
 	loop
 
@@ -385,7 +387,7 @@ sub DeployCylonShips (crisisID as integer)
 				end if
 			end if
 			
-			if deployflag = 1 then				
+			if deployflag = 1 then
 				for j = 1 to shipcount
 					shipID = GetAvailableShip(shiptypes(i))
 					LogThis GetShipName(shiptypes(i), shipID) &amp; &quot; deployed in Sector &quot; &amp; shipdeploy(j)
@@ -1315,6 +1317,7 @@ sub Configure_CrisisCards
 	GetCrisisSheet
 	
 	&apos; sort the decks so that any cards we are not using are at the end.
+	SetCurrentTask(&quot;Sorting Crisis Decks&quot;)
 	for crisisID = 1 to _MaxCrisisCnt
 		gametype = CrisisCardGame(crisisID)
 		crisistype = GetCrisisType(crisisID)
@@ -1362,6 +1365,7 @@ sub Configure_CrisisCards
 	next crisisID
 		
 	&apos; show all the rows we&apos;ll need, hide the others.
+	SetCurrentTask(&quot;Hiding Unused Crisis Cards&quot;)
 	for currow = 1 to _MaxCrisisCnt
 		if currow &lt;= CrisisCnt() then
 			CrisisSheet.Rows(_CrisisRow + currow).IsVisible = TRUE
@@ -1372,6 +1376,7 @@ sub Configure_CrisisCards
 
 	&apos; if we&apos;re not playing ObjectiveIsNewCaprica(), go ahead and hide the new caprica crisis card section
 	&apos; in this case we hide or show the whole deck, so the &quot;deck size&quot; row is included
+	SetCurrentTask(&quot;Hiding New Caprica Deck&quot;)
 	for currow = 0 to _CapricaCnt + 1 
 		if ObjectiveIsNewCaprica() then
 			CrisisSheet.Rows(_CapricaRow + currow).IsVisible = TRUE
@@ -1381,12 +1386,14 @@ sub Configure_CrisisCards
 	next currow
 	
 	&apos; If we&apos;re not playing with ObjectiveIsEarth(), hide the Mission deck.
+	SetCurrentTask(&quot;Hiding Mission Deck&quot;)
 	for currow = -1 to _MissionCnt + 1
 			CrisisSheet.Rows(_MissionRow + currow).IsVisible	= ObjectiveIsEarth()
 	next currow
 
 	&apos; if we&apos;re not playing ObjectiveIsColony(), go ahead and hide theColony crisis card section
 	&apos; in this case we hide or show the whole deck, so the &quot;deck size&quot; row is included
+	SetCurrentTask(&quot;Hiding Attack on the Colony Deck&quot;)
 	for currow = 0 to _ColonyCnt + 1 
 		if ObjectiveIsColony() then
 			CrisisSheet.Rows(_ColonyRow + currow).IsVisible = TRUE
@@ -1403,6 +1410,8 @@ sub Initialize_CrisisCards
 	dim crisisID as integer
 	
 	GetCrisisSheet
+
+	SetCurrentTask(&quot;Repacking Crisis Deck&quot;)
 	for crisisID = 1 to CrisisCnt()
 		if CrisisSheet.getCellByPosition(_CrisisCol, _CrisisRow + crisisID).string = &quot;&quot; then
 			CrisisSheet.getCellByPosition(_CrisisCol, _CrisisRow + crisisID).string = 	CrisisSheet.getCellByPosition(_CrisisCol + 1, _CrisisRow + crisisID).string
@@ -1411,6 +1420,7 @@ sub Initialize_CrisisCards
 		CrisisSheet.getCellByPosition(_CrisisCol + 1, _CrisisRow + crisisID).string = &quot;&quot;
 	next crisisID
 	
+	SetCurrentTask(&quot;Repacking New Caprica Crisis Deck&quot;)
 	for crisisID = 1 to _CapricaCnt
 		if CrisisSheet.getCellByPosition(_CapricaCol, _CapricaRow + crisisID).string = &quot;&quot; then
 			CrisisSheet.getCellByPosition(_CapricaCol, _CapricaRow + crisisID).string = CrisisSheet.getCellByPosition(_CapricaCol + 1, _CapricaRow + crisisID).string
@@ -1419,6 +1429,7 @@ sub Initialize_CrisisCards
 		CrisisSheet.getCellByPosition(_CapricaCol + 1, _CapricaRow + crisisID).string = &quot;&quot;
 	next crisisID
 	
+	SetCurrentTask(&quot;Repacking Mission Deck&quot;)
 	for crisisID = 1 to _MissionCnt
 		if CrisisSheet.getCellByPosition(_MissionCol, _MissionRow + crisisID).string = &quot;&quot; then
 			CrisisSheet.getCellByPosition(_MissionCol, _MissionRow + crisisID).string	= CrisisSheet.getCellByPosition(_MissionActiveCol, _MissionRow + crisisID).string
@@ -1428,6 +1439,7 @@ sub Initialize_CrisisCards
 		CrisisSheet.getCellByPosition(_MissionStatusCol, _MissionRow + crisisID).string	= &quot;&quot;
 	next crisisID
 	
+	SetCurrentTask(&quot;Repacking Attack on the Colony Deck&quot;)
 	for crisisID = 1 to _ColonyCnt
 		if CrisisSheet.getCellByPosition(_ColonyCol, _ColonyRow + crisisID).string = &quot;&quot; then
 			CrisisSheet.getCellByPosition(_ColonyCol, _ColonyRow + crisisID).string = CrisisSheet.getCellByPosition(_ColonyCol + 1, _ColonyRow + crisisID).string
@@ -1442,13 +1454,19 @@ sub Initialize_CrisisCards
 	SetBuryCnt _DeckColony, TRUE
 	
 	Configure_CrisisCards
+	SetCurrentTask(&quot;Shuffling Crisis Deck&quot;)
 	ShuffleCrisisDeck TRUE
+	SetCurrentTask(&quot;Shuffling New Caprica Deck&quot;)
 	ShuffleNCDeck TRUE
+	SetCurrentTask(&quot;Shuffling Missions Deck&quot;)
 	ShuffleMissionDeck TRUE
+	SetCurrentTask(&quot;Shuffling Attack on the Colony Deck&quot;)
 	ShuffleColonyDeck TRUE
+	SetCurrentTask(&quot;Setting Crisis Colors&quot;)
 	ResetColors
-	EnableThirtyThree FALSE
-	
+
+	SetCurrentTask(&quot;Setting Up Initial Buttons&quot;)
+	EnableThirtyThree FALSE	
 	SetCrisisStartButton (&quot;&quot;, _CrisisTypeNone)
 	ClearCrisisFlags
 	ClearMissionFlag
@@ -1456,9 +1474,8 @@ sub Initialize_CrisisCards
 	SetMissionBtns TRUE
 	SetMissionResultBtns FALSE
 	ShowMissionBtns ObjectiveIsEarth
-
+	SetCrisisBtns TRUE
 end sub	&apos;Initialize_CrisisCards
-
 
 function SuperCrisisCardGame (crisisID as integer) as string
 	SuperCrisisCardGame = CrisisSheet.getCellByPosition(_CrisisGameTypeCol, _SuperRow + crisisID).string
@@ -1547,6 +1564,7 @@ sub Initialize_Super
 	dim i, j as integer
 	
 	GetCrisisSheet
+	SetCurrentTask(&quot;Repacking Super Crisis Deck&quot;)
 	Configure_SuperCrisisCards
 	
 	maxcnt = SuperCrisisCnt()
@@ -1588,13 +1606,20 @@ sub Initialize_Super
 	next superID
 
 	ResetSuperColors
+	SetSuperCrisisBtns
 end sub
 
 sub DealSuperCrisisBtn
 	dim playerID as integer
 	getGS
 	
-	playerID = GetCurrentPlayer()
+	playerID = GetSelected(_ListCrisisPlayers)
+	if playerID &lt; 1 then
+		MsgBox &quot;Please select a player.&quot;
+		exit sub
+	end if
+	&apos;player = GetPlayerName(playerID)
+	&apos;playerID = GetCurrentPlayer()
 	DealSuperCrisis playerID
 end sub
 
@@ -1625,7 +1650,7 @@ end sub
 
 sub PlaySuperCrisis
 	&apos;this can only be for the current player 
-	dim superID, skillID, difficulty, partial as integer
+	dim superID, skillID, difficulty, partial, playerID as integer
 	dim cpn, skillsincheck(5), tmplst(), supername as string
 	dim consequence as boolean
 	GetCrisisSheet
@@ -1636,10 +1661,15 @@ sub PlaySuperCrisis
 		exit sub
 	end if
 	
+	playerID = GetSelected(_ListCrisisPlayers)
+	if playerID &lt; 1 then
+		MsgBox &quot;Please select a player.&quot;
+		exit sub
+	end if
+	cpn = GetPlayerName(playerID)
+
 	supername = CrisisForm.getByName(&quot;lstSuperCrisis&quot;).StringItemList(val(tmplst(0)))
 
-	cpn = GetPlayerName(GetCurrentPlayer())
-	
 	for superID = 1 to _MaxSuperCnt
 		if CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).string = supername then
 			exit for
@@ -1711,74 +1741,143 @@ end sub
 
 sub ShowMissionBtns (enflag as boolean)
 	GetCrisisSheet
-	CrisisForm.getByName(&quot;btnPlayCrisis&quot;).enabled = enflag
-	CrisisForm.getByName(&quot;btnBuryMission&quot;).enabled = enflag
+	CrisisForm.getByName(&quot;btnPlayMission&quot;).enableVisible = enflag
+	CrisisForm.getByName(&quot;btnBuryMission&quot;).enableVisible = enflag
+	CrisisForm.getByName(&quot;btnMissionPass&quot;).enableVisible = enflag
+	CrisisForm.getByName(&quot;btnMissionFail&quot;).enableVisible = enflag
+	CrisisForm.getByName(&quot;btnDispatchMissionButton&quot;).enableVisible = enflag
 	CrisisForm.getByName(&quot;btnMissionPass&quot;).enabled = FALSE
 	CrisisForm.getByName(&quot;btnMissionFail&quot;).enabled = FALSE
 end sub
 
 sub DiscardSuperCrisis
-	&apos;this is to discard and get a new one
-	&apos;find the super crisis in the current player&apos;s hand
+	dim superID, playerID as integer
+	dim cpn, supername, tmplst() as string
+
 	GetCrisisSheet
-	dim superID as integer
-	dim cpn as string
-	cpn = GetPlayerName(GetCurrentPlayer())
-	for superID = 1 to _MaxSuperCnt
-		if CrisisSheet.getCellByPosition(_SuperCol+1, _SuperRow + superID).string = cpn then
-			exit for
+
+	&apos; This has to be treated in 2 different ways
+	&apos; If we&apos;re a base-only game, give the Cylon the opportunity to discard his SC and draw a new one
+	&apos; If it&apos;s not a base-only game and we have a Daybreak, D&apos;Anna must discard Super Crisis to move to a different location
+	
+	if GameTypeIsDaybreak then
+		
+		playerID = GetSelected(_ListCrisisPlayers)
+		if playerID &lt; 1 then
+			MsgBox &quot;Please select a player.&quot;
+			exit sub
 		end if
-	next superID
-	if MsgBox (&quot;Does &quot; &amp; cpn &amp; &quot; really want to discard the Super Crisis &apos;&quot; &amp; CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).string &amp; &quot;&apos; and get a new one?&quot; ,4) = 6 then
+		cpn = GetPlayerName(playerID)
+		
+		tmplst = CrisisForm.getByName(&quot;lstSuperCrisis&quot;).SelectedItems()
+		supername = CrisisForm.getByName(&quot;lstSuperCrisis&quot;).StringItemList(val(tmplst(0)))
+		if MsgBox (&quot;Does &quot; &amp; cpn &amp; &quot; want to discard &apos;&quot; &amp; supername &amp; &quot;&apos;?&quot; ,4, &quot;Discard Super Crisis&quot;) &lt;&gt; 6 then
+			exit sub
+		end if
+		
+		&apos; Find Super Crisis Card Row
+		for superID = 1 to _MaxSuperCnt
+			if CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).string = supername then
+				exit for
+			end if
+		next superID
 		LogThis cpn &amp; &quot; discards Super Crisis: &quot; &amp; CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).string 
-		CrisisSheet.getCellByPosition(_SuperCol+2, _SuperRow + superID).string =CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).string 
-		CrisisSheet.getCellByPosition(_SuperCol+2, _SuperRow + superID).CharColor =CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).CharColor
+		CrisisSheet.getCellByPosition(_SuperCol+2, _SuperRow + superID).string = CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).string 
+		CrisisSheet.getCellByPosition(_SuperCol+2, _SuperRow + superID).CharColor = CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).CharColor
 		CrisisSheet.getCellByPosition(_SuperCol+1, _SuperRow + superID).string = &quot;&quot; 
 		CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).string = &quot;&quot;
-		DealSuperCrisis GetCurrentPlayer()
+
+	&apos; We&apos;re not using Daybreak, so the button SHOULDN&apos;T be enabled unless this is a base-only game
+	&apos; Discard the Super Crisis and draw a new one
+	&apos; Find the super crisis in the current player&apos;s hand
+	else
+		cpn = GetPlayerName(GetCurrentPlayer())
+		for superID = 1 to _MaxSuperCnt
+			if CrisisSheet.getCellByPosition(_SuperCol+1, _SuperRow + superID).string = cpn then
+				exit for
+			end if
+		next superID
+		if MsgBox (&quot;Does &quot; &amp; cpn &amp; &quot; really want to discard the Super Crisis &apos;&quot; &amp; CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).string &amp; &quot;&apos; and get a new one?&quot; ,4) = 6 then
+			LogThis cpn &amp; &quot; discards Super Crisis: &quot; &amp; CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).string 
+			CrisisSheet.getCellByPosition(_SuperCol+2, _SuperRow + superID).string =CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).string 
+			CrisisSheet.getCellByPosition(_SuperCol+2, _SuperRow + superID).CharColor =CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).CharColor
+			CrisisSheet.getCellByPosition(_SuperCol+1, _SuperRow + superID).string = &quot;&quot; 
+			CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).string = &quot;&quot;
+			DealSuperCrisis GetCurrentPlayer()
+		end if
 	end if
-	
+	SetSuperCrisisBtns
 end sub		&apos;DiscardSuperCrisis
 
 sub SetSuperCrisisBtns
 	dim cpn as string
-	dim superlst(13) as string
-	dim superID, scCnt, sel(1) as integer
+	dim superlst(13), player as string
+	dim superID, scCnt, sel(1), playerID as integer
 	GetCrisisSheet
 	scCnt = 0
-
-	cpn = GetPlayerName(GetCurrentPlayer())
+	
+	&apos; These should be disabled ?
+	&apos; CrisisForm.getByName(&quot;btnDetector&quot;).enabled = FALSE
+	&apos; CrisisForm.getByName(&quot;btnColonialOne&quot;).enabled = FALSE
+	
+	playerID = GetSelected(_ListCrisisPlayers)
+	if playerID &lt; 1 then
+		&apos; Disable all buttons when no player is selected
+		CrisisForm.getByName(&quot;btnPlaySuperCrisis&quot;).enabled = FALSE
+		CrisisForm.getByName(&quot;lstSuperCrisis&quot;).StringItemList = g_emptylst()
+		CrisisForm.getByName(&quot;lstSuperCrisis&quot;).enabled = FALSE
+		CrisisForm.getByName(&quot;btnDiscardSuperCrisis&quot;).enabled = FALSE
+		CrisisForm.getByName(&quot;btnDealSuper&quot;).enabled = FALSE
+		exit sub
+	end if
+	player = GetPlayerName(playerID)
+	
 	for superID = 1 to _MaxSuperCnt
 		if CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).string &lt;&gt; &quot;&quot; and _
-				CrisisSheet.getCellByPosition(_SuperCol+1, _SuperRow + superID).string = cpn _
+				CrisisSheet.getCellByPosition(_SuperCol+1, _SuperRow + superID).string = player _
 		then
 			superlst(scCnt) = CrisisSheet.getCellByPosition(_SuperCol, _SuperRow + superID).string
 			scCnt = scCnt + 1
 		end if
 	next superID
+	
+	&apos; If player has a Super Crisis, enable the list and the buttons
+	&apos; Note that this is too generic, but we don&apos;t want to make special cases for everything (Athena&apos;s OPG for instance)
 	if scCnt &gt; 0 then
-		CrisisForm.getByName(&quot;btnPlaySuperCrisis&quot;).enabled =TRUE
-		CrisisForm.getByName(&quot;lstSuperCrisis&quot;).StringItemList=superlst()
+		CrisisForm.getByName(&quot;btnPlaySuperCrisis&quot;).enabled = TRUE
+		CrisisForm.getByName(&quot;lstSuperCrisis&quot;).StringItemList = superlst()
 		sel(0)=0
-		CrisisForm.getByName(&quot;lstSuperCrisis&quot;).SelectedItems()=sel()
+		CrisisForm.getByName(&quot;lstSuperCrisis&quot;).SelectedItems() = sel()
 		if scCnt &gt; 1 then
 			CrisisForm.getByName(&quot;lstSuperCrisis&quot;).enabled = TRUE
 		end if
-		if GameTypeIsBase() then
+		if GameTypeIsBase or IsCylonLeader(playerID) then
 			CrisisForm.getByName(&quot;btnDiscardSuperCrisis&quot;).enabled = TRUE
+		else
+			CrisisForm.getByName(&quot;btnDiscardSuperCrisis&quot;).enabled = FALSE
 		end if
 	else
-		CrisisForm.getByName(&quot;btnPlaySuperCrisis&quot;).enabled =FALSE
-		CrisisForm.getByName(&quot;lstSuperCrisis&quot;).StringItemList=g_emptylst()
+		CrisisForm.getByName(&quot;btnPlaySuperCrisis&quot;).enabled = FALSE
+		CrisisForm.getByName(&quot;lstSuperCrisis&quot;).StringItemList = g_emptylst()
 		CrisisForm.getByName(&quot;lstSuperCrisis&quot;).enabled = FALSE
 		CrisisForm.getByName(&quot;btnDiscardSuperCrisis&quot;).enabled = FALSE
+		CrisisForm.getByName(&quot;btnDealSuper&quot;).enabled = FALSE
 	end if
 	
-	if IsRevealed(GetCurrentPlayer()) and not IsInfiltrating(GetCurrentPlayer()) then
+	&apos; Finally, enable the button to deal Super Crisis for revealed Cylons and for ALL Cylon Leaders
+	&apos; This is to account Athena&apos;s OPG, but can also be used if the moderator forgot to draw a Super Crisis when he should have
+	&apos; You sly mod!
+	if IsRevealed(playerID) then
 		CrisisForm.getByName(&quot;btnDealSuper&quot;).enabled = TRUE
 	else
 		CrisisForm.getByName(&quot;btnDealSuper&quot;).enabled = FALSE
 	end if
+	
+	
+end sub
+
+sub SetInitialSuperCrisisBtns
+	GetCrisisSheet
 	
 	CrisisForm.getByName(&quot;btnDetector&quot;).enabled = FALSE
 	CrisisForm.getByName(&quot;btnColonialOne&quot;).enabled = FALSE
@@ -1938,6 +2037,203 @@ sub BattleOfIonianNebula
 	GetCrisisSheet
 	MsgBox &quot;Setting up the Battle of the Ionian Nebula.&quot;
 	DeployCylonShips(_BattleOfIonianNebulaID)
+end sub
+
+sub DispatchCrisisButton
+	dim PlayerID, crisiscnt, rtncd, i, crisisID, refrow, refcol, refval, refskill, rowid, ctype, cval, cpartial, ccons, skillid, shiptype as integer
+	dim player, msg, crisisColor(), skillcolors(), ships(), ctitle, tmpstr, cbody as string
+	GetCrisisSheet
+	
+	playerID = GetSelected(_ListCrisisPlayers)
+	if playerID &lt; 1 then
+		MsgBox &quot;Please select a player.&quot;
+		exit sub
+	end if
+	player = GetPlayerName(playerID)
+	
+	crisisColor = Array (&quot;black&quot;, &quot;purple&quot;, &quot;green&quot;, &quot;blue&quot;, &quot;darkblue&quot;, &quot;red&quot;)
+	skillcolors = Array (, &quot;[color=orange]Y[/color]&quot;, &quot;[color=green]G[/color]&quot;, &quot;[color=purple]P[/color]&quot;, &quot;[color=red]R[/color]&quot;, &quot;[color=blue]B[/color]&quot;)
+	ships = Array (, &quot;Basestars&quot;, &quot;Heavy Raiders&quot;, &quot;Raiders&quot;, &quot;Vipers&quot;, &quot;Civilians&quot;)
+	crisiscnt = 1
+	msg = &quot;Send the top Crisis Card for &quot;
+	&apos; Now this will be fun! First of all, we need to try and deduce the amount of Crisis we have to send!
+	&apos; Common Cylons are somewhat easier
+	if IsRevealed(playerID) then
+		if GetPlayerLoc(playerID) = &quot;Caprica&quot; then
+			crisiscnt = 2
+			msg = &quot;Send the top 2 Crisis Cards to &quot;
+		&apos; The other case would be Human Fleet, but it&apos;s the default 1 card, so we&apos;ll skip it
+		end if
+	&apos; Karl gets 2 Crisis Cards on scouts, and Roslin gets 2 Crisis on Religious Visions
+	elseif player = &quot;Karl&quot; or player = &quot;Roslin&quot; then
+		crisiscnt = 2
+		msg = &quot;Send the top 2 Crisis Cards for &quot;
+	end if
+	
+	rtncd = MsgBox(msg &amp; player &amp; &quot; ? (NO=Select Amount Manually)&quot;, 3)
+	&apos; Exit on Cancel
+	if rtncd = 2 then
+		exit sub
+	&apos; Ask for amount on No
+	elseif rtncd = 7 then
+		crisiscnt = CInt(InputBox(&quot;Please enter how many Crisis to send&quot;, &quot;Enter Crisis Amount&quot;, crisiscnt))
+		
+		if crisiscnt = 0 then
+			exit sub
+		end if
+		
+		if not (crisiscnt &gt;= 1 and crisiscnt &lt;= 4) then
+			msgbox &quot;You have to enter a valid value (between 1 and 4)&quot;
+			exit sub
+		end if
+	end if
+	
+	DispTargetPlayer(playerID)	
+	DispSubject &quot;Crisis Cards&quot;
+	DispBody &quot;&quot;
+	if crisiscnt = 1 then
+		DispBodyAdd &quot;[b]&quot; &amp; player &amp; &quot;[/b], the top card of the Crisis deck is:&quot; &amp; chr(13)
+	else
+		DispBodyAdd &quot;[b]&quot; &amp; player &amp; &quot;[/b], the top &quot; &amp; crisiscnt &amp; &quot; cards of the Crisis deck are:&quot; &amp; chr(13)
+	end if
+	
+	if OnNewCaprica() then
+		refrow = _CapricaRow
+		refcol = _CapricaCol
+		refval = _CapricaValueCol
+		refskill = _CarpicaSkillCol
+		crisisID = TopofCapricaDeck()
+	else
+		refrow = _CrisisRow
+		refcol = _CrisisCol
+		refval = _CrisisValueCol
+		refskill = _CrisisSkillCol
+		crisisID = TopofCrisisDeck()
+	end if
+
+	for i = 1 to crisiscnt
+		rowid = refrow + crisisID + i - 1
+		ctype = GetCrisisType(crisisID + i - 1)
+		cval = CrisisSheet.GetCellByPosition(refval, rowid).string
+		cpartial = CrisisSheet.GetCellByPosition(refval+1, rowid).string
+		ccons = CrisisSheet.GetCellByPosition(refval, rowid).string
+
+		&apos; Crisis Title set up
+		ctitle = &quot;[b][color=&quot; &amp; crisisColor(ctype) &amp; &quot;]&quot; &amp; CrisisSheet.GetCellByPosition(refcol, rowid).string &amp; &quot;[/color] &quot;
+		if cval &lt;&gt; &quot;&quot; then
+			ctitle = ctitle &amp; cval
+			if cpartial &lt;&gt; &quot;&quot; then
+				ctitle = ctitle &amp; &quot;(&quot; &amp; cpartial &amp; &quot;)&quot;
+			end if
+			&apos; We use _SkillIDBaseMax instead of SkillBaseMax because there are no Crisis that uses Treachery or Faith cards
+			for skillid = _SkillIDMin to _SkillIDBaseMax
+				tmpstr = CrisisSheet.getCellByPosition(_CrisisSkillCol + skillID, rowid).string
+				if tmpstr = &quot;X&quot; then
+					ctitle = ctitle &amp; skillcolors(skillid)
+				end if
+			next skillid
+			if ccons = &quot;X&quot; then
+				ctitle = ctitle &amp; &quot; [i]Consequence[/i]&quot;
+			end if
+		end if
+		ctitle = ctitle &amp; &quot;[/b]&quot;
+		DispBodyAdd ctitle
+		
+		&apos; Now we add the &quot;body&quot; of the crisis		
+		cbody = &quot;&quot;
+		if ctype = _CrisisTypeAttack then
+			&apos; First item is Activate
+			cbody = &quot;[b]1. Activate:[/b] &quot; &amp; CrisisActivationIcon(CrisisSheet.getCellByPosition(_CrisisActivateCol, rowid).string) &amp; chr(13)
+			&apos; On an attack Crisis, we have to send the info &quot;as-is&quot;
+			cbody = cbody &amp; &quot;[b]2. Deploy:[/b][c]&quot; &amp; chr(13)
+			for shiptype = 1 to 5
+				tmpstr = CrisisSheet.getCellByPosition(_CrisisShipCol + shiptype - 1, rowid).string
+				if tmpstr &lt;&gt; &quot;&quot; then
+					cbody = cbody &amp; &quot;   &quot; &amp; ships(shiptype) &amp; &quot; --&gt; &quot; &amp; tmpstr &amp; chr(13)
+				end if
+			next shiptype
+			cbody = cbody &amp; &quot;[/c][b]3. Special:[/b] &quot; &amp; CrisisSheet.getCellByPosition(_CrisisDescCol, rowid).string
+		else
+			cbody = CrisisSheet.getCellByPosition(_CrisisDescCol, rowid).string &amp; chr(13)
+			cbody = cbody &amp; &quot;[b]Cylon Activation:[/b] &quot; &amp; CrisisActivationIcon(CrisisSheet.getCellByPosition(_CrisisActivateCol, rowid).string) &amp; chr(13)
+			if CrisisSheet.getCellByPosition(_CrisisJumpCol, rowid).string = &quot;X&quot; then
+				cbody = cbody &amp; &quot;[b]Has jump preparation icon[/b] &quot;
+			end if
+		end if
+		DispBodyAdd cbody &amp; chr(13)
+	next i
+	DispatchContents
+end sub
+
+sub DispatchMissionButton
+	dim PlayerID, rtncd, missionID, mrow, mval, skillid as integer
+	dim player, skillcolors(), mtitle, tmpstr, mbody as string
+	GetCrisisSheet
+	
+	playerID = GetSelected(_ListCrisisPlayers)
+	if playerID &lt; 1 then
+		MsgBox &quot;Please select a player.&quot;
+		exit sub
+	end if
+	player = GetPlayerName(playerID)
+	
+	skillcolors = Array (, &quot;[color=orange]Y[/color]&quot;, &quot;[color=green]G[/color]&quot;, &quot;[color=purple]P[/color]&quot;, &quot;[color=red]R[/color]&quot;, &quot;[color=blue]B[/color]&quot;)
+
+	&apos; Athena can use OPG to activate Tactical Plot even as revealed Cylon, so needs to be removed from this rule. Sigh...
+	if IsRevealed(playerID) and (not IsInfiltrating(playerID) and player &lt;&gt; &quot;Athena&quot;) then
+		MsgBox player &amp; &quot; is a Revealed Cylon and can&apos;t activate Tactical Plot&quot;
+		exit sub
+	end if
+	
+	rtncd = MsgBox(&quot;Send top card of the Mission deck to &quot; &amp; player &amp; &quot;?&quot;, 4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	&apos; If the player is not on the Tactical Plot, ask for confirmation
+	if GetPlayerLoc(playerID) &lt;&gt; &quot;Tactical Plot&quot; then
+		rtncd = MsgBox(player &amp; &quot; is not on Tactical Plot. Send Mission anyway?&quot;, 4)
+		if rtncd &lt;&gt; 6 then
+			exit sub
+		end if
+	end if
+	
+	DispTargetPlayer(playerID)	
+	DispSubject &quot;Mission Card&quot;
+	DispBody &quot;&quot;
+	mrow = topofmissiondeck + _MissionRow
+	DispBodyAdd &quot;[b]&quot; &amp; player &amp; &quot;[/b], the top card of the Mission deck is:&quot; &amp; chr(13)	
+	
+	&apos; Mission Title set up
+	mtitle = &quot;[b]&quot; &amp; CrisisSheet.GetCellByPosition(_MissionCol, mrow).string &amp; &quot; &quot;
+	mtitle = mtitle &amp; CrisisSheet.GetCellByPosition(_MissionValueCol, mrow).string
+	&apos; We use _SkillIDBaseMax instead of SkillBaseMax because there are no Missions that uses Treachery or Faith cards
+	for skillid = _SkillIDMin to _SkillIDBaseMax
+		tmpstr = CrisisSheet.getCellByPosition(_MissionSkillCol + skillID - 1, mrow).string
+		if tmpstr = &quot;X&quot; then
+			mtitle = mtitle &amp; skillcolors(skillid)
+		end if
+	next skillid
+
+	mtitle = mtitle &amp; &quot;[/b]&quot;
+	DispBodyAdd mtitle
+	DispBodyAdd CrisisSheet.getCellByPosition(_MissionDescCol, mrow).string &amp; chr(13)
+
+	DispatchContents
+end sub
+
+sub CrisisActivationIcon (letter as string) as string
+	if letter = &quot;R&quot; then
+		CrisisActivationIcon = &quot;Raiders&quot;
+	elseif letter = &quot;H&quot; then
+		CrisisActivationIcon = &quot;Heavy Raiders&quot;
+	elseif letter = &quot;L&quot; then
+		CrisisActivationIcon = &quot;Launch Raiders&quot;
+	elseif letter = &quot;B&quot; then
+		CrisisActivationIcon = &quot;Basestars&quot;
+	else
+		CrisisActivationIcon = letter
+	end if
 end sub
 
 &apos; ALL WORK AND NO PLAY MAKES MAWKEE A DULL BOY ALL WORK AND NO PLAY MAKES MAWKEE A DULL BOY ALL WORK AND NO PLAY MAKES MAWKEE A DULL
