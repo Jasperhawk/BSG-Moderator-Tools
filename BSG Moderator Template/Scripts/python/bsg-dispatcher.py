@@ -130,7 +130,7 @@ def calculate_md5(contents):
 
 def get_md5(playerfile):
     # Calculate the MD5 so we don't re-send a file if nothing has changed
-    subject, body = clean_file(open(playerfile, 'r').read()).split('\n', 1)
+    subject, body = clean_str(open(playerfile, 'r').read()).split('\n', 1)
     return calculate_md5(body)
 
 def dispatch_selected(*args):
