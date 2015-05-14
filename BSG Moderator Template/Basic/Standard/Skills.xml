@@ -571,16 +571,21 @@ Sub DealSelectedCardToAll
 end sub &apos;DealSelectedCardToAll
 
 sub DealToAll (srcskill as integer, optional dealtocylons as boolean)
-	dim playerID as integer
+	dim playerID, i as integer
 	if IsMissing(dealtocylons) then
 		dealtocylons = FALSE
 	end if
 
-	for playerID = 1 to playercnt()
+	for i = GetCurrentPlayer to playercnt() + GetCurrentPlayer - 1
+		playerID = i
+		&apos; This hack is necessary so the first player to receive a card is the current player
+		if playerID &gt; playercnt() then
+			playerID = i - playercnt()
+		end if
 		if dealtocylons = TRUE or not isRevealed(playerID) or (isCylonLeader(playerID) and IsInfiltrating(playerID) ) then
 			DealCard(playerID, srcskill)
 		end if
-	next playerID	
+	next i	
 end sub &apos;DealToAll
 
 Sub DealCard(destplayer as integer, srcskill as integer)
@@ -1011,8 +1016,9 @@ end sub
 
 
 sub PlayFromHand 
-	dim player, srccol, srcrow, cardno as integer
-	dim tmplst() as string
+	dim player, srccol, srcrow, cardno, rtncd, tmpint as integer
+	dim playerloc, tmplst() as string
+	dim cont as boolean
 
 	GetSF
 	
@@ -1087,6 +1093,87 @@ sub PlayFromHand
 				SkillSheet.getCellByPosition(_LeePlayedXOCol, _LeePlayedXORow).string = &quot;X&quot;
 			end if
 		
+		case &quot;Negotiation&quot;
+			&apos; Place 1 Basestar on sector 1 then 1 political card to the player that played this card
+			DealCard(player, _SkillIDPolitics)
+			if GetAvailableShipCnt(_ShipBasestar) &gt;= 1 then
+				SetShipStatus _ShipRaider, GetAvailableShip(_ShipBasestar), 1
+				MsgBox GetPlayerName(player) &amp; &quot; draws 1 Politics and 1 Basestar was deployed on sector 1 (Negotiation)&quot;
+				LogThis &quot;1 Basestar deployed on sector 1 (Negotiation)&quot;
+			else
+				if UseCylonFleet then
+					MsgBox GetPlayerName(player) &amp; &quot; draws 1 Politics. There are no Basestars in the reserves. Pull from CFB, starting with the lowest-numbered CFB sector. Do not advance the Pursuit Track, do not warp in the whole Sector.&quot;
+				else
+					MsgBox GetPlayerName(player) &amp; &quot; draws 1 Politics. There are no Basestars in the reserves.&quot;
+				end if
+			end if
+		
+		case &quot;State of Emergency&quot;
+			&apos; Reduce 1 Food (ask beforehand, in case of Preventative Policy or something like that)
+			rtncd	= MsgBox(&quot;Lose 1 Food from State of Emergency?&quot;, 3)
+			if rtncd = 2 then
+				exit sub
+			elseif rtncd = 6 then
+				ReduceResource _ResourceFood
+			end if
+			MsgBox &quot;Each player now has 1 action, starting with &quot; &amp; GetPlayerName(player)
+			
+		case &quot;Launch Scout&quot;
+			&apos; Check if we have a Raptor and warn the mod if not, then ask if successful
+			if GetAvailableShipCnt(_ShipRaptor) &gt;= 1 then
+				rtncd = MsgBox(&quot;Was the Scout successful?&quot;, 4)
+				if rtncd = 7 then      &apos; We destroy a Raptor
+					tmpint = GetAvailableShip(_ShipRaptor)
+					SetShipStatus _ShipRaptor, tmpint, _ShipStatusDestroyed
+					MsgBox &quot;Raptor DESTROYED&quot;
+					LogThis &quot;Raptor &quot; &amp; tmpint &amp; &quot; DESTROYED&quot;
+				end if
+			else
+				rtncd = MsgBox(&quot;There are no Raptors available. Do you still want to play Launch Scout?&quot;, 4)
+				if rtncd &lt;&gt; 6 then
+					exit sub
+				end if
+			end if
+		
+		case &quot;Repair&quot;
+			&apos; Check the current player location, warn if he&apos;s not on a damaged location or hangar
+			playerloc = GetPlayerLoc(player)
+			if playerloc = &quot;Hangar Deck&quot; then
+				&apos; Here we have two alternatives; Either Hangar Deck is Damaged (in which case I won&apos;t even bother guessing how many vipers we can repair) or he wants to repair vipers
+				cont = TRUE
+				if IsDamaged(&quot;Hangar Deck&quot;) then
+					rtncd = MsgBox (&quot;Repair the Hangar Deck?&quot;, 4)
+					if rtncd = 6 then
+						RepairLocation &quot;Hangar Deck&quot;
+						MsgBox GetPlayerName(player) &amp; &quot; repaired the Hangar Deck&quot;
+						cont = FALSE
+					end if
+				end if
+				if cont then
+					&apos; Count the amount of Vipers Mark VII we have damaged, IF we&apos;re using CFB
+					dim markvii, viper as integer
+					viper = CountDamagedShips(_ShipViper)
+					markvii = CountDamagedShips(_ShipMarkVII)
+					&apos; If we only have one or another, this makes our lifes easier
+					if viper = 0 and markvii &gt;= 2 then
+						RepairVipers(_ShipMarkVII, 2)
+						MsgBox &quot;2 Vipers Mark VII repaired&quot;
+					elseif markvii = 0 and viper &gt;= 2 then
+						RepairVipers(_ShipViper, 2)
+						MsgBox &quot;2 Vipers repaired&quot;
+					else
+						MsgBox &quot;Please repair 2 Vipers manually&quot;
+					end if
+				end if
+			elseif IsDamaged(playerloc) then
+				RepairLocation(playerloc)
+				MsgBox GetPlayerName(player) &amp; &quot; repaired the &quot; &amp; playerloc
+			else
+				rtncd = MsgBox (GetPlayerName(player) &amp; &quot; is not on a damaged location or Hangar. Use Repair anyway?&quot;, 4)
+				if rtncd &lt;&gt; 6 then
+					exit sub
+				end if
+			end if
 	end select
 			
 	RemoveFromHand player, cardno, TRUE
@@ -1341,7 +1428,7 @@ sub ProcessSkillCheckAbilities (cardname as string) as string
 		&apos; Draw 1 Treachery for each non-revealed-cylon player. If current player is human, also draw 1 Mutiny (2 in case Tom is present)
 		DealToAll(_SkillIDTreachery, FALSE)
 		tmpid = GetCurrentPlayer()
-		if not IsRevealed(tmpid) then
+		if (IsCylonLeader(tmpid) and IsInfiltrating(tmpid)) or not IsRevealed(tmpid) then
 			DrawMutiny(tmpid)
 			MsgBox &quot;1 Treachery Card dealt to each human and 1 Mutiny dealt to &quot; &amp; GetPlayerName(tmpid) &amp; &quot; (Personal Vices)&quot;
 		else
@@ -2537,7 +2624,7 @@ end sub	&apos;AddSkillCardTo
 &apos;Note: this will NOT compress the deck...that&apos;s a separate call so that if we&apos;re pulling multiple cards we don&apos;t waste too much effort
 
 function GetSkillCardFrom (whichset as integer, optional setID as integer, optional cardno as integer) as string
-	dim srccol, srcrow, maxcnt, i as integer
+	dim srccol, srcrow, maxcnt, i, cardnum as integer
 	
 	srccol	= GetSkillSetCol(whichset, setID)
 	srcrow	= GetSkillSetRow(whichset)
@@ -2546,20 +2633,20 @@ function GetSkillCardFrom (whichset as integer, optional setID as integer, optio
 		maxcnt = MaxCardCnt(whichset)
 		&apos;take from the top of the deck
 		GetSkillCardFrom = &quot;&quot;
-		for cardno = 0 to maxcnt
-			if SkillSheet.getCellByPosition(srccol,srcrow + cardno).string &lt;&gt; &quot;&quot; then
-				GetSkillCardFrom = SkillSheet.getCellByPosition(srccol,srcrow + cardno).string 
-				SkillSheet.getCellByPosition(srccol,srcrow + cardno).string = &quot;&quot;
+		for cardnum = 0 to maxcnt
+			if SkillSheet.getCellByPosition(srccol,srcrow + cardnum).string &lt;&gt; &quot;&quot; then
+				GetSkillCardFrom = SkillSheet.getCellByPosition(srccol,srcrow + cardnum).string 
+				SkillSheet.getCellByPosition(srccol,srcrow + cardnum).string = &quot;&quot;
 				&apos; Once again, special case for Skill Check skillset
 				if whichset = _SkillSetSkillCheck then
 					for i = 1 to _SkillIDMax
-						SkillSheet.getCellByPosition(srccol + i, srcrow + cardno).string = &quot;&quot;
+						SkillSheet.getCellByPosition(srccol + i, srcrow + cardnum).string = &quot;&quot;
 					next i
 				end if
 				
 				exit for
 			end if
-		next cardno
+		next cardnum
 	else
 		GetSkillCardFrom = SkillSheet.getCellByPosition(srccol,srcrow + cardno - 1).string
 		SkillSheet.getCellByPosition(srccol,srcrow + cardno - 1).string = &quot;&quot;

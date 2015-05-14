@@ -2062,5 +2062,54 @@ sub SortRaiders
 	UpdateShips
 end sub
 
+function CountDamagedShips (shiptype as integer) as integer
+	&apos; Only used for Vipers Mark II and Mark VII
+	dim vipercnt, i, maxvipers as integer
+	
+	GetShipSheet
+	
+	vipercnt = 0
+	if shiptype = _ShipMarkVII and UseCylonFleet then
+		for i = 1 to 4 &apos; We only have 4 Mark VII ships
+			if GetShipStatus(_ShipMarkVII, i) = _ShipStatusDamaged then
+				vipercnt = vipercnt + 1
+			end if
+		next i
+	elseif shiptype = _ShipViper then
+		maxvipers = 8
+		if UseCylonFleet then
+			maxvipers = 6
+		end if
+		for i = 1 to maxvipers
+			if GetShipStatus(_ShipViper, i) = _ShipStatusDamaged then
+				vipercnt = vipercnt + 1
+			end if
+		next i
+	end if
+	CountDamagedShips = vipercnt
+end function
+
+function RepairVipers (shiptype as integer, shipcnt as integer)
+	dim maxvipers, i as integer
+	
+	GetShipSheet
+	maxvipers = 8
+	if shiptype = _ShipMarkVII then
+		maxvipers = 4
+	elseif shiptype = _ShipViper and UseCylonFleet then
+		maxvipers = 6		
+	end if
+	
+	for i = 1 to maxvipers
+		if GetShipStatus(shiptype, i) = _ShipStatusDamaged then
+			SetShipStatus(shiptype, i, _ShipStatusOffboard)
+			shipcnt = shipcnt - 1
+			if shipcnt = 0 then
+				UpdateShips
+				exit function
+			end if
+		end if
+	next i	
+end function
 
 </script:module>

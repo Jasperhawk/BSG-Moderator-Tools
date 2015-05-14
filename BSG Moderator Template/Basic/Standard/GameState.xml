@@ -1271,7 +1271,7 @@ sub UpdateResource
 				GameSheet.GetCellByPosition(whichres, _ResTrackReducedRow).string = &quot;X&quot;
 				if (whichres-_ResourceCol) = _ResourcePopulation then
 					for hotdogID = 1 to PlayerCnt()
-						if GetPlayerName(hotdogID) = &quot;Hot Dog&quot; then    &apos; Hot dog is in play and the resource is Population
+						if GetPlayerName(hotdogID) = &quot;Hot Dog&quot; and not IsRevealed (hotdogID) then    &apos; Hot dog is in play and the resource is Population
 							MsgBox &quot;Remember Hot Dog&apos;s Memento Ability (draw 3 Piloting cards)&quot;
 						end if
 					next hotdogID
@@ -1591,24 +1591,12 @@ function IsDamaged (locstr as string) as boolean
 
 end function		&apos;IsDamaged
 
-sub RepairGalactica
+function RepairLocation (dmgstr as string)
 	dim dmgID, dmgcnt, rtncd, i,j as integer
-	dim dmgstr, tmpstr as string
+	dim tmpstr as string
 	dim dmgloclst(6) as string
-		
 	GetGS
-	dmgID = GetSelected(_ListGameDamaged)
-	if dmgID = -1 then
-		MsgBox &quot;Please select a location to REPAIR.&quot;
-		exit sub
-	end if
-	dmgstr = GameForm.getByName(&quot;lstDamaged&quot;).StringItemList(dmgid)
 	
-	rtncd = MsgBox (&quot;REPAIR the &quot; &amp; dmgstr &amp; &quot;?&quot;,4)
-	if rtncd &lt;&gt; 6 then
-		exit sub
-	end if
-
 	&apos;find the actual location
 	for i = 1 to 8
 		if GameSheet.GetCellByPosition(_GalDmgCol, _GalDmgRow+i).string = dmgstr then
@@ -1635,8 +1623,28 @@ sub RepairGalactica
 		GameForm.getByName(&quot;btnRepairGalactica&quot;).enabled=FALSE
 	end if
 	LogThis dmgstr &amp; &quot; REPAIRED&quot;
-	Board_RefreshLocationDamage
+	Board_RefreshLocationDamage	
+end function &apos;RepairLocation
+
+sub RepairGalactica
+	dim dmgID, dmgcnt, rtncd, i,j as integer
+	dim dmgstr, tmpstr as string
+	dim dmgloclst(6) as string
+		
+	GetGS
+	dmgID = GetSelected(_ListGameDamaged)
+	if dmgID = -1 then
+		MsgBox &quot;Please select a location to REPAIR.&quot;
+		exit sub
+	end if
+	dmgstr = GameForm.getByName(&quot;lstDamaged&quot;).StringItemList(dmgid)
 	
+	rtncd = MsgBox (&quot;REPAIR the &quot; &amp; dmgstr &amp; &quot;?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	
+	RepairLocation dmgstr	
 	ShuffleDamage
 end sub		&apos;RepairGalactica
 
