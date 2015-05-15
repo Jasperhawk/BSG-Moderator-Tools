@@ -336,6 +336,7 @@ sub DeployCylonShips (crisisID as integer)
 
 	for i = 1 to 5
 		shipstr=CrisisSheet.getCellByPosition(_CrisisCol + _CrisisShipCol + i - 1, _CrisisRow + crisisID).string
+
 		if shipstr &lt;&gt; &quot;&quot; then
 			shipdeploy = ParseShipString(shipstr)
 			shipcount=ubound(shipdeploy)
