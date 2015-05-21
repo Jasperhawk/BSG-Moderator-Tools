@@ -487,7 +487,7 @@ function CardInHand (playerID as integer, cardNo as integer, optional stripped) 
 		handrow = _PlayerHandRow
 	end if
 
-	if IsMissing(stripped) then
+	if IsMissing(stripped) or stripped = FALSE then
 		CardInHand =SkillSheet.getCellByPosition(GetPlayerCol(playerID), handrow + cardNo - 1).string
 	else
 		CardInHand =StripColor(SkillSheet.getCellByPosition(GetPlayerCol(playerID), handrow + cardNo - 1).string)
@@ -844,6 +844,39 @@ sub CardSelected
 	end if
 end sub
 
+function RandomCardFromPlayer (player as integer) as integer
+	dim cardno as integer
+	GetSF
+	
+	cardno = Int(RND()* HandCardCnt(player))+1
+	&apos; We have to also copy this card to the clipboard (and warn the mod)
+	&apos; FALSE means we won&apos;t strip the color codes
+	CopyToClipboard(CardInHand(player,cardno,FALSE))
+
+	RandomCardFromPlayer = cardno
+end function
+
+sub DiscardRandomFromHand
+	dim player, srccol, srcrow, cardno, rtncd as integer
+	dim cardtext, tmplst() as string
+
+	GetSF
+	player = GetSelected(_ListSkillPlayers)
+	if player = -1 or IsPlayerDestiny(player) or IsPlayerSkillCheck(player) then
+		MsgBox &quot;Please select a player.&quot;
+		exit sub
+	end if
+	
+	rtncd = MsgBox(&quot;Discard a random card from &quot; &amp; GetPlayerName(player) &amp; &quot;&apos;s hand?&quot;, 4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+	cardno = RandomCardFromPlayer(player)
+	
+	msgbox GetPlayerName(player) &amp; &quot; discarded &quot; &amp; CardInHand(player, cardno, TRUE) &amp; &quot; (copied to clipboard)&quot;
+	RemoveFromHand player, cardno, FALSE
+end sub
+
 sub DiscardFromHand 
 	dim player, srccol, srcrow, cardno, rtncd as integer
 	dim cardtext, tmplst() as string
@@ -860,7 +893,7 @@ sub DiscardFromHand
 	elseif IsPlayerSkillCheck(player) then
 		player = _SkillCheckPlayerID
 	end if
-	
+
 	if GetPlayerName(player) &lt;&gt; &quot;Apollo&quot; or IsRevealed(player) then
 		cardNo	= GetSelected(_ListSkillCards)
 		if cardNo = -1 then
@@ -870,8 +903,9 @@ sub DiscardFromHand
 	else
 		rtncd = MsgBox (&quot;Should this discard for Apollo be random? (Headstrong)&quot;,4)
 		if rtncd = 6 then
-			cardno= Int(RND()* HandCardCnt(player))+1
-			Msgbox &quot;Apollo will discard: &quot; &amp; CardInHand(player,cardno,TRUE)
+			&apos;cardno= Int(RND()* HandCardCnt(player))+1
+			cardno = RandomCardFromPlayer(player)
+			Msgbox &quot;Apollo will discard: &quot; &amp; CardInHand(player,cardno,TRUE) &amp; &quot; (copied to clipboard)&quot;
 		else
 			cardNo= GetSelected(_ListSkillCards)
 			if cardNo = -1 then

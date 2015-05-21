@@ -686,7 +686,7 @@ sub NextTurn
 		MsgBox GetPlayerName(GetCurrentPlayer()) &amp; &quot; is in &quot; &amp; GetPlayerLoc(GetCurrentPlayer()) &amp; &quot; and only receives 1 card this turn.&quot;, 0, &quot;Sickness&quot;
 	elseif GetPlayerName(curmin) = &quot;Doral&quot; and IsInfiltrating(curmin) then
 		MsgBox &quot;Doral is Infiltrating and draws two extra cards instead of one.&quot;
-	elseif GetPlayerName(curmin) = &quot;Karl&quot; and not IsGalacticaLoc(GetPlayerLoc(curmin)) then
+	elseif GetPlayerName(curmin) = &quot;Karl&quot; and not IsRevealed(curmin) and not IsGalacticaLoc(GetPlayerLoc(curmin)) then
 		MsgBox &quot;Karl is not on Galactica and draws only 4 cards this turn.&quot;
 	else
 		if GameForm.getByName(&quot;chkAutoDraw&quot;).state = 1 then

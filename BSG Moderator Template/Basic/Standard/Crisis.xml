@@ -519,7 +519,8 @@ sub DiscardCurrentMission
 		exit sub
 	end if
 	
-	if CrisisSheet.getCellByPosition(_MissionStatusCol, refrow + crisisID).string = &quot;Passed&quot; then
+	if CrisisSheet.getCellByPosition(_MissionStatusCol, refrow + crisisID).string = &quot;Passed&quot; _
+					or CrisisSheet.getCellByPosition(_MissionDistanceCol, refrow + crisisID).string = &quot;&quot; then
 		CrisisSheet.getCellByPosition(refcol, refrow + crisisID).string = &quot;X&quot;
 	else
 		CrisisSheet.getCellByPosition(_MissionStatusCol, refrow + crisisID).string = &quot;&quot;
@@ -527,6 +528,7 @@ sub DiscardCurrentMission
 		CrisisSheet.getCellByPosition(_MissionCol, refrow + crisisID).CharColor = CrisisSheet.getCellByPosition(_MissionCol+1, refrow + crisisID).CharColor
 		CrisisSheet.getCellByPosition(_MissionCol+1, refrow + crisisID).string = &quot;&quot;
 		ShuffleMissionDeck FALSE
+		msgbox &quot;Since last Mission played had a distance marker and it failed, Mission deck was reshuffled&quot;
 	end if
 	SetMissionBtns TRUE
 end sub
@@ -2210,7 +2212,7 @@ sub DispatchMissionButton
 	mtitle = mtitle &amp; CrisisSheet.GetCellByPosition(_MissionValueCol, mrow).string
 	&apos; We use _SkillIDBaseMax instead of SkillBaseMax because there are no Missions that uses Treachery or Faith cards
 	for skillid = _SkillIDMin to _SkillIDBaseMax
-		tmpstr = CrisisSheet.getCellByPosition(_MissionSkillCol + skillID - 1, mrow).string
+		tmpstr = CrisisSheet.getCellByPosition(_MissionSkillCol + skillID, mrow).string
 		if tmpstr = &quot;X&quot; then
 			mtitle = mtitle &amp; skillcolors(skillid)
 		end if

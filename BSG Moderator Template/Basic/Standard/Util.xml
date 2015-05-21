@@ -45,6 +45,36 @@ const _PostAntRow		= 30
 const _GameThreadRow	= 20
 const _GameThreadCol	= 0
 
+&apos; Script to place a text on the clipboard
+global clipboard_string as string
+
+sub CopyToClipboard (byval s as string)
+	dim sc, xt, null as object
+	
+	sc = createUnoService (&quot;com.sun.star.datatransfer.clipboard.SystemClipboard&quot;)
+	xt = createUnoListener (&quot;clipboard_transferable_&quot;, &quot;com.sun.star.datatransfer.XTransferable&quot;)    
+	clipboard_string = s
+	sc.setcontents (xt, null)
+end sub
+
+function clipboard_transferable_getTransferData (df as com.sun.star.datatransfer.DataFlavor)
+	if (df.mimetype = &quot;text/plain;charset=utf-16&quot;) then
+		clipboard_transferable_getTransferData =  clipboard_string
+	end if
+end function
+
+function clipboard_transferable_getTransferDataFlavors
+	dim df as new com.sun.star.datatransfer.DataFlavor
+	df.mimetype = &quot;text/plain;charset=utf-16&quot;
+	df.humanpresentablename = &quot;Unicode-Text&quot;
+	clipboard_transferable_getTransferDataFlavors = array (df)
+end function
+
+function clipboard_transferable_isDataFlavorSupported (df as com.sun.star.datatransfer.DataFlavor) as boolean
+	clipboard_transferable_isDataFlavorSupported = (df.mimetype = &quot;text/plain;charset=utf-16&quot;)
+end function
+&apos; End of &quot;copy a string to clipboard&quot; functions
+
 function GetSelected (listid as integer) as integer
 	dim tmplst() as string
 	
