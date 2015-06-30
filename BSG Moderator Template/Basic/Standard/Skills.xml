@@ -104,7 +104,6 @@ sub GetSF
 	SkillSheet= ThisComponent.Sheets.getByName(&quot;Skill Cards&quot;)
 	SkillForm = SkillSheet.DrawPage.Forms.GetByName(&quot;DealCards&quot;)
 	SkillName= Array(&quot;&quot;,&quot;Politics&quot;,&quot;Leadership&quot;,&quot;Tactics&quot;,&quot;Piloting&quot;,&quot;Engineering&quot;,&quot;Treachery&quot;,&quot;Faith&quot;,&quot;Destiny&quot;)
-	Randomize
 end sub	&apos;GetSF
 
 function AreManipulateButtonsClear as boolean

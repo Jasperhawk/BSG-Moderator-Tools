@@ -90,8 +90,6 @@ sub GetGS
 	
 	GameSheet	= ThisComponent.Sheets.getByName(&quot;Game State&quot;)
 	GameForm	= GameSheet.DrawPage.Forms.GetByName(&quot;formGameState&quot;)
-
-	Randomize
 end sub
 
 sub PopulatePlayers
@@ -1444,7 +1442,6 @@ end sub
 sub RandomDieRoll
 	dim diesize as integer
 	GetGS
-	Randomize
 
 	diesize = GameSheet.GetCellByPosition(_DieRollCol,_DieRollRow).value
 	MsgBox &quot;Random # from 1 - &quot; &amp; diesize &amp; &quot; = &quot; &amp; Int(RND()*diesize)+1,0,&quot;Die Roll&quot;
@@ -2091,6 +2088,8 @@ sub Initialize_GameState
 	SetGamePhase _PhaseInSpace
 	if ObjectiveIsColony() then
 		GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow+3).string = &quot;Colony&quot;
+	elseif ObjectiveIsIonianEarth() then
+		GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow+3).string = &quot;Ionian Earth&quot;
 	elseif ObjectiveIsEarth() then
 		GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow+3).string = &quot;Earth&quot;
 	elseif ObjectiveIsNewCaprica() then

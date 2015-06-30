@@ -52,7 +52,6 @@ sub GetDestn
 	
 	DestnSheet= ThisComponent.Sheets.getByName(&quot;Destination Cards&quot;)
 	DestnForm = DestnSheet.DrawPage.Forms.GetByName(&quot;formDestination&quot;)
-	Randomize
 end sub
 
 function GetDestnBuryCnt as integer
