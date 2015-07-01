@@ -1346,7 +1346,7 @@ sub LaunchRaiders
 			end if
 		end if
 	next shipID
-	SetCrisisFlag(FALSE, TRUE)
+	SetCrisisFlag(FALSE, &quot;&quot;)
 	UpdateShips
 end sub &apos; LaunchRaiders
 
@@ -1432,7 +1432,7 @@ sub RaiderActivation
 			LogThis &quot;Raider moved from sector &quot; &amp; shipstatus &amp; &quot; to sector &quot; &amp; target
 		end if
 	next shipid
-	SetCrisisFlag(FALSE, TRUE)
+	SetCrisisFlag(FALSE, &quot;&quot;)
 	UpdateShips
 
 end sub &apos; RaiderActivation
@@ -1564,7 +1564,7 @@ sub HeavyActivation
 		end if
 	end if
 	
-	SetCrisisFlag(FALSE, TRUE)
+	SetCrisisFlag(FALSE, &quot;&quot;)
 	UpdateShips
 end sub &apos; HeavyActivation
 
