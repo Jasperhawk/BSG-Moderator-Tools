@@ -1090,13 +1090,14 @@ sub ReshuffleCrisis
 	SetCrisisBtns TRUE
 end sub
 
-sub ShuffleCrisisDeck (shuffleALL as boolean)
+sub ShuffleCrisisDeck (optional shuffleALL as boolean)
+    shuffleAll = true
 	dim tmpval, sortOrder(_MaxCrisisCnt) as double
-	dim tmpcrisis, crisislst(_MaxCrisisCnt) as variant
 	dim crisisdata(_CrisisColCnt) as variant
 	dim crisisID, i, j, topofdeck, endofdeck as integer
+	dim colors(_MaxCrisisCnt), tmpcolor as variant
 	GetCrisisSheet
-	&apos; to support Thirty-Three, we may need to reshuffle the deck mid-game, so find out where we are starting
+	' to support Thirty-Three, we may need to reshuffle the deck mid-game, so find out where we are starting
 	topofdeck=TopOfCrisisDeck()
 
 	if shuffleALL then
@@ -1104,42 +1105,39 @@ sub ShuffleCrisisDeck (shuffleALL as boolean)
 	else
 		endofdeck = CrisisCnt() - GetBuryCnt(_DeckCrisis)
 	end if
-	for crisisID = topofdeck to endofdeck
+	dim tmpcrisis, crisislst() as variant
+	for crisisID = 0 to endofdeck - topofdeck
 		sortOrder(crisisID) = rnd()	
+		colors(crisisId) = CrisisSheet.getCellByPosition(_CrisisCol, _CrisisRow + crisisID + topofdeck).CharColor
 		redim crisisdata(_CrisisColCnt) as variant
-		for i = 0 to _CrisisColCnt
-			crisisdata(i) = CrisisSheet.getCellByPosition(_CrisisCol + i, _CrisisRow + crisisID).string
-		next i
-		crisisdata(1) = CrisisSheet.getCellByPosition(_CrisisCol, _CrisisRow + crisisID).CharColor
-		crisislst(crisisID) = crisisdata()
 	next crisisID
+	crisislst = CrisisSheet.getCellRangeByPosition(_CrisisCol, _CrisisRow + topofdeck, _crisisCol + _CrisisColCnt, _CrisisRow + endofdeck).getDataArray()
 	
-	for i = topofdeck to endofdeck -1
-		for j=i+1 to endofdeck
-			if sortOrder(i) &gt; sortOrder(j) then
+	for i = 0 to endofdeck - topofdeck - 1
+		for j=i+1 to endofdeck - topofdeck
+			if sortOrder(i) > sortOrder(j) then
 				tmpval = sortOrder(i)
 				tmpcrisis = crisislst(i)
+				tmpcolor = colors(i)
 				
 				sortOrder(i) = sortOrder(j)
 				crisislst(i) = crisislst(j)
+				colors(i) = colors(j)
 				
 				sortOrder(j) = tmpval
 				crisislst(j) = tmpcrisis
+				colors(j) = tmpcolor
 			end if
 		next j
 	next i
 	
 	for crisisID = topofdeck to endofdeck
-		tmpcrisis = crisislst(crisisID)
-		CrisisSheet.getCellByPosition(_CrisisCol, _CrisisRow + crisisID).string = tmpcrisis(0)
-		CrisisSheet.getCellByPosition(_CrisisCol, _CrisisRow + crisisID).CharColor = tmpcrisis(1)
-		for i = 2 to _CrisisColCnt
-			CrisisSheet.getCellByPosition(_CrisisCol + i, _CrisisRow + crisisID).string = tmpcrisis(i)
-		next i
+		CrisisSheet.getCellByPosition(_CrisisCol, _CrisisRow + crisisID).CharColor = colors(crisisID - topofdeck)
 	next crisisID
+	CrisisSheet.getCellRangeByPosition(_CrisisCol, _CrisisRow + topofdeck, _crisisCol + _CrisisColCnt, _CrisisRow + endofdeck).setDataArray(crisislst)
 	
 	if shuffleALL then
-		SetBuryCnt(_DeckCrisis, TRUE) &apos;Not NC, Reset count.
+		SetBuryCnt(_DeckCrisis, TRUE) 'Not NC, Reset count.
 	end if
 
 end sub
