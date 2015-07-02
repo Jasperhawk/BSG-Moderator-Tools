@@ -37,6 +37,7 @@ const _KobolDistance			= 8
 const _NewCapricaDistance		= 7
 const _IonianNebulaDistance		= 8
 const _EarthDistance			= 10
+const _IonianEarthDistance		= 10
 const _CivilWarDistance			= 1
 const _ColonyDistance			= 7
 
@@ -503,6 +504,14 @@ sub HandleDistanceTriggers (optional legendary as boolean)
 			SetGamePhase _PhaseOnNewCaprica
 			SetDistanceTrigger(_DistanceTriggerEndgame)
 		end if		
+	elseif ObjectiveIsIonianEarth() then
+		if GetTotalDistance() &gt;=_IonianEarthDistance and not CheckDistanceTrigger(_DistanceTriggerEndgame) then
+			MsgBox &quot;We have reached the CROSSROADS! One more jump to Earth!&quot;
+			EnableDestButtons FALSE
+			DealCrossroads
+			BattleOfIonianNebula
+			SetDistanceTrigger(_DistanceTriggerEndgame)
+		end if
 	elseif ObjectiveIsIonianNebula() then
 		if GetTotalDistance() &gt;=_IonianNebulaDistance and not CheckDistanceTrigger(_DistanceTriggerEndgame) then
 			MsgBox &quot;We have reached the CROSSROADS!&quot;
