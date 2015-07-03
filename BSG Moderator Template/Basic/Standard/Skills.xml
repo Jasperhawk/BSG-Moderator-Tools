@@ -1199,7 +1199,11 @@ sub PlayFromHand
 					end if
 				end if
 			elseif IsDamaged(playerloc) then
-				RepairLocation(playerloc)
+				if IsPegasusLoc(playerloc) then
+					RepairPegasusLocation(playerloc)
+				else
+					RepairLocation(playerloc)
+				end if
 				MsgBox GetPlayerName(player) &amp; &quot; repaired the &quot; &amp; playerloc
 			else
 				rtncd = MsgBox (GetPlayerName(player) &amp; &quot; is not on a damaged location or Hangar. Use Repair anyway?&quot;, 4)

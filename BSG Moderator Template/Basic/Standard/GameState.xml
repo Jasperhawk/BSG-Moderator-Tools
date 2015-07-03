@@ -1620,6 +1620,7 @@ function RepairLocation (dmgstr as string)
 		GameForm.getByName(&quot;btnRepairGalactica&quot;).enabled=FALSE
 	end if
 	LogThis dmgstr &amp; &quot; REPAIRED&quot;
+	ShuffleDamage
 	Board_RefreshLocationDamage	
 end function &apos;RepairLocation
 
@@ -1642,7 +1643,6 @@ sub RepairGalactica
 	end if
 	
 	RepairLocation dmgstr	
-	ShuffleDamage
 end sub		&apos;RepairGalactica
 
 
@@ -1775,24 +1775,10 @@ sub DamagePegasus
 	end if
 end sub		&apos;DamagePegasus
 
-
-sub RepairPegasus
+function RepairPegasusLocation (dmgstr as string)
 	dim dmgID, dmgcnt, rtncd, i,j as integer
-	dim dmgstr, tmpstr as string
+	dim tmpstr as string
 	dim dmgloclst(4) as string
-		
-	GetGS
-	dmgID = GetSelected(_ListGameDamagedPeg)
-	if dmgID = -1 then
-		MsgBox &quot;Please select a location to REPAIR.&quot;
-		exit sub
-	end if
-	dmgstr = GameForm.getByName(&quot;lstDamagedPeg&quot;).StringItemList(dmgid)
-	
-	rtncd = MsgBox (&quot;REPAIR the &quot; &amp; dmgstr &amp; &quot;?&quot;,4)
-	if rtncd &lt;&gt; 6 then
-		exit sub
-	end if
 
 	&apos;find the actual location
 	for i = 1 to 4
@@ -1820,9 +1806,29 @@ sub RepairPegasus
 		GameForm.getByName(&quot;btnRepairPegasus&quot;).enabled=FALSE
 	end if
 	LogThis dmgstr &amp; &quot; REPAIRED&quot;
-	Board_RefreshLocationDamage
-	
 	ShuffleDamagePeg
+	Board_RefreshLocationDamage
+end function
+
+sub RepairPegasus
+	dim dmgID, dmgcnt, rtncd, i,j as integer
+	dim dmgstr, tmpstr as string
+	dim dmgloclst(4) as string
+		
+	GetGS
+	dmgID = GetSelected(_ListGameDamagedPeg)
+	if dmgID = -1 then
+		MsgBox &quot;Please select a location to REPAIR.&quot;
+		exit sub
+	end if
+	dmgstr = GameForm.getByName(&quot;lstDamagedPeg&quot;).StringItemList(dmgid)
+	
+	rtncd = MsgBox (&quot;REPAIR the &quot; &amp; dmgstr &amp; &quot;?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+
+	RepairPegasusLocation dmgstr	
 end sub		&apos;RepairPegasus
 
 
