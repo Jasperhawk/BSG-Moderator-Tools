@@ -157,7 +157,7 @@ sub SaveVersion
 	dispatcher.executeDispatch(document, &quot;.uno:Save&quot;, &quot;&quot;, 0, args1())
 end sub
 
-sub GenerateHandLists
+function GenerateHandLists
 	dim playerID, cardID, cardcnt, fileno as integer
 	dim player, card, handlimit, filename, gamethread, cardcolor as string
 	dim PostSheet, LoyaltySheet, CrisisSheet as object		&apos; This is the only function that uses the Posting Template tab, so we can leave it local.
@@ -327,5 +327,6 @@ sub GenerateHandLists
 		close #fileno
 		
 	next playerID
-end sub
+end function
+
 </script:module>

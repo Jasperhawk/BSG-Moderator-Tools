@@ -1375,10 +1375,13 @@ sub GalacticaReturns
 end sub &apos;GalacticaReturns
 
 
-sub SetJumpTrack (jumpstate as integer)
+sub SetJumpTrack (jumpstate as integer, optional initial as boolean)
 	GetGS
-	dim i as integer
+	dim i, rtncd as integer
 	dim jpstr as variant
+	if IsMissing(initial) then 
+		initial=FALSE
+	end if
 
 	GameSheet.GetCellByPosition(_JumpPrepCol+2, _JumpPrepRow+2).value = jumpstate
 
@@ -1393,6 +1396,13 @@ sub SetJumpTrack (jumpstate as integer)
 	SetCrisisFlag TRUE, &quot;&quot;
 	jpstr = Array(&quot;Start&quot;,&quot;Red 1&quot;,&quot;Red 2&quot;,&quot;Blue(-3)&quot;,&quot;Blue(-1)&quot;)	
 	LogThis &quot;Jump Prep track Set to &quot; &amp; jpstr(jumpstate)
+	
+	if IsMutineer(GetCurrentPlayer) and not initial then
+		rtncd = MsgBox(GetPlayerName(GetCurrentPlayer) &amp; &quot; is the Mutineer. Do you want to draw a Mutiny now?&quot;, 4, &quot;Mutineer&quot;)
+		if rtncd = 6 then
+			DrawMutiny(GetCurrentPlayer)
+		end if
+	end if
 end sub	&apos;SetJumpTrack
 
 
@@ -2048,7 +2058,7 @@ sub Initialize_GameState
 			GameSheet.GetCellByPosition(_JumpPrepCol+jumpstate, _JumpPrepRow).string = &quot;&quot;
 		end if
 	next jumpstate
-	SetJumpTrack 0
+	SetJumpTrack 0, TRUE
 	SetPursuitTrack 0
 
 	&apos; clear any damage and shuffle the Galactia Damage tokens
@@ -2683,4 +2693,18 @@ sub SetModuleFlags
 		GameSheet.getCellByPosition(_ModuleCol, _ModuleRow + _ModuleCCW).string = &quot;X&quot;
 	end if
 end sub
+
+sub SetDispatchButtons (state as boolean)
+	GetGS
+	
+	GameForm.getByName(&quot;btnDispatchSelected&quot;).enabled = state	
+	GameForm.getByName(&quot;btnDispatchAll&quot;).enabled = state
+end sub
+
+sub CreateHandList
+	SetDispatchButtons FALSE
+	GenerateHandLists
+	SetDispatchButtons TRUE
+end sub
+
 </script:module>
