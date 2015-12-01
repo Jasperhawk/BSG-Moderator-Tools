@@ -7,6 +7,7 @@
 
 import os
 import sys
+import multiprocessing
 if sys.version_info.major >= 3:
     import urllib.request as urllib2
     from urllib.parse import urlencode
@@ -231,7 +232,7 @@ def dispatch_all(*args):
     if not to_send:
         MessageBox(document, "Nothing new to send. Maybe you forgot to use Create Hand Lists?", "No files modified!", "infobox")
     else:
-        for p in to_send:
+        def send(p):
             # Now we finally try to send our files
             try:
                 gm = GeekMail(workdir=maindir)
@@ -240,6 +241,12 @@ def dispatch_all(*args):
                 dispatcherinfo.getCellByPosition(p['player_id']+4, 31).setString(p['md5'])
             except Exception as e:
                 MessageBox(document, e.message, "Alert!", "warningbox")
+        processes = []
+        n = 0
+        for player in to_send:
+            n += 1
+            processes.append(multiprocessing.Process(target=send, args=(player, )))
+            processes[-1].start()
             
         MessageBox(document, "Successfully sent the updated hands to: %s" % (", ".join([e['player'] for e in to_send])), "Success!", "infobox")
 
