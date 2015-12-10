@@ -537,7 +537,7 @@ end function
 	
 sub NextTurn
 	dim curmaj,curmin as integer
-	dim i, rtncd, playerid, cntr as integer
+	dim i, rtncd, playerid, cntr, skillid as integer
 	dim tmploc as string
 	
 	GetGS
@@ -675,6 +675,9 @@ sub NextTurn
 	
 	&apos; Check if we have to automatically Draw the current player hand or just enable the respective button
 	GetSF
+	&apos; Start by clearing up (setting to 0) the current player draw
+	ClearCPDrawnCount
+	
 	SkillForm.getByName(&quot;btnDrawCurrentPlayerHand&quot;).enabled = FALSE
 	if GetPlayerName(curmin) = &quot;Athena&quot; and IsHazardous(GetPlayerLoc(curmin)) then
 		MsgBox &quot;Athena is Grieving, and draws no cards this turn.&quot;
