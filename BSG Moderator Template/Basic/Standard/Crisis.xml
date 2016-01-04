@@ -111,8 +111,6 @@ sub GetCrisisSheet
 	
 	CrisisSheet= ThisComponent.Sheets.getByName(&quot;Crisis Cards&quot;)
 	CrisisForm = CrisisSheet.DrawPage.Forms.GetByName(&quot;formCrisis&quot;)
-
-	Randomize
 end sub
 
 function GetCrisisType (crisisID as integer) as integer

@@ -264,7 +264,7 @@
 				7 1 7 7 7 7 4 2 8 2 8 
 				5 4 9 
 				10 38 12 12 12 1 8 9
-				2 4 30 6 1 
+				2 5 30 6 1 
 				7 6 7 4 4 
 				12 14 6 6 32 6 
 				10 2 7 7 7 7
@@ -1473,11 +1473,11 @@
 ; 3 - Pegasus & NC           - DONE
 ; 4 - Base & CF & Kobol/IN - DONE
 ; 5 - Pegasus & CF & Kobol/IN - DONE
-; 6 - Pegasus & CF & NC - DONE (double-check this, it's not very pretty. )
-; 7 - Base & Earth
-; 8 - Base & CF & Earth
-; 9 - Pegasus & Earth
-; 10 - Pegasus & CF & Earth
+; 6 - Pegasus & CF & NC - DONE
+; 7 - Base & Earth - DONE
+; 8 - Base & CF & Earth - DONE
+; 9 - Pegasus & Earth - DONE
+; 10 - Pegasus & CF & Earth - DONE
 (let*
 	(
 		(destcnt 0)
@@ -1491,6 +1491,7 @@
 	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "FinalDest") 1)) (btoint (string=? objective "New Caprica")))
 	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "FinalDest") 2)) (btoint (string=? objective "Ionian Nebula")))
 	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "FinalDest") 3)) (btoint (string=? objective "Earth")))
+	(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "FinalDest") 4)) (btoint (string=? objective "Ionian Earth")))
 	;(gimp-drawable-set-visible (vector-ref mylayers (+ (p_getlayerpos "FinalDest") 4)) (btoint (string=? objective "Colony")))
 	
 	; Show or hide the Cylon Overlay, Pegasus & Treachery
@@ -1515,10 +1516,10 @@
 	; Do we need to add a Treachery deck slot if there's no Pegasus board? Probably.
 	
 	; Show or hide the Demetrius, Daybreak Rebel Basestar, Mission Deck, Mission Counter
-	(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "Demetrius" )) (btoint (string=? objective "Earth")))
-	(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "RebelBasestar" )) (btoint (string=? objective "Earth")))
-	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 6)) (btoint (string=? objective "Earth")))
-	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 8)) (btoint (string=? objective "Earth")))
+	(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "Demetrius" )) (btoint (or (string=? objective "Earth") (string=? objective "Ionian Earth"))))
+	(gimp-layer-set-visible (vector-ref mylayers (p_getlayerpos "RebelBasestar" )) (btoint (or (string=? objective "Earth") (string=? objective "Ionian Earth"))))
+	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CrisisCntr") 6)) (btoint (or (string=? objective "Earth") (string=? objective "Ionian Earth"))))
+	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "CrisisToken") 8)) (btoint (or (string=? objective "Earth") (string=? objective "Ionian Earth"))))
 	
 	; Show or hide the Faith Counter and deck placement layer
 	(gimp-layer-set-visible (vector-ref mylayers (+ (p_getlayerpos "TreacheryDeck") 1)) (btoint useRev))
@@ -1600,7 +1601,7 @@
 	)
 
 ; 1 - Main Game Board only - no Pegasus, no CFB, no New Caprica, Earth, or Colony, no CCW. Decks on the left, MGB in the middle, characters on the right.
-	(when (not (or usePeg useCF (string=? objective "Earth")))
+	(when (not (or usePeg useCF (or (string=? objective "Earth") (string=? objective "Ionian Earth"))))
 (logit "ConfigureBoard 1 - Main Game Board only")
 		
 		; Move the turn indicator to the right.
@@ -1701,7 +1702,7 @@
 	); when Base + Kobol/IN
 
 ; 2 - Main Game Board and either 2 or fewer small (Peg, NC, Demetrius, RBB, Colony) boards or the CFB. If it's the CFB, we'll need to move it down.
-	(when (and usePeg (not useCF) (not (or (string=? objective "New Caprica") (string=? objective "Earth") (string=? objective "Colony"))))
+	(when (and usePeg (not useCF) (not (or (string=? objective "New Caprica") (string=? objective "Earth") (string=? objective "Ionian Earth") (string=? objective "Colony"))))
 (logit "ConfigureBoard  2 - MGB and Pegasus board")
 		
 	); when Pegasus & Kobol/IN
@@ -1714,7 +1715,7 @@
 	);when Pegasus & NC
 
 ; 4 - Base & CF & Kobol/IN
-	(when (and (not usePeg) useCF (not (or (string=? objective "New Caprica") (string=? objective "Earth"))))
+	(when (and (not usePeg) useCF (not (or (string=? objective "New Caprica") (string=? objective "Earth") (string=? objective "Ionian Earth"))))
 (logit "ConfigureBoard 4 - Base & CF & Kobol/IN")
 		; move the Cylon Fleet down
 		(gimp-layer-set-offsets (vector-ref mylayers (p_getlayerpos "CylonFleet"))  
@@ -1731,7 +1732,7 @@
 	);when Base & CF & Kobol/IN
 	
 ; 5 - Pegasus & CF & Kobol/IN
-	(when (and usePeg useCF (not (or (string=? objective "New Caprica") (string=? objective "Earth") (string=? objective "Colony")))) ; Add a check against CCW here as well. This is strictly Peg + CFB, nothing else.
+	(when (and usePeg useCF (not (or (string=? objective "New Caprica") (string=? objective "Earth") (string=? objective "Ionian Earth") (string=? objective "Colony")))) ; Add a check against CCW here as well. This is strictly Peg + CFB, nothing else.
 (logit "ConfigureBoard 5 - MGB, Pegasus, and Cylon Fleet boards")
 		; Need a left border - extend the image width by 250, justify all the existing data to the right
 		(gimp-image-resize image (+ (car (gimp-image-width image)) 250) (car  (gimp-image-height image)) 250 0)
@@ -1895,7 +1896,7 @@
 );when Peg & CF & New Caprica
 
 ; 7 - Base & Earth
-	(when (and (not usePeg) (not useCF) (string=? objective "Earth"))
+	(when (and (not usePeg) (not useCF) (or (string=? objective "Earth") (string=? objective "Ionian Earth")))
 		(logit "ConfigureBoard 7 - Base & Earth")
 		
 		; Move Objective, Distance information.
@@ -1963,7 +1964,7 @@
 	);when Base & Earth
 
 ; 8 - CF & Earth (Why would ANYONE play like this?!?)
-	(when (and (not usePeg) useCF (string=? objective "Earth"))
+	(when (and (not usePeg) useCF (or (string=? objective "Earth") (string=? objective "Ionian Earth")))
 		(logit "ConfigureBoard 8 - Base & CF & Earth")
 
 		; Move Objective, Distance information.
@@ -2073,7 +2074,7 @@
 	);  when CF & Earth
 
 ; 9 - Pegasus & Earth
-	(when (and usePeg (not useCF) (string=? objective "Earth")) ; Used only for Pegasus and Earth, without CF
+	(when (and usePeg (not useCF) (or (string=? objective "Earth") (string=? objective "Ionian Earth"))) ; Used only for Pegasus and Earth, without CF
 		(logit "ConfigureBoard 9 - Base, Pegasus & Earth")
 		; Need a left border - extend the image width by 250, justify all the existing data to the right
 		(gimp-image-resize image (+ (car (gimp-image-width image)) 250) (car  (gimp-image-height image)) 250 0)
@@ -2118,7 +2119,7 @@
 	);  when Peg & Earth
 
 ; 10 - Pegasus & CF & Earth (The whole deal)
-	(when (and usePeg useCF (string=? objective "Earth"))
+	(when (and usePeg useCF (or (string=? objective "Earth") (string=? objective "Ionian Earth")))
 		(logit "ConfigureBoard 10 - Base & Pegasus & CF & Earth")
 
 		; Need a left border - extend the image width by 250, justify all the existing data to the right

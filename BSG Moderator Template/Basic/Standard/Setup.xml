@@ -15,6 +15,7 @@ const _ObjectiveNewCaprica 		= 1
 const _ObjectiveIonianNebula 	= 2
 const _ObjectiveEarth			= 3
 const _ObjectiveColony 			= 4
+const _ObjectiveIonianEarth		= 5
 
 const _SympathizerNONE 		= 0
 const _Sympathizer 			= 1
@@ -171,11 +172,15 @@ function ObjectiveIsKobol as boolean
 end function
 
 function ObjectiveIsIonianNebula as boolean
-	ObjectiveIsIonianNebula = (GetObjective() = _ObjectiveIonianNebula)
+	ObjectiveIsIonianNebula = (GetObjective() = _ObjectiveIonianNebula or GetObjective() = _ObjectiveIonianEarth)
 end function
 
 function ObjectiveIsEarth as boolean
-	ObjectiveIsEarth	= (GetObjective() = _ObjectiveEarth)
+	ObjectiveIsEarth	= (GetObjective() = _ObjectiveEarth or GetObjective() = _ObjectiveIonianEarth)
+end function
+
+function ObjectiveIsIonianEarth as boolean
+	ObjectiveIsIonianEarth	= (GetObjective() = _ObjectiveIonianEarth)
 end function
 
 function ObjectiveIsColony as boolean
@@ -628,6 +633,9 @@ sub Step3Complete
 	if GameTypeIsRevelations then
 &apos;		grpOpt(_ObjectiveColony).enabled 		= TRUE
 	end if
+	if GameTypeIsDaybreak and GameTypeIsExodus then
+		grpOpt(_ObjectiveIonianEarth).enabled	= TRUE
+	end if
 
 	&apos; Set up Sympathizer/Cylon Leader options
 	if ((PlayerCnt() = 4 or PlayerCnt() = 6) and NOT HasLeader()) or (GameTypeIsDaybreak and (PlayerCnt = 5 or PlayerCnt = 7) and HasLeader) then
@@ -701,12 +709,18 @@ sub Initialize_Game
 	if VariantFlaws() and UsePersonalGoals() then
 		MsgBox(&quot;It is not recommended to use both Flaws and Personal Goals in the same game.&quot;)
 	end if
-		
+	
 	&apos; oh, and you need to confirm a couple of times...
 	rtncd = MsgBox (&quot;Do you really want to Initialize the game?&quot;,4,&quot;COMPLETE SETUP&quot;)
 	if rtncd &lt;&gt; 6 then
 		exit sub
 	end if
+	
+	&apos; I&apos;ve read this is necessary to circumvent this crappy RNG
+	Randomize
+	RND
+	RND
+	RND
 	
 	SetInitFlag TRUE
 	

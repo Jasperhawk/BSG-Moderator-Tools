@@ -65,7 +65,6 @@ sub GetShipSheet
 	ShipForm = ShipSheet.DrawPage.Forms.GetByName(&quot;formShips&quot;)
 
 	PopulateShipLoc
-	Randomize
 end sub
 
 

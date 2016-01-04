@@ -385,8 +385,13 @@ end sub &apos;Initialize_IonianNebula
 
 sub UpdateTTTargetList
 	dim targetlist(3), target as string
-	dim ally, allyID as integer
+	dim ally, allyID, totdist as integer
 	GetIonNeb
+	
+	totdist = 8
+	if ObjectiveIsIonianEarth then
+		totdist = 10
+	end if
 	
 	if GetTotalDistance() &lt; 8 then
 		for ally = 1 to 3

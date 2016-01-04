@@ -77,6 +77,7 @@ const _SkillSetReckless	= 5
 const _PlayerDrawnRow		= 147
 const _SkillCheckNeedsRow 	= 154
 const _DieRollNeedsRow		= _SkillCheckNeedsRow + 1
+const _CPDrawnRow			= 162
 
 global const _SkillIDPolitics		= 1
 global const _SkillIDMin			= _SkillIDPolitics
@@ -104,7 +105,6 @@ sub GetSF
 	SkillSheet= ThisComponent.Sheets.getByName(&quot;Skill Cards&quot;)
 	SkillForm = SkillSheet.DrawPage.Forms.GetByName(&quot;DealCards&quot;)
 	SkillName= Array(&quot;&quot;,&quot;Politics&quot;,&quot;Leadership&quot;,&quot;Tactics&quot;,&quot;Piloting&quot;,&quot;Engineering&quot;,&quot;Treachery&quot;,&quot;Faith&quot;,&quot;Destiny&quot;)
-	Randomize
 end sub	&apos;GetSF
 
 function AreManipulateButtonsClear as boolean
@@ -624,6 +624,10 @@ Sub DealCard(destplayer as integer, srcskill as integer)
 		AddSkillCardTo _SkillSetHand, cardtxt, destplayer
 		Skillsheet.getCellByPosition(GetPlayerCol(destPlayer), _PlayerDrawnRow + srcskill).string = &quot;X&quot;
 		LogThis GetPlayerName(Destplayer) &amp; &quot; receives &quot; &amp; cardtxt
+		if GetCurrentPlayer = Destplayer then
+			&apos; Let&apos;s count the draws for the current player
+			Skillsheet.getCellByPosition(srcskill - 1, _CPDrawnRow).value = Skillsheet.getCellByPosition(srcskill - 1, _CPDrawnRow).value + 1
+		end if
 	end if
 
 	if SkillCardCnt(srcskill) = 0 then
@@ -717,7 +721,7 @@ sub UndealSkill
 		exit sub
 	end if
 
-	cardNo= GetSelected(_ListSkillCards)
+	cardNo = GetSelected(_ListSkillCards)
 	if cardNo = -1 then
 		MsgBox &quot;Please select a card to undeal.&quot;,0,&quot;Undeal a Card&quot;
 		exit sub
@@ -731,6 +735,10 @@ sub UndealSkill
 	end if
 	
 	AddSkillCardTo _SkillSetDeck, GetSkillCardFrom(_SkillSetHand, player, cardNo)
+	if GetCurrentPlayer = player then
+		&apos; We remove this from the current player&apos;s draw count
+		Skillsheet.getCellByPosition(SkillIDFromText(cardtext) - 1, _CPDrawnRow).value = Skillsheet.getCellByPosition(SkillIDFromText(cardtext) - 1, _CPDrawnRow).value - 1
+	end if
 	
 	CompressSkillCards _SkillSetHand, player
 	ShuffleASkillDeck SkillIDFromText(cardtext)
@@ -1200,7 +1208,11 @@ sub PlayFromHand
 					end if
 				end if
 			elseif IsDamaged(playerloc) then
-				RepairLocation(playerloc)
+				if IsPegasusLoc(playerloc) then
+					RepairPegasusLocation(playerloc)
+				else
+					RepairLocation(playerloc)
+				end if
 				MsgBox GetPlayerName(player) &amp; &quot; repaired the &quot; &amp; playerloc
 			else
 				rtncd = MsgBox (GetPlayerName(player) &amp; &quot; is not on a damaged location or Hangar. Use Repair anyway?&quot;, 4)
@@ -1954,7 +1966,7 @@ sub PlayCardIntoCrisis (cardtext as string)
 end sub		&apos;PlayCardIntoCrisis
 
 sub Initialize_SkillCards
-	dim playerid, cardno, srcrow, skillid, flagid as integer
+	dim playerid, cardno, srcrow, skillid, flagid, i as integer
 	dim cardtxt as string
 
 	EnableCommandAuthority FALSE
@@ -1990,11 +2002,24 @@ sub Initialize_SkillCards
 	&apos; Clear &quot;Lee Played an XO&quot; marker
 	SkillSheet.getCellByPosition(_LeePlayedXOCol, _LeePlayedXORow).string = &quot;&quot;
 	
+	&apos; Clear current player drawn count
+	ClearCPDrawnCount
+	
 	SetCurrentTask(&quot;Dealing Destiny&quot;)
 	DealDestiny
 	SetCurrentTask(&quot;Populating Skill Check Lists&quot;)
 	Populate_SkillCheckList
 end sub	&apos;Initialize_SkillCards
+
+function ClearCPDrawnCount
+	dim i as integer
+	GetSF
+	
+	for i = _SkillIDMin to _SkillIDMax
+		&apos; Index starts on 0, so we have use i-1
+		Skillsheet.getCellByPosition(i - 1, _CPDrawnRow).value = 0
+	next i
+end function
 
 function GetPlyrDrawDisplay (playerID as integer) as string
 	dim cards as variant

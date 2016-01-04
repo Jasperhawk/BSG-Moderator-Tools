@@ -90,8 +90,6 @@ sub GetGS
 	
 	GameSheet	= ThisComponent.Sheets.getByName(&quot;Game State&quot;)
 	GameForm	= GameSheet.DrawPage.Forms.GetByName(&quot;formGameState&quot;)
-
-	Randomize
 end sub
 
 sub PopulatePlayers
@@ -539,7 +537,7 @@ end function
 	
 sub NextTurn
 	dim curmaj,curmin as integer
-	dim i, rtncd, playerid, cntr as integer
+	dim i, rtncd, playerid, cntr, skillid as integer
 	dim tmploc as string
 	
 	GetGS
@@ -677,6 +675,9 @@ sub NextTurn
 	
 	&apos; Check if we have to automatically Draw the current player hand or just enable the respective button
 	GetSF
+	&apos; Start by clearing up (setting to 0) the current player draw
+	ClearCPDrawnCount
+	
 	SkillForm.getByName(&quot;btnDrawCurrentPlayerHand&quot;).enabled = FALSE
 	if GetPlayerName(curmin) = &quot;Athena&quot; and IsHazardous(GetPlayerLoc(curmin)) then
 		MsgBox &quot;Athena is Grieving, and draws no cards this turn.&quot;
@@ -1377,10 +1378,13 @@ sub GalacticaReturns
 end sub &apos;GalacticaReturns
 
 
-sub SetJumpTrack (jumpstate as integer)
+sub SetJumpTrack (jumpstate as integer, optional initial as boolean)
 	GetGS
-	dim i as integer
+	dim i, rtncd as integer
 	dim jpstr as variant
+	if IsMissing(initial) then 
+		initial=FALSE
+	end if
 
 	GameSheet.GetCellByPosition(_JumpPrepCol+2, _JumpPrepRow+2).value = jumpstate
 
@@ -1395,6 +1399,13 @@ sub SetJumpTrack (jumpstate as integer)
 	SetCrisisFlag TRUE, &quot;&quot;
 	jpstr = Array(&quot;Start&quot;,&quot;Red 1&quot;,&quot;Red 2&quot;,&quot;Blue(-3)&quot;,&quot;Blue(-1)&quot;)	
 	LogThis &quot;Jump Prep track Set to &quot; &amp; jpstr(jumpstate)
+	
+	if IsMutineer(GetCurrentPlayer) and not initial then
+		rtncd = MsgBox(GetPlayerName(GetCurrentPlayer) &amp; &quot; is the Mutineer. Do you want to draw a Mutiny now?&quot;, 4, &quot;Mutineer&quot;)
+		if rtncd = 6 then
+			DrawMutiny(GetCurrentPlayer)
+		end if
+	end if
 end sub	&apos;SetJumpTrack
 
 
@@ -1444,7 +1455,6 @@ end sub
 sub RandomDieRoll
 	dim diesize as integer
 	GetGS
-	Randomize
 
 	diesize = GameSheet.GetCellByPosition(_DieRollCol,_DieRollRow).value
 	MsgBox &quot;Random # from 1 - &quot; &amp; diesize &amp; &quot; = &quot; &amp; Int(RND()*diesize)+1,0,&quot;Die Roll&quot;
@@ -1623,6 +1633,7 @@ function RepairLocation (dmgstr as string)
 		GameForm.getByName(&quot;btnRepairGalactica&quot;).enabled=FALSE
 	end if
 	LogThis dmgstr &amp; &quot; REPAIRED&quot;
+	ShuffleDamage
 	Board_RefreshLocationDamage	
 end function &apos;RepairLocation
 
@@ -1645,7 +1656,6 @@ sub RepairGalactica
 	end if
 	
 	RepairLocation dmgstr	
-	ShuffleDamage
 end sub		&apos;RepairGalactica
 
 
@@ -1778,24 +1788,10 @@ sub DamagePegasus
 	end if
 end sub		&apos;DamagePegasus
 
-
-sub RepairPegasus
+function RepairPegasusLocation (dmgstr as string)
 	dim dmgID, dmgcnt, rtncd, i,j as integer
-	dim dmgstr, tmpstr as string
+	dim tmpstr as string
 	dim dmgloclst(4) as string
-		
-	GetGS
-	dmgID = GetSelected(_ListGameDamagedPeg)
-	if dmgID = -1 then
-		MsgBox &quot;Please select a location to REPAIR.&quot;
-		exit sub
-	end if
-	dmgstr = GameForm.getByName(&quot;lstDamagedPeg&quot;).StringItemList(dmgid)
-	
-	rtncd = MsgBox (&quot;REPAIR the &quot; &amp; dmgstr &amp; &quot;?&quot;,4)
-	if rtncd &lt;&gt; 6 then
-		exit sub
-	end if
 
 	&apos;find the actual location
 	for i = 1 to 4
@@ -1823,9 +1819,29 @@ sub RepairPegasus
 		GameForm.getByName(&quot;btnRepairPegasus&quot;).enabled=FALSE
 	end if
 	LogThis dmgstr &amp; &quot; REPAIRED&quot;
-	Board_RefreshLocationDamage
-	
 	ShuffleDamagePeg
+	Board_RefreshLocationDamage
+end function
+
+sub RepairPegasus
+	dim dmgID, dmgcnt, rtncd, i,j as integer
+	dim dmgstr, tmpstr as string
+	dim dmgloclst(4) as string
+		
+	GetGS
+	dmgID = GetSelected(_ListGameDamagedPeg)
+	if dmgID = -1 then
+		MsgBox &quot;Please select a location to REPAIR.&quot;
+		exit sub
+	end if
+	dmgstr = GameForm.getByName(&quot;lstDamagedPeg&quot;).StringItemList(dmgid)
+	
+	rtncd = MsgBox (&quot;REPAIR the &quot; &amp; dmgstr &amp; &quot;?&quot;,4)
+	if rtncd &lt;&gt; 6 then
+		exit sub
+	end if
+
+	RepairPegasusLocation dmgstr	
 end sub		&apos;RepairPegasus
 
 
@@ -2045,7 +2061,7 @@ sub Initialize_GameState
 			GameSheet.GetCellByPosition(_JumpPrepCol+jumpstate, _JumpPrepRow).string = &quot;&quot;
 		end if
 	next jumpstate
-	SetJumpTrack 0
+	SetJumpTrack 0, TRUE
 	SetPursuitTrack 0
 
 	&apos; clear any damage and shuffle the Galactia Damage tokens
@@ -2091,6 +2107,8 @@ sub Initialize_GameState
 	SetGamePhase _PhaseInSpace
 	if ObjectiveIsColony() then
 		GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow+3).string = &quot;Colony&quot;
+	elseif ObjectiveIsIonianEarth() then
+		GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow+3).string = &quot;Ionian Earth&quot;
 	elseif ObjectiveIsEarth() then
 		GameSheet.GetCellByPosition(_GamePhaseTextCol,_GamePhaseTextRow+3).string = &quot;Earth&quot;
 	elseif ObjectiveIsNewCaprica() then
@@ -2678,4 +2696,18 @@ sub SetModuleFlags
 		GameSheet.getCellByPosition(_ModuleCol, _ModuleRow + _ModuleCCW).string = &quot;X&quot;
 	end if
 end sub
+
+sub SetDispatchButtons (state as boolean)
+	GetGS
+	
+	GameForm.getByName(&quot;btnDispatchSelected&quot;).enabled = state	
+	GameForm.getByName(&quot;btnDispatchAll&quot;).enabled = state
+end sub
+
+sub CreateHandList
+	SetDispatchButtons FALSE
+	GenerateHandLists
+	SetDispatchButtons TRUE
+end sub
+
 </script:module>

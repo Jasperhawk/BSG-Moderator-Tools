@@ -61,7 +61,6 @@ sub GetLoyalty
 	
 	LoyaltySheet= ThisComponent.Sheets.getByName(&quot;Loyalty&quot;)
 	LoyaltyForm = LoyaltySheet.DrawPage.Forms.GetByName(&quot;formLoyalty&quot;)
-	Randomize
 end sub
 
 function PlayerLoyaltyCol (playerID as integer) as integer
