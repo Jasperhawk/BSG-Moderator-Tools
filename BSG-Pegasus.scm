@@ -1332,8 +1332,8 @@
 						(0 500) (230 210) (400 210) (650 500) (400 680) (230 680))	; Heavy
 			#( (40 700) (510 510) (820 510) (1370 690) (830 1340) (510 1340) 
 				(10 430) (250 150) (420 150) (610 430) (420 620) (250 620))			; Raider
-			#( (30 1165) (580 640) (825 640) (1360 1155) (820 1260) (500 1260)) 	; Viper
-			#( (30 1225) (390 645) (825 710) (1360 1215) (820 1320) (500 1320)) 	; MkVII
+			#( (30 1165) (600 640) (825 640) (1360 1155) (820 1260) (500 1260)) 	; Viper
+			#( (30 1225) (420 645) (825 710) (1360 1215) (820 1320) (500 1320)) 	; MkVII
 			#( (5 600) (440 520) (760 520) (1300 690) (760 1340) (440 1340)) 		; Scar
 			#( (30 1225) (265 640) (1010 600) (1360 1215) (820 1320) (500 1320))	)	; Assault Raptor - Originally from MkVII, but tweaked extensively
 		)
@@ -1373,8 +1373,8 @@
 
 		(gimp-drawable-set-visible (vector-ref mylayers cntpos) TRUE)		; Enable the count layer.
 		(if (> sector 6)
-			(set! shiptextoffset (* (vector-ref #(130 100 120 120 0 120) shiptype) imgscale))		; Grab the offset of the text.
-			(set! shiptextoffset (vector-ref #(130 100 120 120 0 120) shiptype))					; Scale the offset for the CFB
+			(set! shiptextoffset (* (vector-ref #(130 100 110 120 0 110) shiptype) imgscale))		; Grab the offset of the text.
+			(set! shiptextoffset (vector-ref #(130 100 110 120 0 110) shiptype))					; Scale the offset for the CFB
 		)
 		(gimp-layer-set-offsets (vector-ref mylayers cntpos) (+ (car myloc) shiptextoffset boardoffsetX) (+ (cadr myloc) boardoffsetY))	; Move the Couter to the right spot
 		(gimp-text-layer-set-text (vector-ref mylayers cntpos) (string-append "x" (number->string shipcnt)))							; And set the text (xN).
