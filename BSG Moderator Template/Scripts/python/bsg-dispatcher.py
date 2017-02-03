@@ -3,20 +3,11 @@
 
 # BSG Moderator Tools (JasperHawk) Dispatcher
 
-from __future__ import unicode_literals
+#from __future__ import unicode_literals
 
 import os
 import sys
-import socket
-import tempfile
 import threading
-import subprocess
-# from com.sun.star.awt import Rectangle
-from com.sun.star.awt import WindowDescriptor
-from com.sun.star.awt.WindowClass import MODALTOP
-# from com.sun.star.awt.VclWindowPeerAttribute import OK, OK_CANCEL, YES_NO, YES_NO_CANCEL, RETRY_CANCEL, DEF_OK, DEF_CANCEL, DEF_RETRY, DEF_YES, DEF_NO
-from com.sun.star.awt.VclWindowPeerAttribute import OK, YES_NO
-
 if sys.version_info.major >= 3:
     import urllib.request as urllib2
     from urllib.parse import urlencode
@@ -30,9 +21,15 @@ else:  # python2
     reload(sys)
     sys.setdefaultencoding("UTF-8")
 
+from pprint import pprint as pp
+
+from com.sun.star.awt import Rectangle
+from com.sun.star.awt import WindowDescriptor
+from com.sun.star.awt.WindowClass import MODALTOP
+from com.sun.star.awt.VclWindowPeerAttribute import OK, OK_CANCEL, YES_NO, YES_NO_CANCEL, RETRY_CANCEL, DEF_OK, DEF_CANCEL, DEF_RETRY, DEF_YES, DEF_NO
+
 if sys.version_info < (2, 7):
     raise Exception('We need python 2.7, sorry')
-
 
 def MessageBox(Document, MsgText, MsgTitle, MsgType="messbox", MsgButtons=OK):
     ParentWin = Document.CurrentController.Frame.ContainerWindow
@@ -63,7 +60,6 @@ def MessageBox(Document, MsgText, MsgTitle, MsgType="messbox", MsgButtons=OK):
 
     return msgbox.execute()
 
-
 class GeekMail(object):
     def __init__(self, username=None, password=None, workdir=None):
 
@@ -78,26 +74,14 @@ class GeekMail(object):
             except:
                 raise Exception('Invalid credential file - check bgguser.txt')
 
-        if hasattr(socket, 'ssl'):
-            # This Python version supports SSL
-            self.loginurl = "https://www.boardgamegeek.com/login"
-            self.msgurl = "https://boardgamegeek.com/geekmail_controller.php"
-            self.cj = CookieJar()
-            self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.cj))
-            self.opener.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_3) AppleWebKit/602.4.2 (KHTML, like Gecko) Version/10.0.3 Safari/602.4.2')]
-            urllib2.install_opener(self.opener)
+        self.loginurl = "https://www.boardgamegeek.com/login"
+        self.msgurl = "https://boardgamegeek.com/geekmail_controller.php"
+        self.cj = CookieJar()
+        self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.cj))
+        self.opener.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_3) AppleWebKit/602.4.2 (KHTML, like Gecko) Version/10.0.3 Safari/602.4.2')]
+        urllib2.install_opener(self.opener)
 
-            self.authenticate()
-        else:
-            # If it doesn't, then we're in a lot of trouble
-            # First, we don't authenticate. Then, we have to search for a Python interpreter
-            # Get the executable path (from openoffice/libreoffice), split it, and search for a python.exe there
-            sofficepath = os.path.split(sys.executable)[0]
-            pexec = os.path.join(sofficepath, 'python.exe')
-            if not os.path.exists(pexec):
-                raise Exception("Your OpenOffice Python macro does not support SSL and I couldn't find an alternative. Sorry.")
-            self.pexec = pexec
-            self.workdir = workdir
+        self.authenticate()
 
     def authenticate(self):
         data = urlencode({'lasturl': '/', 'username': self.username, 'password': self.password, 'B1': 'Submit'})
@@ -111,36 +95,22 @@ class GeekMail(object):
     def dispatch_text(self, bgguser, subject, body):
         subject = clean_str(subject)
         body = clean_str(body)
-        if hasattr(socket, 'ssl'):
-            data = urlencode({
-                'action': 'save',
-                'B1': "Send",
-                'savecopy': '1',
-                'sizesel': '10',
-                'folder': 'inbox',
-                'ajax': '1',
-                'searchid': '0',
-                'pageID': '0',
-                'messageid': '',
-                'touser': bgguser,
-                'subject': subject,
-                'body': body})
+        data = urlencode({
+            'action': 'save',
+            'B1': "Send",
+            'savecopy': '1',
+            'sizesel': '10',
+            'folder': 'inbox',
+            'ajax': '1',
+            'searchid': '0',
+            'pageID': '0',
+            'messageid': '',
+            'touser': bgguser,
+            'subject': subject,
+            'body': body })
 
-            response = self.opener.open(self.msgurl, data.encode())
-            content = response.read()
-        else:
-            # We're dealing with a platform without SSL support. We'll have to use a subprocess
-            fsock = tempfile.NamedTemporaryFile(delete=False)
-            fsock.write("\n".join((self.username, self.password, bgguser, subject, body)).encode())
-            fsock.flush()
-            fsock.close()
-
-            command = '"%s" "%s" "%s"' % (self.pexec, os.path.join(self.workdir, 'dispatch.py'), fsock.name)
-            status = subprocess.call(command)
-            os.unlink(fsock.name)  # Remove the temporary file, obviously
-            print(command)
-            if status:
-                raise Exception("Dispatcher script returned code %s" % status)
+        response = self.opener.open(self.msgurl, data.encode())
+        content = response.read()
 
     def dispatch_file(self, bgguser, filename):
         f = clean_str(open(filename, 'r').read())
@@ -148,26 +118,21 @@ class GeekMail(object):
 
         self.dispatch_text(bgguser, subject, body)
 
-
 def clean_str(fs):
-    # Openoffice on Windows does something VERY weird. Not gonna waste my time, but I'll do something weird
-    fs = fs.decode('utf-8', 'ignore').encode('utf-8')
     # fs = fs.replace('→', '->')
     fs = fs.replace('\r\n', '\n').strip()
+    # fs = fs.decode('utf-8').encode('ascii', 'ignore')
     return fs
-
 
 def calculate_md5(contents):
     pmd5 = md5.md5()
     pmd5.update(contents.encode('utf-8'))
     return pmd5.hexdigest()
 
-
 def get_md5(playerfile):
     # Calculate the MD5 so we don't re-send a file if nothing has changed
     subject, body = clean_str(open(playerfile, 'r').read()).split('\n', 1)
     return calculate_md5(body)
-
 
 def dispatch_selected(*args):
     """BGG BSG Function to dispatch a single user hand"""
@@ -261,30 +226,33 @@ def dispatch_all(*args):
     if not to_send:
         MessageBox(document, "Nothing new to send. Maybe you forgot to use Create Hand Lists?", "No files modified!", "infobox")
     else:
-        gm = GeekMail(workdir=maindir)
-
         def send(p):
             # Now we finally try to send our files
             try:
+                gm = GeekMail(workdir=maindir)
                 gm.dispatch_file(p['player'], p['playerfile'])
                 # Set the current MD5 on the spreadsheet (so that we only send it again after something is changed)
                 dispatcherinfo.getCellByPosition(p['player_id']+4, 31).setString(p['md5'])
             except Exception as e:
                 MessageBox(document, e.message, "Alert!", "warningbox")
-
         processes = []
+        n = 0
         for player in to_send:
-            thread = threading.Thread(target=send, args=(player, ))
-            thread.start()
-            processes.append(thread)
+            n += 1
+            processes.append(threading.Thread(target=send, args=(player, )))
+            processes[-1].start()
+
+        for process in processes:
+            # They all run in parallel (ok, GIL-parallel, but since we're waiting on I/O...)
+            # So we need to check if each of them has ended
+            process.join()
 
         MessageBox(document, "Successfully sent the updated hands to: %s" % (", ".join([e['player'] for e in to_send])), "Success!", "infobox")
-
 
 def dispatcher_call(*args):
     """BGG BSG Function to dispatch a generic message via GeekMail"""
     document = XSCRIPTCONTEXT.getDocument()
-    maindir = urllib2.url2pathname(os.path.dirname(document.Location.replace("file://", "")))
+    maindir = urllib2.url2pathname(os.path.dirname(document.Location.replace("file://","")))
     logfile = os.path.join(maindir, 'bsg-dispatcher-debug.log')
     sys.stdout = open(logfile, "a", 0)  # unbuffered
 
