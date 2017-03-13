@@ -87,7 +87,7 @@ class GeekMail(object):
         data = urlencode({'lasturl': '/', 'username': self.username, 'password': self.password, 'B1': 'Submit'})
         response = self.opener.open(self.loginurl, data.encode())
         content = response.read()
-        if "Invalid Username" in content:
+        if b"Invalid Username" in content:
             raise Exception('Invalid user or password! Please check')
         # if 'bggusername' not in response.headers['set-cookie']:  # invalid user
         #     raise Exception('Invalid user or password! Please check')
