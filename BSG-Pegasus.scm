@@ -264,7 +264,7 @@
 				7 1 7 7 7 7 4 2 8 2 8 
 				5 4 9 
 				10 38 12 12 12 1 8 9
-				2 5 30 6 1 
+				2 5 33 6 1
 				7 6 7 4 4 
 				12 14 6 6 32 6 
 				10 2 7 7 7 7
@@ -803,13 +803,13 @@
 						)
 						(set! voffset (quotient specialcnt 2))
 						(set! specoff 0)
-						(while (< specoff 8)
+						(while (< specoff 11)
 							(when (string=5? (car (gimp-layer-get-name (vector-ref mylayers (+ c_specpos specoff)))) (car myvalues))
 								(begin
 									(gimp-drawable-set-visible (vector-ref mylayers (+ c_specpos specoff)) TRUE)
 									(gimp-layer-translate (vector-ref mylayers (+ c_specpos specoff)) (* hoffset 700) (* voffset 36))
 									(set! specialcnt (++ specialcnt))
-									(set! specoff 8)
+									(set! specoff 11)
 								)
 							) ;when
 							(set! specoff (++ specoff))
