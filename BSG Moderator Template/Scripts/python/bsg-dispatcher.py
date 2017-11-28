@@ -249,7 +249,7 @@ def dispatcher_call(*args):
     document = XSCRIPTCONTEXT.getDocument()
     maindir = urllib2.url2pathname(os.path.dirname(document.Location.replace("file://","")))
     logfile = os.path.join(maindir, 'bsg-dispatcher-debug.log')
-    sys.stdout = open(logfile, "a", 0)  # unbuffered
+    sys.stdout = open(logfile, "ab", 0)  # unbuffered
 
     # Useful variables so we don't need to do a lot of typing
     worksheet = document.getSheets().getByName('Game State')
