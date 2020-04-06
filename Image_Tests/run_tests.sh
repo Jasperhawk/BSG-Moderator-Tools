@@ -6,6 +6,7 @@ IFS='
 '
 
 mkdir -p results
+rm -f results/*jpg
 cd data
 for x in *csv; do
    fullname=$(readlink -f "$x")
