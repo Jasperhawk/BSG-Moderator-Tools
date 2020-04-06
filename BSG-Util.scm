@@ -35,6 +35,43 @@
 (define (++ srcval) (let* ()(+ srcval 1)))
 (define (-- srcval) (let* ()(- srcval 1)))
 
+; This reads either the next string, or the rest of the line as a scheme symbol
+; This is to work around the changes to how the "read" builtin handles the " deliminator
+; between tinyscheme 1.40 and 1.41, which breaks the assumptions in getcvsline and
+; causes it to fail with gimp 2.10
+(define (readstringorsymbol in)
+(let*
+   (
+      (valuelst '())
+      (templst '())
+      (tempstr nil)
+      (symbolstr nil)
+      (nextitem nil)
+   )
+   (set! nextitem (read in))
+   (if (and (symbol? (list-ref nextitem 1)) (not (char-ci=? (peek-char in) #\newline)))
+      (begin
+          ; We have a symbol, but we didn't read to the newline, so we have to create
+          ; a symbol with the rest of the line
+          (while (not (char-ci=? (peek-char in) #\newline))
+             (set! templst (append templst (list (read-char in))))
+          ) ; while
+          (set! tempstr (list->string templst))
+          (set! symbolstr (symbol->string (list-ref nextitem 1)))
+          (set! symbolstr (string-append symbolstr tempstr))
+          (set! valuelst (append valuelst (list (list-ref nextitem 0))))
+          (set! valuelst (append valuelst (list (string->symbol symbolstr))))
+      )
+      (begin
+         ; else we just return the read results
+         (set! valuelst nextitem)
+      )
+  ) ; if
+  (set! valuelst valuelst)
+) ; let
+) ; define
+
+
 ; Reading from the csv is a strange process.  Each line will start with a string.  The first string of the first line should have
 ; already been read when this is called.  each call of this reads everyhing after the first string and builds it in a list (A), then 
 ; reads the first string of the next line (B) and returns a list comprising ((A) (B)).
@@ -56,7 +93,7 @@
 		(logflag FALSE)
 		(havenexttok nil)
 	)
-	(set! nextitem (read in))
+	(set! nextitem (readstringorsymbol in))
 	(set! valuelst '())
 	(while (not (or (string? nextitem) (eof-object? nextitem)))
 		(set! havenexttok FALSE)
