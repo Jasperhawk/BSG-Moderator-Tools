@@ -443,6 +443,15 @@ sub Board_SetSpecial (effect as string)
 			case &quot;The Guardians&quot;
 				offseth = 7
 				offsetv = -4
+			case &quot;Lockdown&quot;
+				offseth = 7
+				offsetv = -6
+			case &quot;Hornet&apos;s Nest&quot;
+				offseth = 7
+				offsetv = -7
+			case &quot;Event Horizon&quot;
+				offseth = 7
+				offsetv = -2
 			case else
 				foundeffect = FALSE
 		end select
@@ -516,7 +525,31 @@ sub Board_ClearSpecial (which as string)
 				LogThis &quot;Special: The Guardians are no longer in effect.&quot;
 			end if
 		end if
-		
+		if BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-6).String &lt;&gt; &quot;&quot; then
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-6).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-6).CellBackColor = _white
+			if which &lt;&gt; &quot;All&quot; then
+				MsgBox &quot;Special: Lockdown is no longer in effect.&quot;
+				LogThis &quot;Special: Lockdown is no longer in effect.&quot;
+			end if
+		end if
+		if BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-7).String &lt;&gt; &quot;&quot; then
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-7).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-7).CellBackColor = _white
+			if which &lt;&gt; &quot;All&quot; then
+				MsgBox &quot;Special: Hornet&apos;s Nest is no longer in effect.&quot;
+				LogThis &quot;Special: Hornet&apos;s Nest is no longer in effect.&quot;
+			end if
+		end if
+		if BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-2).String &lt;&gt; &quot;&quot; then
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-2).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-2).CellBackColor = _white
+			if which &lt;&gt; &quot;All&quot; then
+				MsgBox &quot;Special: Event Horizon is no longer in effect.&quot;
+				LogThis &quot;Special: Event Horizon is no longer in effect.&quot;
+			end if
+		end if
+
 		if which = &quot;All&quot; then
 			BoardSheet.GetCellByPosition(_DetectorCol,_DetectorRow).String = &quot;&quot;
 			BoardSheet.GetCellByPosition(_DetectorCol,_DetectorRow).CellBackColor = _white
@@ -562,6 +595,20 @@ sub Board_ClearSpecial (which as string)
 			BoardSheet.GetCellByPosition(_SpecialsCol,_SpecialsRow-4).CellBackColor = _white
 			MsgBox &quot;Special: Dogfight is no longer in effect.&quot;
 			LogThis &quot;Special: Dogfight is no longer in effect.&quot;
+		end if
+	elseif which = &quot;Lockdown&quot; then
+		if BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-6).String &lt;&gt; &quot;&quot; then
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-6).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-6).CellBackColor = _white
+			MsgBox &quot;Special: Lockdown is no longer in effect.&quot;
+			LogThis &quot;Special: Lockdown is no longer in effect.&quot;
+		end if
+	elseif which = &quot;Hornet&apos;s Nest&quot; then
+		if BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-7).String &lt;&gt; &quot;&quot; then
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-7).String = &quot;&quot;
+			BoardSheet.GetCellByPosition(_SpecialsCol+7,_SpecialsRow-7).CellBackColor = _white
+			MsgBox &quot;Special: Hornet&apos;s Nest is no longer in effect.&quot;
+			LogThis &quot;Special: Hornet&apos;s Nest is no longer in effect.&quot;
 		end if
 	end if
 end sub

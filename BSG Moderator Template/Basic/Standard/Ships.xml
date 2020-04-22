@@ -841,9 +841,13 @@ sub SetShipStatus (shiptype, shipid, ByVal targetstatus, optional seldamage as s
 			exit sub
 		elseif targetstatus = _ShipStatusDestroyed then
 			Board_ClearSpecial(&quot;Thirty-Three&quot;)
+			Board_ClearSpecial(&quot;Lockdown&quot;)
+			Board_ClearSpecial(&quot;Hornet&apos;s Nest&quot;)
 			targetstatus = _ShipStatusOffBoard
 		elseif targetstatus = _ShipStatusRemoved then
 			Board_ClearSpecial(&quot;Thirty-Three&quot;)
+			Board_ClearSpecial(&quot;Lockdown&quot;)
+			Board_ClearSpecial(&quot;Hornet&apos;s Nest&quot;)
 			targetstatus = _ShipStatusDestroyed
 		end if
 	end if
@@ -932,6 +936,10 @@ sub SetShipStatus (shiptype, shipid, ByVal targetstatus, optional seldamage as s
 			end if
 			if shiptype =_ShipCivilian or shiptype =_ShipBasestar then
 				Board_ClearSpecial(&quot;Thirty-Three&quot;)
+			    if shiptype =_ShipBasestar then
+			        Board_ClearSpecial(&quot;Lockdown&quot;)
+			        Board_ClearSpecial(&quot;Hornet&apos;s Nest&quot;)
+			     end if
 			end if
 		else
 			ShipSheet.GetCellByPosition(ShipCol(ShipType, _ShipColDestroyed), ShipRow(ShipType) + ShipID).string = &quot;&quot;
